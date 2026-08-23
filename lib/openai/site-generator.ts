@@ -3,14 +3,16 @@ import OpenAI from "openai";
 import { z } from "zod";
 import { ensureEditingMetadata, validateNodePatch, validateProjectSource } from "@/lib/cafe24/protection";
 import { buildDesignGenerationUserPrompt, validateGeneratedDesignContract, type DesignGenerationInput } from "@/lib/openai/design-generation-contract";
+import { composeDesignBlueprint } from "@/lib/design-library/blueprint";
+import { HERO_VARIANT_IDS } from "@/lib/design-library/variants";
 import { writeGenerationTrace, type GenerationTrace } from "@/lib/openai/dev-trace";
 import type { ProjectSource } from "@/lib/project-source";
 
 const architectureSchema = z.object({
   header: z.enum(["split-utility", "centered-brand", "overlay-minimal"]),
-  hero: z.enum(["full-bleed", "split-editorial"]),
+  hero: z.enum(HERO_VARIANT_IDS),
   sections: z.array(z.string().min(2)).min(2).max(20),
-  productPresentation: z.enum(["grid-four", "large-grid"]),
+  productPresentation: z.enum(["grid-four", "large-grid", "editorial-two", "featured-grid", "compact-five"] as const),
   typography: z.string().min(3),
   footer: z.string().min(3),
 });
@@ -49,9 +51,9 @@ const architectureJsonSchema = {
   required: ["header", "hero", "sections", "productPresentation", "typography", "footer"],
   properties: {
     header: { type: "string", enum: ["split-utility", "centered-brand", "overlay-minimal"] },
-    hero: { type: "string", enum: ["full-bleed", "split-editorial"] },
+    hero: { type: "string", enum: [...HERO_VARIANT_IDS] },
     sections: { type: "array", minItems: 2, maxItems: 20, items: { type: "string" } },
-    productPresentation: { type: "string", enum: ["grid-four", "large-grid"] }, typography: { type: "string" }, footer: { type: "string" },
+    productPresentation: { type: "string", enum: ["grid-four", "large-grid", "editorial-two", "featured-grid", "compact-five"] }, typography: { type: "string" }, footer: { type: "string" },
   },
 } as const;
 
@@ -86,7 +88,9 @@ const nodeEditJsonSchema = {
 
 const systemPrompt = `You are the autonomous art director and frontend designer for a Korean Cafe24 storefront.
 
-Your primary output is the ACTUAL semantic HTML and CSS that will be stored, previewed, edited, and published. There is no section AST, component renderer, template, variant library, or predetermined page skeleton after your response. The architecture summary is audit metadata only and never renders the page.
+Your primary output is the ACTUAL semantic HTML and CSS that will be stored, previewed, edited, and published. There is no section AST, component renderer, template, or predetermined page skeleton after your response. The architecture summary is audit metadata only and never renders the page.
+
+The user message contains a binding DESIGN BLUEPRINT composed from real Cafe24 reference patterns: one hero variant, an ordered section plan, and density/typography/image-treatment axes. Build exactly that structure — do not add, drop, or reorder sections — and spend your creativity on copy, palette, imagery, proportion, and detail within it. Two briefs with different blueprints must produce structurally different pages, not recolored copies.
 
 COMMERCE FIRST
 - This is a real storefront whose job is conversion, not a one-screen brand landing page. Build a complete journey from brand promise to product discovery to trust and a clear next action.
@@ -97,16 +101,16 @@ COMMERCE FIRST
 
 REFERENCE-DERIVED DESIGN GRAMMAR
 - Derive a genuinely project-specific page architecture from the brief and assets. The AI-owned canvas starts after fixed HeaderV1 and includes Hero, Category/Collection expression, product surroundings, Brand Story, editorial imagery, Benefit/Trust, Banner/CTA, social-style gallery, and an optional short brand closing. It never includes Cafe24 function DOM.
-- Hero must be either a committed full-bleed composition or a purposeful split-editorial composition. Vary crop, focal point, text anchoring, layering, and vertical rhythm instead of merely swapping colours.
+- Hero must follow the blueprint's hero variant. The library spans a committed full-bleed composition, a purposeful split-editorial composition, a banner-stack board, a typographic-marquee statement, a cinematic-still, and a product-forward compact banner; build the one the blueprint names to its structural spec. Vary crop, focal point, text anchoring, layering, and vertical rhythm instead of merely swapping colours.
 - The product surroundings may feel commerce-forward and dense or editorial and spacious, but ProductSectionV1 itself remains untouched.
 - Brand Story should use split-media or a strong editorial composition, not another generic card row.
 - Category, CTA, Benefit/Trust, gallery, and editorial sections are optional. Select and order them according to industry, buying intent, available imagery, and brand voice.
 - Avoid a page whose hero is polished but everything below becomes repeated equal cards. Alternate composition, scale, image/text relationships, and background rhythm while keeping one coherent design language.
 - Before writing HTML, commit to headerVariant, heroComposition, productLayout, section order/selection, typography scale, image treatment, spacing/density, and content composition. Do not return vague labels such as modern, premium, or clean by themselves.
-- Encode the deterministic choices in the existing architecture object exactly: header = split-utility | centered-brand | overlay-minimal, hero = full-bleed | split-editorial, productPresentation = grid-four | large-grid. architecture.sections is the actual ordered section plan and must vary with the brief.
+- Encode the deterministic choices in the existing architecture object exactly: header = split-utility | centered-brand | overlay-minimal, hero = the blueprint's hero variant id (full-bleed | split-editorial | banner-stack | typographic-marquee | cinematic-still | product-forward), productPresentation = the blueprint's presentation id (grid-four | large-grid | editorial-two | featured-grid | compact-five). architecture.sections is the actual ordered section plan and must record the blueprint's section refs in order.
 - A materially different brief must produce visibly different decisions across those six axes, not a recoloured copy of the same page.
 - Keep decoration subordinate to product discovery and purchase flow. Use effects sparingly and preserve scanability, readable contrast, and obvious actions.
-- The product cards use the verified four-column desktop, three-column tablet, and two-column mobile layout. Express the brief through the surrounding section rather than changing the product grid.
+- The product cards render through the verified presentation named by the blueprint (standard four-column, large three-column, editorial two-column, featured-plus-grid, or compact five-column, each with its own crop, density, and mobile reflow owned by code). Express the brief through the surrounding section rather than authoring card CSS.
 - Use semantic main, section/article, and optional brand-level footer markup. Every desktop composition must define a deliberate mobile stack/reflow; preserve content order, crop focal points, touch spacing, and readable type. Do not return Tailwind classes or JavaScript.
 
 CAFE24 BASE-SKIN CONTRACT
@@ -154,8 +158,22 @@ function responseTrace(response: { id: string; model: string; output_text: strin
 export async function generateProjectSource(input: DesignGenerationInput) {
   const traceId = crypto.randomUUID();
   const createdAt = new Date().toISOString();
-  const userPrompt = buildDesignGenerationUserPrompt(input);
-  const trace: GenerationTrace = { traceId, kind: "generate", createdAt, request: { model: model(), systemPrompt, userPrompt, imageCount: input.assetUrls?.length ?? 0 }, response: [] };
+  const blueprint = composeDesignBlueprint(input, input.seed);
+  const userPrompt = buildDesignGenerationUserPrompt(input, blueprint);
+  const blueprintAudit = {
+    industry: blueprint.industry,
+    flowId: blueprint.flowId,
+    header: blueprint.header.id,
+    hero: blueprint.hero.id,
+    productPresentation: blueprint.productPresentation.id,
+    sections: blueprint.sections.map((section) => section.ref),
+    footerMood: blueprint.footerMood,
+    density: blueprint.density,
+    typeScale: blueprint.typeScale,
+    imageTreatment: blueprint.imageTreatment,
+    seed: blueprint.seed,
+  };
+  const trace: GenerationTrace = { traceId, kind: "generate", createdAt, request: { model: model(), systemPrompt, userPrompt, blueprint: blueprintAudit, imageCount: input.assetUrls?.length ?? 0 }, response: [] };
   let previousIssues: string[] = [];
 
   try {
@@ -179,7 +197,7 @@ export async function generateProjectSource(input: DesignGenerationInput) {
       const css = resolveAssetReferences(parsed.css, input.assetUrls ?? []);
       const source: ProjectSource = { id: projectId, name: parsed.name, html, css, architecture: parsed.architecture, commerce: parsed.commerce, updatedAt: new Date().toISOString() };
       const baseValidator = validateProjectSource(source);
-      const designViolations = validateGeneratedDesignContract(source);
+      const designViolations = validateGeneratedDesignContract(source, blueprint);
       const validator = {
         ...baseValidator,
         safe: baseValidator.safe && designViolations.length === 0,
@@ -190,7 +208,7 @@ export async function generateProjectSource(input: DesignGenerationInput) {
         trace.generated = source;
         trace.validator = validator;
         await writeGenerationTrace(trace);
-        return { source, rationale: parsed.designRationale, traceId, validator };
+        return { source, rationale: parsed.designRationale, traceId, validator, blueprint: blueprintAudit };
       }
       previousIssues = validator.violations.map((item) => `${item.code}: ${item.message}${item.token ? ` (${item.token})` : ""}`).slice(0, 24);
     }

@@ -8,7 +8,7 @@ import { renderComponent } from "../component-library/renderer.ts";
 
 export type CommerceVariant = "minimal" | "editorial" | "bold";
 export type HeaderVariant = "split-utility" | "centered-brand" | "overlay-minimal";
-export type ProductLayout = "grid-four" | "large-grid";
+export type ProductLayout = "grid-four" | "large-grid" | "editorial-two" | "featured-grid" | "compact-five";
 export type LegacyComposition = { headerVariant: HeaderVariant; productLayout: ProductLayout };
 
 /** AI가 정할 수 있는 값은 전부 스타일입니다. 구조를 바꾸는 값은 받지 않습니다. */
@@ -49,7 +49,7 @@ const DEFAULTS = {
 };
 
 const HEADER_VARIANTS = new Set<HeaderVariant>(["split-utility", "centered-brand", "overlay-minimal"]);
-const PRODUCT_LAYOUTS = new Set<ProductLayout>(["grid-four", "large-grid"]);
+const PRODUCT_LAYOUTS = new Set<ProductLayout>(["grid-four", "large-grid", "editorial-two", "featured-grid", "compact-five"]);
 
 export function resolveLegacyComposition(architecture?: { header?: string; productPresentation?: string }): LegacyComposition {
   const headerVariant = HEADER_VARIANTS.has(architecture?.header as HeaderVariant) ? architecture?.header as HeaderVariant : "split-utility";
@@ -136,21 +136,31 @@ export function commerceCss(tokens: CommerceTokens = {}, headerVariant: HeaderVa
 .pocHeader__util{display:flex;align-items:center;gap:18px}
 .pocHeader__state{display:flex;align-items:center;gap:18px}
 .pocHeader__item{display:inline-flex;align-items:center;font:600 12px/1 ${t.fontFamily};letter-spacing:.06em;color:inherit;text-decoration:none;white-space:nowrap;background:none;border:0;padding:0;cursor:pointer}
+/* split-utility: compact single row — 낮은 헤더, 작은 로고, 촘촘한 한 줄 */
 .pocHeader--split-utility .pocHeader__logo{order:1}
 .pocHeader--split-utility .pocHeader__category{order:2}
 .pocHeader--split-utility .pocHeader__util{order:3}
-.pocHeader--centered-brand .pocHeader__inner{display:grid;grid-template-columns:1fr auto 1fr;grid-template-areas:"category logo utility";gap:24px}
+.pocHeader--split-utility .pocHeader__inner{padding:12px 0;gap:28px}
+.pocHeader--split-utility .pocHeader__logo img{height:22px}
+.pocHeader--split-utility .pocHeader__categoryList a{font-size:12px}
+/* centered-brand: large brand row + separate nav row — 큰 로고 행 아래 내비 행 분리 */
+.pocHeader--centered-brand .pocHeader__inner{display:grid;grid-template-columns:1fr auto 1fr;grid-template-areas:". logo utility" "category category category";gap:24px;row-gap:16px;padding:26px 0 14px}
 .pocHeader--centered-brand .pocHeader__logo{grid-area:logo;justify-self:center}
-.pocHeader--centered-brand .pocHeader__category{grid-area:category;justify-self:start}
-.pocHeader--centered-brand .pocHeader__util{grid-area:utility;justify-self:end}
+.pocHeader--centered-brand .pocHeader__logo img{height:34px}
+.pocHeader--centered-brand .pocHeader__category{grid-area:category;justify-self:center}
+.pocHeader--centered-brand .pocHeader__categoryList{gap:26px}
+.pocHeader--centered-brand .pocHeader__util{grid-area:utility;justify-self:end;align-self:center}
+/* overlay-minimal: Hero 위 투명 오버레이 — 넉넉한 상단 여백, 넓은 자간 */
 #header.pocHeader--overlay-minimal{position:absolute;inset:0 0 auto;background:transparent;color:${t.ink}}
-.pocHeader--overlay-minimal .pocHeader__inner{display:grid;grid-template-columns:1fr auto 1fr;gap:24px}
+.pocHeader--overlay-minimal .pocHeader__inner{display:grid;grid-template-columns:1fr auto 1fr;gap:24px;padding:30px 0}
 .pocHeader--overlay-minimal .pocHeader__logo{grid-column:2;justify-self:center}
+.pocHeader--overlay-minimal .pocHeader__logo img{height:30px}
 .pocHeader--overlay-minimal .pocHeader__category{grid-column:1;grid-row:1;justify-self:start}
 .pocHeader--overlay-minimal .pocHeader__util{grid-column:3;grid-row:1;justify-self:end}
+.pocHeader--overlay-minimal .pocHeader__item,.pocHeader--overlay-minimal .pocHeader__categoryList a{letter-spacing:.12em}
 ${VARIANT_CSS[t.variant] ?? ""}
 @media (max-width:1024px){.pocHeader__inner{width:calc(100% - 48px)}}
-@media (max-width:767px){.pocHeader__inner{width:calc(100% - 40px);gap:16px}.pocHeader__category{display:none}.pocHeader--centered-brand .pocHeader__inner,.pocHeader--overlay-minimal .pocHeader__inner{grid-template-columns:1fr auto}.pocHeader--centered-brand .pocHeader__logo,.pocHeader--overlay-minimal .pocHeader__logo{grid-column:1;justify-self:start}.pocHeader--centered-brand .pocHeader__util,.pocHeader--overlay-minimal .pocHeader__util{grid-column:2;justify-self:end}.pocHeader__order,.pocHeader__state{display:none}}
+@media (max-width:767px){.pocHeader__inner{width:calc(100% - 40px);gap:16px}.pocHeader__category{display:none}.pocHeader--centered-brand .pocHeader__inner,.pocHeader--overlay-minimal .pocHeader__inner{grid-template-columns:1fr auto}.pocHeader--centered-brand .pocHeader__inner{grid-template-areas:"logo utility";row-gap:0;padding:16px 0}.pocHeader--centered-brand .pocHeader__logo img{height:26px}.pocHeader--centered-brand .pocHeader__logo,.pocHeader--overlay-minimal .pocHeader__logo{grid-column:1;justify-self:start}.pocHeader--centered-brand .pocHeader__util,.pocHeader--overlay-minimal .pocHeader__util{grid-column:2;justify-self:end}.pocHeader__order,.pocHeader__state{display:none}}
 `;
 }
 
@@ -161,19 +171,77 @@ function stronglyScopeProductCss(css: string) {
   )).join("\n");
 }
 
+/** verified 선언 뒤층에서만 쓰는 presentation 선택자 prefix입니다. */
+const P = "[data-moire-root] [data-cafe24-slot] .moireProductSection.ec-base-product";
+
+/**
+ * Presentation variant별 CSS 뒤층입니다. golden DOM/module/변수 계약은 그대로 두고
+ * 반복 폭·이미지 비율·밀도·정렬·모바일 reflow만 재선언합니다.
+ * 이미지 소스 정책: Guide skin4/17/18의 상품 진열에서 검증된 리스트 이미지 변수는
+ * {$image_medium}뿐이므로({$image_tiny}는 board/myshop 전용, big/small은 미존재)
+ * 큰 카드를 쓰는 variant는 변수 교체 대신 카드 콘텐츠 폭 캡으로 확대를 막습니다.
+ */
+const PRODUCT_LAYOUT_CSS: Record<Exclude<ProductLayout, "grid-four">, string> = {
+  "large-grid": `/* ProductSectionV1/large-grid: PC 3열, 4/5 크롭, 넉넉한 간격의 라이프스타일 진열 */
+${P} .prdList > li{width:33.3333%}
+@media all and (min-width:768px) and (max-width:1024px){${P} .prdList > li{width:50%}}
+@media all and (max-width:767px){${P} .prdList > li{width:50%}}
+${P} .prdList{margin:0 -14px}
+${P} .prdList > li{margin:0 0 52px}
+${P} .prdList .prdList__item{margin:0 14px}
+${P} .prdList .thumbnail a{display:block;overflow:hidden;aspect-ratio:4/5}
+${P} .prdList .thumbnail a img{height:100%;object-fit:cover}
+${P} .prdList .description .name a{font-size:14px}`,
+  "editorial-two": `/* ProductSectionV1/editorial-two: 2열 대형 카드, 3/4 크롭, 중앙 정렬 타이포, 좁은 section 폭 */
+${P}{max-width:1040px}
+${P} .prdList > li{width:50%;margin:0 0 76px}
+${P} .prdList .prdList__item{margin:0 auto;max-width:500px}
+${P} .prdList .thumbnail a{display:block;overflow:hidden;aspect-ratio:3/4}
+${P} .prdList .thumbnail a img{height:100%;object-fit:cover}
+${P} .prdList .description{margin:24px 0 0;text-align:center}
+${P} .prdList .description .name{text-align:center}
+${P} .prdList .description .name a{font-size:15px;letter-spacing:.01em}
+${P} .spec{margin:10px 0 0}
+${P} .spec > li{margin:0 0 6px;text-align:center}
+${P} .prdList .icon{text-align:center}
+@media all and (min-width:768px) and (max-width:1024px){${P} .prdList > li{width:50%}}
+@media all and (max-width:767px){${P} .prdList > li{width:100%;margin:0 0 56px}${P} .prdList .prdList__item{max-width:420px}}`,
+  "featured-grid": `/* ProductSectionV1/featured-grid: 첫 상품을 4/5 대형 피처로, 나머지는 1/1 그리드로 */
+${P} .prdList > li{width:25%;margin:0 0 40px}
+${P} .prdList > li:first-child{width:50%}
+${P} .prdList > li:first-child .prdList__item{max-width:540px}
+${P} .prdList .thumbnail a{display:block;overflow:hidden;aspect-ratio:1/1}
+${P} .prdList > li:first-child .thumbnail a{aspect-ratio:4/5}
+${P} .prdList .thumbnail a img{height:100%;object-fit:cover}
+${P} .prdList > li:first-child .description .name a{font-size:15px}
+@media all and (min-width:768px) and (max-width:1024px){${P} .prdList > li{width:50%}${P} .prdList > li:first-child{width:100%}${P} .prdList > li:first-child .prdList__item{margin-left:auto;margin-right:auto;max-width:520px}}
+@media all and (max-width:767px){${P} .prdList > li{width:50%}${P} .prdList > li:first-child{width:100%}${P} .prdList > li:first-child .prdList__item{margin-left:auto;margin-right:auto;max-width:420px}}`,
+  "compact-five": `/* ProductSectionV1/compact-five: 5열 컴팩트, 1/1 크롭, 타이트한 정보 밀도, 넓은 section 폭 */
+${P}{max-width:1440px}
+${P} .prdList{margin:0 -6px}
+${P} .prdList > li{width:20%;margin:0 0 20px}
+${P} .prdList .prdList__item{margin:0 6px}
+${P} .prdList .thumbnail{margin:0 0 8px}
+${P} .prdList .thumbnail a{display:block;overflow:hidden;aspect-ratio:1/1}
+${P} .prdList .thumbnail a img{height:100%;object-fit:cover}
+${P} .prdList .description{margin:12px 8px 0 0;font-size:11px;line-height:16px}
+${P} .prdList .description .name a{font-size:12px}
+${P} .spec{margin:6px 0 0}
+${P} .spec > li{margin:0 0 6px;line-height:16px}
+${P} .prdList .icon{margin:8px 0 0}
+@media all and (min-width:768px) and (max-width:1024px){${P} .prdList > li{width:25%}}
+@media all and (max-width:767px){${P} .prdList{margin:0 -4px}${P} .prdList > li{width:50%;margin:0 0 16px}${P} .prdList .prdList__item{margin:0 4px}}`,
+};
+
 /** AI CSS와 Guide bridge보다 뒤에서 golden 선언을 같은 값으로 재확정합니다. */
 export function verifiedProductLayoutCss(layout: ProductLayout = "grid-four") {
   if (!PRODUCT_LAYOUTS.has(layout)) throw new Error(`지원하지 않는 Product layout입니다: ${layout}`);
-  const contentContract = `[data-moire-root] [data-cafe24-slot] .moireProductSection.ec-base-product{box-sizing:border-box;width:calc(100% - 64px);max-width:1280px;margin-left:auto;margin-right:auto}
-@media all and (max-width:1024px){[data-moire-root] [data-cafe24-slot] .moireProductSection.ec-base-product{width:calc(100% - 48px)}}
-@media all and (max-width:767px){[data-moire-root] [data-cafe24-slot] .moireProductSection.ec-base-product{width:calc(100% - 40px)}}`;
+  const contentContract = `${P}{box-sizing:border-box;width:calc(100% - 64px);max-width:1280px;margin-left:auto;margin-right:auto}
+@media all and (max-width:1024px){${P}{width:calc(100% - 48px)}}
+@media all and (max-width:767px){${P}{width:calc(100% - 40px)}}`;
   const canonical = `${stronglyScopeProductCss(renderVerifiedProductSection("preview").css)}\n${contentContract}`;
   if (layout === "grid-four") return canonical;
-  return `${canonical}
-/* ProductSectionV1/large-grid: DOM 계약은 그대로 두고 반복 폭만 확장합니다. */
-[data-moire-root] [data-cafe24-slot] .moireProductSection.ec-base-product .prdList > li{width:33.3333%}
-@media all and (min-width:768px) and (max-width:1024px){[data-moire-root] [data-cafe24-slot] .moireProductSection.ec-base-product .prdList > li{width:50%}}
-@media all and (max-width:767px){[data-moire-root] [data-cafe24-slot] .moireProductSection.ec-base-product .prdList > li{width:50%}}`;
+  return `${canonical}\n${PRODUCT_LAYOUT_CSS[layout]}`;
 }
 
 function normalizeResponsiveDesignCss(css: string) {

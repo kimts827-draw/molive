@@ -163,3 +163,45 @@ test("Legacy commerce CSS는 HeaderV1만 담당하고 기존 ProductGrid 선택�
   assert.equal(css.includes(".pocGrid"), false);
   assert.equal(css.includes("undefined"), false);
 });
+
+test("editorial-two·featured-grid·compact-five presentation은 golden DOM을 바꾸지 않고 CSS 뒤층만 바꾼다", () => {
+  const editorial = verifiedProductLayoutCss("editorial-two");
+  assert.match(editorial, /\.ec-base-product\{max-width:1040px\}/);
+  assert.match(editorial, /prdList > li\{width:50%;margin:0 0 76px\}/);
+  assert.match(editorial, /aspect-ratio:3\/4/);
+  assert.match(editorial, /prdList__item\{margin:0 auto;max-width:500px\}/);
+  assert.match(editorial, /text-align:center/);
+  assert.match(editorial, /max-width:767px[^{]*\{[^{]*prdList > li\{width:100%/);
+
+  const featured = verifiedProductLayoutCss("featured-grid");
+  assert.match(featured, /prdList > li:first-child\{width:50%\}/);
+  assert.match(featured, /li:first-child \.prdList__item\{max-width:540px\}/);
+  assert.match(featured, /li:first-child \.thumbnail a\{aspect-ratio:4\/5\}/);
+  assert.match(featured, /thumbnail a\{display:block;overflow:hidden;aspect-ratio:1\/1\}/);
+
+  const compact = verifiedProductLayoutCss("compact-five");
+  assert.match(compact, /\.ec-base-product\{max-width:1440px\}/);
+  assert.match(compact, /prdList > li\{width:20%;margin:0 0 20px\}/);
+  assert.match(compact, /aspect-ratio:1\/1/);
+  assert.match(compact, /description\{margin:12px 8px 0 0;font-size:11px/);
+  assert.match(compact, /min-width:768px[^{]*\{[^{]*prdList > li\{width:25%\}/);
+
+  // 어떤 presentation도 canonical 선언 재확정과 golden DOM을 유지한다.
+  for (const css of [editorial, featured, compact]) {
+    assert.match(css, /prdList > li \{ display: inline-block; width: 25%/);
+  }
+  assert.equal(renderVerifiedProductSection("cafe24").html, canonicalProductSection);
+});
+
+test("HeaderV1 3 variant는 정렬 차이가 아니라 행 구조·높이·로고 스케일이 다르다", () => {
+  const css = commerceCss();
+  assert.match(css, /pocHeader--split-utility \.pocHeader__inner\{padding:12px 0;gap:28px\}/);
+  assert.match(css, /pocHeader--split-utility \.pocHeader__logo img\{height:22px\}/);
+  assert.match(css, /pocHeader--centered-brand[^}]*grid-template-areas:"\. logo utility" "category category category"/);
+  assert.match(css, /pocHeader--centered-brand \.pocHeader__logo img\{height:34px\}/);
+  assert.match(css, /pocHeader--centered-brand \.pocHeader__category\{grid-area:category;justify-self:center\}/);
+  assert.match(css, /pocHeader--overlay-minimal \.pocHeader__inner\{[^}]*padding:30px 0\}/);
+  assert.match(css, /pocHeader--overlay-minimal \.pocHeader__logo img\{height:30px\}/);
+  // 모바일에서 centered-brand는 한 행으로 접힌다.
+  assert.match(css, /max-width:767px[\s\S]*?grid-template-areas:"logo utility"/);
+});

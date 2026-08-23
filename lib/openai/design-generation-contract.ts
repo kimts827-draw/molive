@@ -1,4 +1,6 @@
 import type { SafetyViolation } from "../cafe24/protection.ts";
+import { renderBlueprintContract, type DesignBlueprint } from "../design-library/blueprint.ts";
+import { HERO_VARIANT_IDS } from "../design-library/variants.ts";
 
 export type DesignGenerationInput = {
   prompt: string;
@@ -6,9 +8,12 @@ export type DesignGenerationInput = {
   colors?: string[];
   assetUrls?: string[];
   assetRoles?: string[];
+  /** blueprint 조합을 결정적으로 만들 때만 씁니다(테스트/스크립트용). */
+  seed?: number;
 };
 
-export function buildDesignGenerationUserPrompt(input: DesignGenerationInput) {
+export function buildDesignGenerationUserPrompt(input: DesignGenerationInput, blueprint?: DesignBlueprint) {
+  const heroChoices = blueprint ? blueprint.hero.id : HERO_VARIANT_IDS.join(" | ");
   return `Design a complete Cafe24 storefront from first principles.
 Brand: ${input.brandName?.trim() || "Not specified"}
 Creative brief: ${input.prompt}
@@ -17,7 +22,7 @@ Attached image count: ${(input.assetUrls ?? []).length}
 Attachment roles in order: ${(input.assetRoles ?? []).join(", ") || "Not labelled"}
 Use attachments only through asset:// followed by the zero-based attachment index.
 
-Before coding, make coupled decisions and record them concretely in designRationale and the existing architecture fields: headerVariant (split-utility | centered-brand | overlay-minimal), heroComposition (full-bleed | split-editorial), productLayout (grid-four | large-grid), section order and selection, typography scale, image treatment, spacing/density, and content composition. Each decision must follow this brand and would be recognizably wrong for a materially different brand. Do not merely recolor a generic storefront. Then author the complete HTML and CSS.`;
+Before coding, make coupled decisions and record them concretely in designRationale and the existing architecture fields: headerVariant (split-utility | centered-brand | overlay-minimal), heroComposition (${heroChoices}), productLayout (grid-four | large-grid), section order and selection, typography scale, image treatment, spacing/density, and content composition. Each decision must follow this brand and would be recognizably wrong for a materially different brand. Do not merely recolor a generic storefront. Then author the complete HTML and CSS.${blueprint ? `\n\n${renderBlueprintContract(blueprint)}` : ""}`;
 }
 
 const PRODUCT_SELECTORS = [
@@ -39,8 +44,28 @@ function productSlotsAreEmpty(html: string, expectedCount: number) {
 }
 
 /** 일반 Legacy 문서가 아니라 새 AI 생성 draft에만 적용되는 품질·소유권 계약입니다. */
-export function validateGeneratedDesignContract(source: { html: string; css: string }): SafetyViolation[] {
+export function validateGeneratedDesignContract(
+  source: { html: string; css: string; architecture?: { hero?: string; header?: string; productPresentation?: string; sections?: string[] } },
+  blueprint?: DesignBlueprint,
+): SafetyViolation[] {
   const violations: SafetyViolation[] = [];
+
+  if (blueprint) {
+    if (source.architecture?.hero !== blueprint.hero.id) {
+      violations.push({ code: "BLUEPRINT_HERO_MISMATCH", message: `architecture.hero는 blueprint의 hero variant "${blueprint.hero.id}"를 그대로 기록해야 합니다.`, token: source.architecture?.hero });
+    }
+    if (source.architecture?.header !== blueprint.header.id) {
+      violations.push({ code: "BLUEPRINT_HEADER_MISMATCH", message: `architecture.header는 blueprint의 header 구조 "${blueprint.header.id}"를 그대로 기록해야 합니다.`, token: source.architecture?.header });
+    }
+    if (source.architecture?.productPresentation !== blueprint.productPresentation.id) {
+      violations.push({ code: "BLUEPRINT_PRODUCT_MISMATCH", message: `architecture.productPresentation은 blueprint의 진열 "${blueprint.productPresentation.id}"를 그대로 기록해야 합니다.`, token: source.architecture?.productPresentation });
+    }
+    const planned = blueprint.sections.length;
+    const recorded = source.architecture?.sections?.length ?? 0;
+    if (recorded < planned) {
+      violations.push({ code: "BLUEPRINT_SECTIONS_MISSING", message: `architecture.sections에는 blueprint의 섹션 계획 ${planned}개가 순서대로 기록되어야 합니다.` });
+    }
+  }
   const slots = [...source.html.matchAll(/data-cafe24-slot\s*=\s*["']product-list["']/gi)].length;
   const sections = [...source.html.matchAll(/<section\b/gi)].length;
 
