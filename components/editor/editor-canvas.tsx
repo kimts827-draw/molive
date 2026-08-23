@@ -15,12 +15,12 @@ type EditorCanvasProps = {
 const editorOverlayCss = `
 [data-moire-id]{cursor:pointer}
 [data-moire-id][data-moire-editor-selected="true"]{outline:2px solid #7357e8!important;outline-offset:-2px!important}
-[data-moire-id]:hover{outline:1px dashed rgba(115,87,232,.7);outline-offset:-1px}
+[data-moire-id][data-moire-editor-hovered="true"]{outline:1px dashed rgba(115,87,232,.7);outline-offset:-1px}
 `;
 
 const PREVIEW_VIEWPORTS = {
-  desktop: { width: 1440, height: 1000 },
-  tablet: { width: 1024, height: 900 },
+  desktop: { width: 1920, height: 1080 },
+  tablet: { width: 1024, height: 768 },
   mobile: { width: 390, height: 844 },
 } as const;
 
@@ -57,10 +57,30 @@ export function EditorCanvas({ source, selection, onSelect, viewport }: EditorCa
     overlay.dataset.moireEditorOverlay = "true";
     overlay.textContent = editorOverlayCss;
     document.head.appendChild(overlay);
+    let hoveredTarget: HTMLElement | null = null;
+    const resolvePointerTarget = (event: MouseEvent | PointerEvent) => {
+      const iframe = iframeRef.current;
+      const frameScale = iframe && iframe.offsetWidth > 0 ? iframe.getBoundingClientRect().width / iframe.offsetWidth : 1;
+      const eventTarget = event.target as Element | null;
+      const correctedTarget = frameScale > 0 && frameScale < 1
+        ? document.elementFromPoint(event.clientX / frameScale, event.clientY / frameScale)
+        : eventTarget;
+      return typeof correctedTarget?.closest === "function" ? correctedTarget.closest<HTMLElement>("[data-moire-id]") : null;
+    };
+    document.addEventListener("pointermove", (event) => {
+      const target = resolvePointerTarget(event);
+      if (target === hoveredTarget) return;
+      hoveredTarget?.removeAttribute("data-moire-editor-hovered");
+      target?.setAttribute("data-moire-editor-hovered", "true");
+      hoveredTarget = target;
+    }, { passive: true });
+    document.documentElement.addEventListener("pointerleave", () => {
+      hoveredTarget?.removeAttribute("data-moire-editor-hovered");
+      hoveredTarget = null;
+    });
     document.addEventListener("click", (event) => {
       event.preventDefault();
-      const eventTarget = event.target as Element | null;
-      const target = typeof eventTarget?.closest === "function" ? eventTarget.closest<HTMLElement>("[data-moire-id]") : null;
+      const target = resolvePointerTarget(event);
       if (!target?.dataset.moireId) return;
       onSelect({ id: target.dataset.moireId, type: target.dataset.moireType || "element", tagName: target.tagName.toLowerCase() });
     });
@@ -94,6 +114,10 @@ export function EditorCanvas({ source, selection, onSelect, viewport }: EditorCa
       <iframe
         ref={iframeRef}
         className={`project-source-frame viewport-${viewport}`}
+        width={previewViewport.width}
+        height={previewViewport.height}
+        data-preview-preset={viewport}
+        data-preview-scale={previewScale}
         style={{ width: previewViewport.width, height: previewViewport.height, transform: `scale(${previewScale})` }}
         title="Project Source 미리보기"
         sandbox="allow-same-origin"

@@ -42,11 +42,33 @@ test("component-spec Preview는 renderProject(spec, preview) RenderBundle을 그
   assert.equal(preview.srcDoc, expectedDocument(bundle.documentHtml, bundle.css));
 });
 
-test("Editor Preview는 표시 영역과 무관하게 Desktop 1440·Tablet 1024·Mobile 390 layout viewport를 유지한다", () => {
-  for (const contract of ["desktop: { width: 1440", "tablet: { width: 1024", "mobile: { width: 390", "transform: `scale(${previewScale})`"]) {
+test("Editor Preview는 표시 영역과 무관하게 preset별 실제 browser layout viewport를 유지한다", () => {
+  for (const contract of [
+    "desktop: { width: 1920, height: 1080 }",
+    "tablet: { width: 1024, height: 768 }",
+    "mobile: { width: 390, height: 844 }",
+    "width={previewViewport.width}",
+    "height={previewViewport.height}",
+    "transform: `scale(${previewScale})`",
+  ]) {
     assert.ok(editorCanvasSource.includes(contract), contract);
   }
   assert.ok(editorCanvasSource.includes("container.clientWidth / PREVIEW_VIEWPORTS[viewport].width"));
+});
+
+test("Editor Preview panel resize는 iframe viewport가 아니라 visual scale과 wrapper 크기만 변경한다", () => {
+  assert.ok(editorCanvasSource.includes("Math.min(1, container.clientWidth / PREVIEW_VIEWPORTS[viewport].width)"));
+  assert.ok(editorCanvasSource.includes("height: previewViewport.height * previewScale"));
+  assert.equal(editorCanvasSource.includes("zoom:"), false);
+});
+
+test("Editor selection과 overlay는 scaled wrapper 외부 좌표가 아닌 iframe document 내부에서 처리한다", () => {
+  assert.ok(editorCanvasSource.includes('iframeRef.current?.contentDocument'));
+  assert.ok(editorCanvasSource.includes('document.addEventListener("click"'));
+  assert.ok(editorCanvasSource.includes('document.head.appendChild(overlay)'));
+  assert.ok(editorCanvasSource.includes("iframe.getBoundingClientRect().width / iframe.offsetWidth"));
+  assert.ok(editorCanvasSource.includes("document.elementFromPoint(event.clientX / frameScale, event.clientY / frameScale)"));
+  assert.ok(editorCanvasSource.includes('correctedTarget.closest<HTMLElement>("[data-moire-id]")'));
 });
 
 test("component-spec render 실패 시 Legacy fallback 없이 명확한 오류 문서를 표시한다", () => {
