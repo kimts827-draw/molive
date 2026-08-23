@@ -1,0 +1,9 @@
+#popup { width:600px; }
+.ec-base-layer .inputTypeText { width:200px; }
+.ec-base-layer select { min-width:85px; }
+.ec-base-layer textarea { min-width:277px; min-height:90px; }
+
+/********************* Mobile / Tablet *********************/
+@media all and (max-width:1239px) {
+    #layout .ec-base-layer { position:relative; top:auto; left:auto; width:100%; border:0; transform: initial; }
+}

@@ -1,0 +1,49 @@
+<aside id="aside" module="layout_slidePackage">
+    <!--@css(/layout/basic/css/slideMenu.css)-->
+    <!--@js(/layout/basic/js/slide_menu.js)-->
+    <nav class="navigation-menu" role="navigation">
+        <div class="navigation-menu__member">
+            <div module="Layout_statelogoff">
+                <a href="/member/agreement.html">Join</a>
+                <a href="/member/login.html">Login</a>
+                <a href="/order/basket.html" class="RTMI">Cart <span class="count {$basket_count_display|display} {$basket_count_display_class}"><span class="{$basket_count_class}">{$basket_count}</span></span></a>
+            </div>
+            <div module="Layout_stateLogon">
+                <a href="{$action_logout}">Logout</a>
+                <a href="/myshop/index.html">My Account</a>
+                <a href="/order/basket.html" class="RTMI">Cart <span class="count {$basket_count_display|display} {$basket_count_display_class}"><span class="{$basket_count_class}">{$basket_count}</span></span></a>
+            </div>
+        </div>
+        <div id="slideCateList" class="navigation-menu__category">
+            <ul module="layout_category" class="categoryList">
+                <li id="cate{$cate_no}" class="menu">
+                    <a href="{$link_product_list}" class="view">{$name}</a>
+                    <a href="#none" class="cate" cate="{$param}">상품보기</a>
+                </li>
+                <li id="cate{$cate_no}" class="menu">
+                    <a href="{$link_product_list}" class="view">{$name}</a>
+                    <a href="#none" class="cate" cate="{$param}">상품보기</a>
+                </li>
+            </ul>
+        </div>
+        <div id="slideProjectList" module="layout_project" class="navigation-menu__project">
+            <div class="title selected">기획전<button type="button" class="icoCategory">펼침</button></div>
+            <ul class="categoryList">
+                <li id="cate{$cate_no}" class="menu">
+                    <a href="#none" class="view cate" cate="{$param}">{$category_text|cut 25}</a>
+                </li>
+                <li id="cate{$cate_no}" class="menu">
+                    <a href="#none" class="view cate" cate="{$param}">{$category_text|cut 25}</a>
+                </li>
+            </ul>
+        </div>
+        
+        <div module="Layout_BoardInfo" class="navigation-menu__board">
+            <ul>
+                <li class="menu"><a href="{$link_board_list}">{$board_name}</a> {$board_adult_icon}</li>
+                <li class="menu"><a href="{$link_board_list}">{$board_name}</a> {$board_adult_icon}</li>
+            </ul>
+        </div>
+    </nav>
+    <button type="button" class="btnClose"><i aria-hidden="true" class="icon icoClose"></i>닫기</button>
+</aside>

@@ -1,0 +1,96 @@
+{
+  "baseline": "cafe24-live-verified-deterministic-poc-v1",
+  "source": "lib/cafe24/poc/theme-poc.ts",
+  "parameters": {
+    "productGridV1": {
+      "moduleIndex": 1,
+      "count": 8
+    }
+  },
+  "artifacts": {
+    "headerV1": {
+      "fixture": "cafe24-poc-header-v1.html",
+      "sha256": "18293749de97980d3903ccd830bb21ebb619579aa1d01fb1d17705dd0b81dc08",
+      "bytes": 1123,
+      "modules": [
+        "Layout_LogoTop",
+        "Layout_category",
+        "Layout_statelogoff",
+        "Layout_stateLogon"
+      ],
+      "variables": [
+        "{$logo}",
+        "{$mall_name}",
+        "{$link_product_list}",
+        "{$name_or_img_tag}",
+        "{$action_logout}"
+      ],
+      "classes": [
+        "btnSearch",
+        "eSearch",
+        "pocHeader",
+        "pocHeader__cart",
+        "pocHeader__category",
+        "pocHeader__categoryList",
+        "pocHeader__inner",
+        "pocHeader__item",
+        "pocHeader__logo",
+        "pocHeader__order",
+        "pocHeader__search",
+        "pocHeader__state",
+        "pocHeader__util"
+      ]
+    },
+    "productGridV1": {
+      "fixture": "cafe24-poc-product-grid-v1.html",
+      "sha256": "dd941c8cefd0ab8fde4e4f82d68dffd9564b218099c1df4f5f6c6322e302561c",
+      "bytes": 675,
+      "modules": [
+        "product_listmain_1"
+      ],
+      "variables": [
+        "{$product_no}",
+        "{$image_medium}",
+        "{$image_medium_id}",
+        "{$seo_alt_tag}",
+        "{$product_name}",
+        "{$disp_product_price}",
+        "{$product_sale_price}"
+      ],
+      "classes": [
+        "pocGrid",
+        "pocGrid__item",
+        "pocGrid__list",
+        "pocGrid__module",
+        "pocGrid__name",
+        "pocGrid__original",
+        "pocGrid__sale",
+        "pocGrid__thumb",
+        "pocGrid__title"
+      ]
+    },
+    "css": {
+      "fixture": "cafe24-poc-v1.css",
+      "sha256": "4ef264e5427c5646ad0f79c10408d5dac67bd95a3ca90253c6d9efc560c3624f",
+      "bytes": 2354,
+      "classes": [
+        "pocGrid",
+        "pocGrid__item",
+        "pocGrid__list",
+        "pocGrid__name",
+        "pocGrid__original",
+        "pocGrid__sale",
+        "pocGrid__thumb",
+        "pocGrid__title",
+        "pocHeader",
+        "pocHeader__category",
+        "pocHeader__categoryList",
+        "pocHeader__inner",
+        "pocHeader__item",
+        "pocHeader__logo",
+        "pocHeader__state",
+        "pocHeader__util"
+      ]
+    }
+  }
+}

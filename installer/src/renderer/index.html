@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; img-src 'none'" />
+    <title>Moiré 설치 도우미</title>
+    <style>
+      body { font: 14px/1.7 system-ui, "Malgun Gothic", sans-serif; margin: 0; padding: 20px 22px 32px; color: #1a1a1a; background: #fff; }
+      h1 { font-size: 18px; margin: 0 0 4px; }
+      .lead { color: #555; margin: 0 0 18px; }
+      section { border: 1px solid #ddd; border-radius: 6px; padding: 14px 16px; margin-bottom: 14px; }
+      h2 { font-size: 14px; margin: 0 0 10px; }
+      .step { color: #888; font-weight: 400; }
+      label { display: inline-block; min-width: 88px; }
+      input[type="text"], input[type="password"], input[type="number"], select { padding: 5px 7px; font: inherit; border: 1px solid #bbb; border-radius: 4px; }
+      input[type="text"], input[type="password"] { width: 280px; }
+      select { min-width: 200px; }
+      .row { margin-bottom: 8px; }
+      .note { color: #555; font-size: 13px; margin: 0 0 10px; }
+      .hint { color: #777; font-size: 13px; margin-left: 6px; }
+      .caution { background: #fff8e6; border: 1px solid #e3c168; border-radius: 4px; padding: 9px 11px; margin: 10px 0; }
+      .status { margin-left: 8px; font-size: 13px; }
+      .ok { color: #0a7a2f; }
+      .err { color: #b00020; }
+      button { font: inherit; padding: 5px 14px; border: 1px solid #999; border-radius: 4px; background: #f6f6f6; cursor: pointer; }
+      button:disabled { color: #999; cursor: default; }
+      #install { font-weight: 600; padding: 7px 22px; }
+      progress { width: 100%; height: 16px; margin-top: 8px; }
+      details { margin-top: 10px; }
+      summary { cursor: pointer; color: #555; font-size: 13px; }
+      #guide { border: 1px solid #cddcf0; background: #f5f9ff; border-radius: 6px; padding: 12px 16px; margin: 0 0 14px; }
+      .guideHead { color: #1a1a1a; font-size: 14px; font-weight: 600; }
+      .guideBody { margin-top: 8px; }
+      .guideBody ol { margin: 0 0 4px; padding-left: 22px; }
+      .guideBody li { margin-bottom: 3px; }
+      .tip { margin: 4px 0 0; }
+      .tip ol { margin: 6px 0 2px; padding-left: 22px; color: #444; font-size: 13px; }
+      .tip li { margin-bottom: 3px; }
+      #log { height: 180px; overflow: auto; border: 1px solid #ddd; border-radius: 4px; padding: 7px; margin-top: 7px; font-family: Consolas, monospace; font-size: 12px; white-space: pre-wrap; color: #333; }
+      #result { margin-top: 10px; white-space: pre-wrap; }
+      #result.ok { background: #eefaf1; border: 1px solid #9ad3ae; border-radius: 4px; padding: 10px 12px; }
+      #result.err { background: #fdeff1; border: 1px solid #e0a3ad; border-radius: 4px; padding: 10px 12px; }
+    </style>
+  </head>
+  <body>
+    <h1>Moiré 설치 도우미</h1>
+    <p class="lead">Moiré에서 만든 디자인을 내 카페24 쇼핑몰에 올려 줍니다.</p>
+
+    <details id="guide" open>
+      <summary class="guideHead">디자인 FTP를 처음 신청하시나요? (신청 방법 보기)</summary>
+      <div class="guideBody">
+        <p class="note">디자인을 쇼핑몰에 올리려면 카페24에서 <b>디자인 FTP 권한</b>을 먼저 신청해야 합니다. 1~2분이면 끝납니다.</p>
+        <ol>
+          <li>카페24 쇼핑몰 관리자에 로그인합니다.</li>
+          <li><b>디자인(PC/모바일)</b> → <b>디자인FTP</b> → <b>디자인FTP 권한신청</b> 을 차례로 누릅니다.</li>
+          <li><b>FTP 접속 비밀번호</b>를 직접 정하고 <b>사용 기간</b>을 고릅니다. (1일 ~ 7일)</li>
+          <li>신청이 끝나면 화면에 <b>계정</b>, <b>FTP 주소</b>, <b>SFTP 접속포트</b>가 나옵니다. 그 값을 아래 1단계에 그대로 옮겨 적으세요.</li>
+          <li>비밀번호는 3번에서 직접 정한 그 비밀번호입니다. <b>쇼핑몰 관리자 로그인 비밀번호가 아닙니다.</b></li>
+        </ol>
+        <p class="caution">사용 기간은 최대 7일입니다. 기간이 지나면 접속이 안 되니, 같은 메뉴에서 다시 신청하고 새로 받은 정보로 접속하세요.</p>
+      </div>
+    </details>
+
+    <section>
+      <h2><span class="step">1단계</span> 쇼핑몰 접속 정보</h2>
+      <p class="note">카페24 쇼핑몰 관리자의 <b>디자인 FTP 권한 신청 정보</b> 화면에 있는 값을 그대로 옮겨 적으세요.</p>
+      <div class="row"><label for="host">FTP 주소</label><input id="host" type="text" placeholder="관리자 화면의 FTP 주소" autocomplete="off" /></div>
+      <div class="row"><label for="port">접속 포트</label><input id="port" type="number" placeholder="관리자 화면의 접속포트" style="width: 190px" /><span class="hint">쇼핑몰마다 다릅니다</span></div>
+      <div class="row"><label for="username">계정</label><input id="username" type="text" placeholder="관리자 화면의 계정" autocomplete="off" /></div>
+      <div class="row"><label for="password">비밀번호</label><input id="password" type="password" placeholder="디자인 FTP 비밀번호" autocomplete="off" /></div>
+      <div class="row">
+        <button id="connect">접속 확인</button>
+        <button id="disconnect" disabled>접속 끊기</button>
+        <span id="connectStatus" class="status"></span>
+      </div>
+      <p class="note">비밀번호는 이 컴퓨터에서만 사용하며, 어디에도 저장하거나 전송하지 않습니다.</p>
+      <details>
+        <summary>디자인 폴더를 못 찾을 때 (직접 지정)</summary>
+        <div class="row" style="margin-top: 8px">
+          <label for="basePath">폴더 위치</label>
+          <input id="basePath" type="text" value="/" style="width: 200px" />
+          <button id="browse" disabled>안에 뭐가 있는지 보기</button>
+        </div>
+        <p class="note">접속하면 보통 자동으로 찾습니다. 못 찾았을 때만 여기서 위치를 바꿔 다시 <b>접속 확인</b>을 누르세요.</p>
+      </details>
+    </section>
+
+    <section>
+      <h2><span class="step">2단계</span> 어떤 디자인에 설치할까요?</h2>
+      <div class="row"><label for="skin">디자인</label><select id="skin" disabled><option value="">접속 확인을 먼저 하세요</option></select></div>
+      <details class="tip">
+        <summary>목록의 번호가 어떤 디자인인지 모르겠나요? (skin 번호 확인 방법)</summary>
+        <ol>
+          <li>카페24 쇼핑몰 관리자에서 <b>디자인 보관함</b>을 엽니다.</li>
+          <li>설치하려는 디자인의 <b>미리보기</b>를 누릅니다.</li>
+          <li>새로 열린 창의 <b>주소 맨 뒤에 붙은 숫자</b>가 그 디자인의 skin 번호입니다.</li>
+          <li>숫자가 11이면 위 목록에서 <b>skin11</b>을 고르면 됩니다.</li>
+        </ol>
+      </details>
+      <div class="caution">
+        지금 쇼핑몰에서 사용 중인 디자인에 설치하면 되돌릴 수 없습니다.<br />
+        카페24 관리자에서 <b>새 디자인을 하나 추가한 뒤</b>, 그 디자인을 골라 주세요.
+      </div>
+      <div class="row"><label style="min-width: 0"><input id="confirmSkin" type="checkbox" /> 확인했습니다. 위에서 고른 것은 새로 만든 디자인입니다.</label></div>
+    </section>
+
+    <section>
+      <h2><span class="step">3단계</span> 디자인 파일 고르기</h2>
+      <div class="row">
+        <button id="pickZip">파일 고르기</button>
+        <span id="zipStatus" class="status">아직 고르지 않았습니다</span>
+      </div>
+      <p class="note" id="zipDetail">Moiré에서 내려받은 압축 파일(.zip)을 고르세요.</p>
+    </section>
+
+    <section>
+      <h2><span class="step">4단계</span> 설치</h2>
+      <div class="row">
+        <button id="install" disabled>설치하기</button>
+        <span id="installStatus" class="status"></span>
+      </div>
+      <progress id="bar" value="0" max="1"></progress>
+      <div id="result"></div>
+      <details>
+        <summary>자세한 진행 내용 보기</summary>
+        <div id="log"></div>
+      </details>
+    </section>
+
+    <script src="renderer.js"></script>
+  </body>
+</html>

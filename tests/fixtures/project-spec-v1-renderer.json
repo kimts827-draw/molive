@@ -1,0 +1,44 @@
+{
+  "kind": "component-spec",
+  "schemaVersion": 1,
+  "libraryVersion": "canonical-poc-v1",
+  "id": "renderer-fixture-v1",
+  "name": "Verified Components Renderer Fixture",
+  "theme": {
+    "palette": {
+      "ink": "#171713",
+      "muted": "#8c877e",
+      "surface": "#ffffff",
+      "accent": "#b5321f",
+      "border": "#e5e2db"
+    },
+    "typography": {
+      "heading": "system-sans",
+      "body": "system-sans"
+    },
+    "spacing": "balanced",
+    "imageRatio": "1:1"
+  },
+  "header": {
+    "instanceId": "header-primary",
+    "component": "HeaderV1",
+    "variant": "canonical",
+    "settings": []
+  },
+  "sections": [
+    {
+      "instanceId": "products-featured",
+      "component": "ProductGridV1",
+      "variant": "canonical",
+      "settings": []
+    },
+    {
+      "instanceId": "products-new",
+      "component": "ProductGridV1",
+      "variant": "canonical",
+      "settings": []
+    }
+  ],
+  "footer": null,
+  "updatedAt": "2026-08-23T00:00:00.000Z"
+}

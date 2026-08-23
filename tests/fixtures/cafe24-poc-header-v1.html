@@ -1,0 +1,24 @@
+<header id="header" class="pocHeader">
+  <div class="pocHeader__inner">
+    <h1 class="pocHeader__logo" module="Layout_LogoTop">
+      <a href="/index.html"><img src="{$logo}" alt="{$mall_name}"></a>
+    </h1>
+    <nav class="pocHeader__category" module="Layout_category">
+      <ul class="pocHeader__categoryList">
+        <li><a href="{$link_product_list}">{$name_or_img_tag}</a></li>
+      </ul>
+    </nav>
+    <div class="pocHeader__util">
+      <button type="button" class="pocHeader__item pocHeader__search btnSearch eSearch">SEARCH</button>
+      <div class="pocHeader__state" module="Layout_statelogoff">
+        <a class="pocHeader__item" href="/member/login.html">LOGIN</a>
+        <a class="pocHeader__item" href="/member/agreement.html">JOIN</a>
+      </div>
+      <div class="pocHeader__state" module="Layout_stateLogon">
+        <a class="pocHeader__item" href="{$action_logout}">LOGOUT</a>
+      </div>
+      <a class="pocHeader__item pocHeader__order" href="/myshop/order/list.html">ORDER</a>
+      <a class="pocHeader__item pocHeader__cart" href="/order/basket.html">CART</a>
+    </div>
+  </div>
+</header>

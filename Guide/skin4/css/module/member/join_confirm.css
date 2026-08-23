@@ -1,0 +1,19 @@
+.xans-member-join .joinConfirm { display:none; z-index:1001; }
+.xans-member-join .joinConfirm .content { overflow-y:auto; }
+.xans-member-join .joinConfirm .content p { color:#353535; }
+.xans-member-join .joinConfirm .content p strong { color:#000; }
+.xans-member-join .joinConfirm .ec-base-table { margin:10px 0 20px; }
+
+/********************* PC *********************/
+@media all and (min-width:1025px) {
+    .xans-member-join .joinConfirm .ec-base-layer { width:620px; }
+    .xans-member-join .joinConfirm .content { max-height:600px; }
+    .xans-member-join .joinConfirm .colJoinConfirm { width:150px; }
+}
+
+/********************* Mobile / Tablet *********************/
+@media all and (max-width:1024px) {
+    .xans-member-join .joinConfirm .ec-base-layer { height:100%; }
+	.xans-member-join .joinConfirm .content { overflow-y:auto; height:calc(100% - 148px); }
+    .xans-member-join .joinConfirm .colJoinConfirm { width:130px; }
+}

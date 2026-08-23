@@ -1,0 +1,39 @@
+import { z } from "zod";
+import { errorResponse, requireApiUser } from "@/lib/api/auth";
+import { generateProjectSource } from "@/lib/openai/site-generator";
+import { createProjectWithVersion, hasSupabaseServerConfig } from "@/lib/projects/service";
+
+const assetUrl = z.string().refine((value) => value.startsWith("https://") || /^data:image\/(jpeg|png|webp|avif);base64,/.test(value), "지원하지 않는 이미지 형식입니다.");
+const requestSchema = z.object({ prompt: z.string().min(10).max(5000), brandName: z.string().max(120).optional(), colors: z.array(z.string()).max(8).optional(), assetUrls: z.array(assetUrl).max(6).optional(), assetPaths: z.array(z.string().max(500)).max(6).optional(), assetRoles: z.array(z.enum(["logo", "product", "reference", "image"])).max(6).optional() });
+
+export async function POST(request: Request) {
+  try {
+    const user = await requireApiUser(request);
+    const parsedInput = requestSchema.safeParse(await request.json());
+    if (!parsedInput.success) return Response.json({ error: "요청 데이터 형식이 올바르지 않습니다.", issues: parsedInput.error.issues }, { status: 400 });
+    try {
+      const result = await generateProjectSource(parsedInput.data);
+      if (!hasSupabaseServerConfig()) return Response.json(result);
+      const stored = await createProjectWithVersion(user.id, result.source, {
+        prompt: parsedInput.data.prompt,
+        brandName: parsedInput.data.brandName ?? null,
+        colors: parsedInput.data.colors ?? [],
+        assetCount: parsedInput.data.assetUrls?.length ?? 0,
+      });
+      const assetRows = (parsedInput.data.assetPaths ?? []).flatMap((storagePath, index) => {
+        if (!storagePath || !storagePath.startsWith(`${user.id}/`)) return [];
+        const role = parsedInput.data.assetRoles?.[index] ?? "reference";
+        return [{ project_id: stored.projectId, owner_id: user.id, kind: role === "image" ? "reference" : role, storage_path: storagePath, mime_type: "image/webp", metadata: { source: "generation-upload" } }];
+      });
+      if (assetRows.length) {
+        const { createAdminClient } = await import("@/lib/supabase/admin");
+        const { error } = await createAdminClient().from("project_assets").insert(assetRows);
+        if (error) throw error;
+      }
+      return Response.json({ ...result, ...stored });
+    } catch (error) {
+      if (error instanceof z.ZodError) return Response.json({ error: "AI 디자인 결과를 Project Source로 변환하지 못했습니다. 다시 시도해 주세요." }, { status: 422 });
+      throw error;
+    }
+  } catch (error) { return errorResponse(error); }
+}

@@ -1,0 +1,19 @@
+node_modules/
+.next/
+out/
+.vercel/
+*.log
+.env
+.env.*
+!.env.example
+.DS_Store
+coverage/
+.moire/traces/
+tmp/
+TEST MAKING/
+%SystemDrive%/
+*.tsbuildinfo
+supabase/.temp/
+
+.vercel
+.env*

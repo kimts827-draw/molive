@@ -1,0 +1,114 @@
+<!--@layout(/layout/basic/layout.html)-->
+<div class="path">
+    <span>현재 위치</span>
+    <ol>
+        <li><a href="/">홈</a></li>
+        <li title="현재 위치">마이 쇼핑</li>
+    </ol>
+</div>
+
+<div module="layout_logincheck">
+<!--
+    $url = /member/login.html
+-->
+</div>
+
+<div class="myshopArea myshopMain">
+    <div class="titleArea titleArea--myshop blind">
+        <h2>마이 쇼핑</h2>
+    </div>
+    <div class="benefit">
+        <div module="myshop_asyncbankbook">
+            <!--@css(/css/module/myshop/bankbook.css)-->
+  
+            <ul>
+                <li module="myshop_asyncbenefit" class="{$display_benefit|display}">
+                    <div class="user">
+                        <span class="user__thumb"><img src="{$group_image}" alt="" onerror="this.src='//img.echosting.cafe24.com/skin/base_ko_KR/member/img_member_default.gif';" width="42" class="{$group_image_tag_class}"></span>
+                        <div class="user__info">
+                            안녕하세요. <span class="txtEm">{$member_name}</span> 님
+                        	<span class="user__data"><span class="{$displayGroupIcon|display}"><img src="{$group_icon}" alt="" class="{$group_icon_tag_class}"></span>{$group_name}</span>
+                        </div>
+                    </div>
+                    <div class="group">
+                        <span class="thumb"><!--@import(/svg/icon-user.html)--></span>
+                        <span class="data"><span class="{$displayGroupIcon|display}"><img src="{$group_icon}" alt="" class="{$group_icon_tag_class}"></span>{$group_name}</span>
+                        <span class="title">회원등급</span>
+                    </div>
+                </li>
+                <li>
+                    <a href="/myshop/mileage/historyList.html">
+                        <span class="thumb"><!--@import(/svg/icon-mileage.html)--></span>
+                        <span class="data">{$total_mileage}</span>
+                        <span class="title">총{$mileage_name}</span>
+                    </a>
+                </li>
+                <li class="{$display_coupon|display}">
+                    <a href="/myshop/coupon/coupon.html">
+                        <span class="thumb"><!--@import(/svg/icon-coupon.html)--></span>
+                        <span class="data">{$coupon_cnt}개</span>
+                        <span class="title">쿠폰</span>
+                    </a>    
+                </li>
+                <li>
+                    <a href="/myshop/order/list.html">
+                        <span class="thumb"><!--@import(/svg/icon-check.html)--></span>
+                        <span class="data">{$total_order_price}({$total_order_count}회)</span>
+                        <span class="title">총주문</span>
+                    </a>    
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="titleArea titleArea--middle">
+        <h3>나의 주문처리 현황 <span class="desc">(최근 <span class="txtEm">3개월</span> 기준)</span></h3>
+    </div>
+    <div module="myshop_orderstate">
+        <!--@css(/css/module/myshop/orderState.css)-->
+        <div class="state">
+            <ul class="state__order">
+                <li>
+                    <a href="{$shppiedBeforeUrl}" class="count">{$shppiedBeforeCount}</a>
+                    <span class="label">입금전</span>
+                </li>
+                <li>
+                    <a href="{$shppiedStandbyUrl}" class="count">{$shppiedStandbyCount}</a>
+                    <span class="label">배송준비중</span>
+                </li>
+                <li>
+                    <a href="{$shppiedBeginUrl}" class="count">{$shppiedBeginCount}</a>
+                    <span class="label">배송중</span>
+                </li>
+                <li>
+                    <a href="{$shppiedComplateUrl}" class="count">{$shppiedComplateCount}</a>
+                    <span class="label">배송완료</span>
+                </li>
+            </ul>
+            <ul class="state__cs">
+                <li>
+                    <strong>취소</strong>
+                    <a href="{$orderCancelUrl}" class="count">{$orderCancelCount}</a>
+                </li>
+                <li>
+                    <strong>교환</strong>
+                    <a href="{$orderExchangeUrl}" class="count">{$orderExchangeCount}</a>
+                </li>
+                <li>
+                    <strong>반품</strong>
+                    <a href="{$orderReturnUrl}" class="count">{$orderReturnCount}</a>
+                </li>
+            </ul>
+        </div>
+    </div>
+    
+    <div class="RW">
+        <div class="titleArea titleArea--middle">
+            <h3>주문내역 조회</h3>
+        </div>
+        <!--@import(/myshop/order/history_list_item.html)-->
+    </div>
+
+    <!--@import(/myshop/myshop_main.html)-->    
+    
+</div>    

@@ -1,0 +1,21 @@
+{
+  "baseline": "cafe24-live-verified-product-library-v1",
+  "source": "Guide skin17/skin18 product_listmain_N + product/list_product.html",
+  "artifacts": {
+    "productCardV1": {
+      "fixture": "product-card-v1-commerce-standard.html",
+      "sha256": "2859eda9162f6affec5a02eeccc76ac19691b4425e09cabef1497fddc48c3953",
+      "bytes": 1790
+    },
+    "productSectionV1": {
+      "fixture": "product-section-v1-grid-four.html",
+      "sha256": "8da1436a6fa9a17317a3b6ab7cc977437abe6e68faa33f88b3d014666b0170e5",
+      "bytes": 3927
+    },
+    "css": {
+      "fixture": "product-section-v1-grid-four.css",
+      "sha256": "1b9f16e54bec65ff9aac4db8b15af3fd65adc7cb129a58f1ce162f05f165bd41",
+      "bytes": 2815
+    }
+  }
+}

@@ -1,0 +1,133 @@
+import type { ComponentDefinition, RenderTarget } from "../types.ts";
+
+/**
+ * Guide skin17/skin18의 product/list_product.html에서 공통으로 확인된 단일 반복 카드 계약입니다.
+ * ProductSectionV1이 이 카드를 두 번 배치해 Cafe24의 반복 template을 소유합니다.
+ */
+export const PRODUCT_CARD_V1_CAFE24_HTML = `<li id="anchorBoxId_{$product_no}">
+  <div class="prdList__item">
+    <div class="thumbnail">
+      <a href="{$link_product_detail}"><img src="{$image_medium}" id="{$image_medium_id}" alt="{$seo_alt_tag}" loading="lazy"><span module="product_Imagestyle"><span class="prdIcon {$icon_class_name}" style="background-image:url('{$icon_url}');"></span></span></a>
+      <div class="likeButton {$disp_likeprd_class}"><button type="button">{$disp_likeprd_icon} <strong>{$disp_likeprd_count}</strong></button></div>
+      <div class="badge"><span></span></div>
+      <div class="icon__box">
+        <span class="wish">{$list_wish_icon}WISH</span>
+        <span class="cart">{$basket_icon}ADD</span>
+        <span class="option">{$option_preview_icon}OPTION</span>
+      </div>
+    </div>
+    <div class="description" ec-data-custom="{$product_custom}" ec-data-price="{$product_price}">
+      <div class="name"><a href="{$link_product_detail}" class="{$product_name_display|display}"><span class="title {$product_name_title_display|display}">{$product_name_title} :</span> {$product_name}</a></div>
+      <p class="ec-base-help txtWarn txt11 {$exclusive_purchase_olny|display}"> 단독구매상품</p>
+      <ul module="product_ListItem" class="spec">
+        <li class="{$item_display|display}">
+          <strong class="title {$item_title_display|display}">{$item_title} :</strong> {$item_content}
+        </li>
+        <li class="{$item_display|display}">
+          <strong class="title {$item_title_display|display}">{$item_title} :</strong> {$item_content}
+        </li>
+      </ul>
+      <div class="icon">{$soldout_icon} {$stock_icon} {$recommend_icon} {$new_icon} {$product_icons} {$today_arrival_icon} {$pickup_icon} {$benefit_icons} {$regular_delivery_icon}</div>
+    </div>
+  </div>
+</li>`;
+
+const CLASS_BINDINGS = [
+  "{$icon_class_name}",
+  "{$disp_likeprd_class}",
+  "{$product_name_display|display}",
+  "{$product_name_title_display|display}",
+  "{$exclusive_purchase_olny|display}",
+  "{$item_display|display}",
+  "{$item_title_display|display}",
+] as const;
+
+const SAMPLE_PRODUCTS = [
+  {
+    no: "101",
+    image: "https://images.unsplash.com/photo-1539109136881-3be0616acf4b?auto=format&fit=crop&w=900&q=80",
+    name: "울 블렌드 테일러드 재킷",
+    custom: "189,000원",
+    price: "159,000원",
+  },
+  {
+    no: "102",
+    image: "https://images.unsplash.com/photo-1551488831-00ddcb6c6bd3?auto=format&fit=crop&w=900&q=80",
+    name: "소프트 캐시미어 니트",
+    custom: "129,000원",
+    price: "109,000원",
+  },
+  {
+    no: "103",
+    image: "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&w=900&q=80",
+    name: "클래식 플리츠 스커트",
+    custom: "119,000원",
+    price: "98,000원",
+  },
+  {
+    no: "104",
+    image: "https://images.unsplash.com/photo-1539533018447-63fcce2678e3?auto=format&fit=crop&w=900&q=80",
+    name: "에센셜 롱 코트",
+    custom: "279,000원",
+    price: "249,000원",
+  },
+] as const;
+
+function bindPreviewProductCard(index: number) {
+  const sample = SAMPLE_PRODUCTS[index] ?? SAMPLE_PRODUCTS[0];
+  let html = PRODUCT_CARD_V1_CAFE24_HTML;
+  for (const binding of CLASS_BINDINGS) html = html.replaceAll(binding, "__binding__");
+  const bindings: ReadonlyArray<readonly [string, string]> = [
+    ["{$product_no}", sample.no],
+    ["{$link_product_detail}", `/product/detail.html?product_no=${sample.no}`],
+    ["{$image_medium}", sample.image],
+    ["{$image_medium_id}", `${sample.no}-image`],
+    ["{$seo_alt_tag}", sample.name],
+    ["{$icon_url}", "none"],
+    ["{$disp_likeprd_icon}", "♡"],
+    ["{$disp_likeprd_count}", "0"],
+    ["{$list_wish_icon}", "♡ "],
+    ["{$basket_icon}", "+ "],
+    ["{$option_preview_icon}", ""],
+    ["{$product_custom}", sample.custom],
+    ["{$product_price}", sample.price],
+    ["{$product_name_title}", "상품명"],
+    ["{$product_name}", sample.name],
+    ["{$item_title}", "가격"],
+    ["{$item_content}", sample.price],
+    ["{$soldout_icon}", ""],
+    ["{$stock_icon}", ""],
+    ["{$recommend_icon}", "추천"],
+    ["{$new_icon}", "NEW"],
+    ["{$product_icons}", ""],
+    ["{$today_arrival_icon}", ""],
+    ["{$pickup_icon}", ""],
+    ["{$benefit_icons}", ""],
+    ["{$regular_delivery_icon}", ""],
+  ];
+  for (const [binding, value] of bindings) html = html.replaceAll(binding, value);
+  if (/\{\$/.test(html)) throw new Error("ProductCardV1 Preview mock에 치환되지 않은 Cafe24 variable이 남아 있습니다.");
+  return html;
+}
+
+export function renderProductCardV1(target: RenderTarget, sampleIndex = 0) {
+  return target === "cafe24" ? PRODUCT_CARD_V1_CAFE24_HTML : bindPreviewProductCard(sampleIndex);
+}
+
+export const productCardV1Definition: ComponentDefinition = {
+  id: "ProductCardV1",
+  version: 1,
+  category: "product-card",
+  internal: true,
+  status: "verified",
+  variants: ["commerce-standard"],
+  canonical: {
+    source: "tests/fixtures/product-card-v1-commerce-standard.html",
+    cafe24HtmlSha256: "2859eda9162f6affec5a02eeccc76ac19691b4425e09cabef1497fddc48c3953",
+    cssSha256: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  },
+  css: "",
+  render(target) {
+    return renderProductCardV1(target);
+  },
+};

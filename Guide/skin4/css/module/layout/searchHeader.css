@@ -1,0 +1,39 @@
+.xans-layout-searchheader { z-index:1001; position:fixed; left:0; right:0; top:0; background:#fff; opacity:0; visibility:hidden;transform: translate3d(0,-100%,0);transition: opacity .5s ease,transform .5s ease,visibility 0s linear .5s; }
+.searchExpand .xans-layout-searchheader { opacity: 1; visibility: visible; transition: opacity .5s ease,transform .5s ease,visibility 0s linear 0s; transform: translateZ(0); }
+.searchExpand .dimmed { display:block; }
+.xans-layout-searchheader .title { font-weight:normal; }
+.xans-layout-searchheader .btnSearch { background:none; overflow:hidden; white-space:nowrap; text-indent:150%; font-size:1px; color:transparent; line-height:1px; }
+.xans-layout-searchheader .btnClose { position:absolute; overflow:hidden; white-space:nowrap; text-indent:150%; font-size:1px; color:transparent; line-height:1px; }
+
+.xans-layout-searchheader fieldset .autoDrop { display:none; border:1px solid #565960; position:absolute; width: 187px; text-align:left; background:#fff; z-index:20; overflow:hidden; overflow-y:auto; max-height:100px;}
+.xans-layout-searchheader fieldset .autoDrop li a { display:block; padding:6px 10px; font-size:11px; color:#1c1c1c; font-family:GulimChe,Gulim; }
+.xans-layout-searchheader fieldset .autoDrop li a:hover,
+.xans-layout-searchheader fieldset .autoDrop li.selected a { text-decoration:none; color:#fff; background:#a1a4ae; }
+
+/********************* Mobile *********************/
+@media all and (max-width:767px) {
+    .xans-layout-searchheader { height:322px; }
+    .xans-layout-searchheader .title { margin:100px 0 29px; display:block; font-size:30px; text-align:center; }
+    .xans-layout-searchheader fieldset { display:flex; margin:0 16px; border-bottom:1px solid #000; }
+    .xans-layout-searchheader #keyword  { width:100%; height:58px; padding:19px 0; flex:1; font-size:15px; box-sizing:border-box; border:0; background:#fff; }
+    .xans-layout-searchheader .btnSearch { width:25px; height:25px; margin:19px 0 0; }
+	.xans-layout-searchheader .btnSearch .icon { width:25px; height:25px; }
+    .xans-layout-searchheader .btnClose { top:12px; right:12px; }
+    .xans-layout-searchheader .icon.icoClose { width:25px; height:25px;}
+    .xans-layout-searchheader .icon.icoClose:before { right: 12px; height:25px; }
+    .xans-layout-searchheader .icon.icoClose:after { top: 12px; width:25px; }
+}
+
+/********************* Tablet / PC *********************/
+@media all and (min-width:768px) {
+    .xans-layout-searchheader { height:389px; }
+    .xans-layout-searchheader .title { margin:103px 0 54px; display:block; font-size:45px; text-align:center; }
+    .xans-layout-searchheader fieldset { display:flex; width:650px; margin:0 auto; border-bottom:1px solid #000; }
+    .xans-layout-searchheader #keyword  { width:100%; height:54px; padding:15px 0; flex:1; font-size:18px; box-sizing:border-box; border:0; background:#fff; }
+    .xans-layout-searchheader .btnSearch { width:28px; height:28px; margin:15px 0 0; }
+	.xans-layout-searchheader .btnSearch .icon { width:28px; height:28px; }
+    .xans-layout-searchheader .btnClose { top:35px; right:50px; }
+    .xans-layout-searchheader .icon.icoClose { width: 35px; height: 35px;}
+    .xans-layout-searchheader .icon.icoClose:before { right: 17px; height: 35px; }
+    .xans-layout-searchheader .icon.icoClose:after { top: 17px; width: 35px; }
+}

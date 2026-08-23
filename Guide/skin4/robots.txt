@@ -1,0 +1,7 @@
+User-agent: *
+Disallow: /admin
+Disallow: /api
+Allow: /
+
+#Sitemap
+Sitemap: https://ecudemo199138.cafe24.com/sitemap.xml
