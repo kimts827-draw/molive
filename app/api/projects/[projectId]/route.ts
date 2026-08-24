@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { errorResponse, requireApiUser } from "@/lib/api/auth";
+import { ApiError, errorResponse, requireApiUser } from "@/lib/api/auth";
 import { isProjectSource } from "@/lib/project-source";
 import { loadProject, saveDraft } from "@/lib/projects/service";
 
@@ -19,7 +19,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ pr
     z.uuid().parse(projectId);
     const body = await request.json() as { source?: unknown };
     if (!isProjectSource(body.source)) return Response.json({ error: "Project Source 형식이 올바르지 않습니다." }, { status: 400 });
-    await saveDraft(projectId, user.id, body.source);
+    const saved = await saveDraft(projectId, user.id, body.source);
+    if (!saved) throw new ApiError(404, "프로젝트를 찾을 수 없습니다.");
     return Response.json({ saved: true });
   } catch (error) { return errorResponse(error); }
 }

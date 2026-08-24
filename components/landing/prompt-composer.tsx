@@ -1,16 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, LoaderCircle, Sparkles, WandSparkles, X } from "lucide-react";
 import { optimizeImageFile, persistProjectAsset } from "@/lib/client-image";
 import type { ProjectSource } from "@/lib/project-source";
+import { generationDestination } from "@/lib/projects/client-flow";
 
 type AttachedAsset = { id: string; kind: "logo" | "image"; name: string; url: string; storagePath?: string };
 
 const initialPrompt = "차분한 올리브 컬러의 수제 가구 브랜드 쇼핑몰";
 
-export function PromptComposer() {
+const generationDraftKey = "moire:generation-draft";
+
+export function PromptComposer({ signedIn, persistenceEnabled, demoMode }: { signedIn: boolean; persistenceEnabled: boolean; demoMode: boolean }) {
   const router = useRouter();
   const [prompt, setPrompt] = useState(initialPrompt);
   const [color, setColor] = useState("#6b6654");
@@ -20,8 +23,29 @@ export function PromptComposer() {
   const [readingFiles, setReadingFiles] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    const raw = sessionStorage.getItem(generationDraftKey);
+    if (!raw) return;
+    try {
+      const draft = JSON.parse(raw) as { prompt?: string; color?: string; colorSelected?: boolean };
+      if (draft.prompt) setPrompt(draft.prompt);
+      if (draft.color) setColor(draft.color);
+      if (draft.colorSelected) setColorSelected(true);
+    } catch { /* Ignore an invalid login-return draft. */ }
+  }, []);
+
+  function rememberDraft() {
+    sessionStorage.setItem(generationDraftKey, JSON.stringify({ prompt, color, colorSelected }));
+  }
+
+  function goToLogin() {
+    rememberDraft();
+    router.push("/login?next=%2F%23create");
+  }
+
   async function addFiles(files: FileList | null, kind: AttachedAsset["kind"]) {
     if (!files?.length) return;
+    if (persistenceEnabled && !signedIn) { goToLogin(); return; }
     setReadingFiles(true);
     setError(null);
     try {
@@ -45,6 +69,14 @@ export function PromptComposer() {
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     if (prompt.trim().length < 10 || busy || readingFiles) return;
+    if (persistenceEnabled && !signedIn) {
+      goToLogin();
+      return;
+    }
+    if (!persistenceEnabled && !demoMode) {
+      setError("영구 저장 설정이 완료되지 않아 디자인을 생성할 수 없습니다.");
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -54,14 +86,17 @@ export function PromptComposer() {
         body: JSON.stringify({ prompt: prompt.trim(), colors: colorSelected ? [color] : [], assetUrls: assets.map((asset) => asset.url), assetPaths: assets.map((asset) => asset.storagePath ?? ""), assetRoles: assets.map((asset) => asset.kind === "logo" ? "logo" : "reference") }),
       });
       const payload = await response.json() as { source?: ProjectSource; rationale?: string; projectId?: string; versionId?: string; error?: string };
+      const destination = generationDestination({ status: response.status, projectId: payload.projectId, persistenceEnabled });
+      if (destination.kind === "login") { goToLogin(); return; }
       if (!response.ok || !payload.source) throw new Error(payload.error ?? "디자인 생성에 실패했습니다.");
-      if (payload.projectId) {
-        router.push(`/editor?project=${encodeURIComponent(payload.projectId)}`);
-      } else {
+      if (destination.kind === "project") {
+        sessionStorage.removeItem(generationDraftKey);
+        router.push(destination.href);
+      } else if (destination.kind === "demo") {
         sessionStorage.setItem("moire:generated-source", JSON.stringify(payload.source));
         if (payload.rationale) sessionStorage.setItem("moire:generated-rationale", payload.rationale);
-        router.push("/editor");
-      }
+        router.push(destination.href);
+      } else throw new Error(destination.message);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "디자인 생성에 실패했습니다.");
       setBusy(false);
@@ -74,6 +109,7 @@ export function PromptComposer() {
       <textarea id="home-design-prompt" value={prompt} onChange={(event) => setPrompt(event.target.value)} rows={2} aria-label="쇼핑몰 디자인 프롬프트" />
       {assets.length > 0 && <div className="home-asset-list">{assets.map((asset) => <span key={asset.id}><b>{asset.kind === "logo" ? "로고" : "이미지"}</b>{asset.name}<button type="button" onClick={() => setAssets((current) => current.filter((item) => item.id !== asset.id))} aria-label={`${asset.name} 제거`}><X size={11} /></button></span>)}</div>}
       {error && <p className="home-prompt-error">{error}</p>}
+      {!persistenceEnabled && demoMode && <p className="home-prompt-demo">개발 데모 결과입니다. Editor를 닫거나 새로고침하면 수정 내용이 사라집니다.</p>}
       <div className="prompt-actions">
         <div className="attachment-pills">
           <label>＋ 로고<input type="file" accept="image/*" onChange={(event) => { void addFiles(event.target.files, "logo"); event.target.value = ""; }} /></label>

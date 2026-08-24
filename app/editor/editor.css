@@ -9,6 +9,10 @@
 .topbar-divider { width: 1px; height: 20px; margin: 0 4px; background: #dfded9; }
 .project-name { display: flex; align-items: center; gap: 6px; font-weight: 650; }
 .saved-state { display: flex; align-items: center; gap: 4px; color: #888780; font-size: 9px; }
+.saved-state-saving { color: #766321; }
+.saved-state-saved { color: #3d6b4d; }
+.saved-state-error { color: #a33d36; }
+.saved-state-demo { color: #8b6420; }
 .viewport-switcher { display: flex; padding: 3px; background: #f0f0ed; border-radius: 7px; }
 .viewport-switcher button { width: 31px; height: 27px; display: grid; place-items: center; color: #7c7b76; border-radius: 5px; }
 .viewport-switcher button.active { color: #272727; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.12); }

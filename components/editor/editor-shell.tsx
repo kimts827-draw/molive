@@ -7,6 +7,7 @@ import { Brand } from "@/components/brand";
 import { EditorCanvas } from "@/components/editor/editor-canvas";
 import { PublishModal } from "@/components/editor/publish-modal";
 import { optimizeImageFile, persistProjectAsset } from "@/lib/client-image";
+import { autosaveLabel, type AutosaveState } from "@/lib/editor/autosave-state";
 import { cloneProjectSource, type EditorNodeSelection, type ProjectSource } from "@/lib/project-source";
 
 type Viewport = "desktop" | "tablet" | "mobile";
@@ -116,6 +117,8 @@ export function EditorShell({ initialSource, projectId = null, initialVersions =
   const [versions, setVersions] = useState<SavedVersion[]>(initialVersions);
   const [activeVersionId, setActiveVersionId] = useState<string | null>(currentVersionId);
   const [persistBusy, setPersistBusy] = useState(false);
+  const [autosaveState, setAutosaveState] = useState<AutosaveState>(projectId ? "saved" : "demo");
+  const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
   const [showVersions, setShowVersions] = useState(false);
   const [showAddSection, setShowAddSection] = useState(false);
   const [showPublish, setShowPublish] = useState(false);
@@ -128,6 +131,7 @@ export function EditorShell({ initialSource, projectId = null, initialVersions =
   const futureRef = useRef(future);
   const historyGroupRef = useRef<string | null>(null);
   const historyTimerRef = useRef<number | null>(null);
+  const autosaveSequenceRef = useRef(0);
 
   const regions = useMemo(() => hydrated ? listRegions(source.html) : [], [hydrated, source.html]);
   const selectedNode = useMemo(() => hydrated ? readNode(source, selection) : null, [hydrated, source, selection]);
@@ -205,6 +209,8 @@ export function EditorShell({ initialSource, projectId = null, initialVersions =
 
   useEffect(() => {
     if (!hydrated || !projectId) return;
+    const sequence = ++autosaveSequenceRef.current;
+    setAutosaveState("saving");
     const timer = window.setTimeout(async () => {
       try {
         const response = await fetch(`/api/projects/${projectId}`, {
@@ -213,7 +219,14 @@ export function EditorShell({ initialSource, projectId = null, initialVersions =
           body: JSON.stringify({ source: sourceRef.current }),
         });
         if (!response.ok) throw new Error();
-      } catch { setToast("Project Source 자동 저장에 실패했습니다"); }
+        if (autosaveSequenceRef.current === sequence) {
+          setLastSavedAt(new Date().toISOString());
+          setAutosaveState("saved");
+        }
+      } catch {
+        if (autosaveSequenceRef.current === sequence) setAutosaveState("error");
+        setToast("Project Source 자동 저장에 실패했습니다");
+      }
     }, 900);
     return () => window.clearTimeout(timer);
   }, [hydrated, projectId, source]);
@@ -397,7 +410,7 @@ export function EditorShell({ initialSource, projectId = null, initialVersions =
   return (
     <main className="editor-app">
       <header className="editor-topbar">
-        <div className="topbar-left"><Link className="editor-back" href="/" aria-label="홈으로"><ArrowLeft size={17} /></Link><Brand compact /><span className="topbar-divider" /><b className="project-name">{source.name}</b><span className="saved-state"><Save size={12} /> {projectId ? "Supabase Project Source" : "로컬 Project Source"}</span></div>
+        <div className="topbar-left"><Link className="editor-back" href={projectId ? "/projects" : "/"} aria-label={projectId ? "내 디자인으로" : "홈으로"}><ArrowLeft size={17} /></Link><Brand compact /><span className="topbar-divider" /><b className="project-name">{source.name}</b><span className={`saved-state saved-state-${autosaveState}`}><Save size={12} /> {autosaveLabel(autosaveState, lastSavedAt)}</span></div>
         <div className="viewport-switcher" aria-label="미리보기 기기"><button type="button" aria-label="Desktop 1920 × 1080" title="Desktop 1920 × 1080" className={viewport === "desktop" ? "active" : ""} onClick={() => setViewport("desktop")}><Monitor size={15} /></button><button type="button" aria-label="Tablet 1024 × 768" title="Tablet 1024 × 768" className={viewport === "tablet" ? "active" : ""} onClick={() => setViewport("tablet")}><Tablet size={15} /></button><button type="button" aria-label="Mobile 390 × 844" title="Mobile 390 × 844" className={viewport === "mobile" ? "active" : ""} onClick={() => setViewport("mobile")}><Smartphone size={15} /></button></div>
         <div className="topbar-actions"><button disabled={!past.length} onClick={undo} title="실행 취소"><Undo2 size={16} /></button><button disabled={!future.length} onClick={redo} title="다시 실행"><Redo2 size={16} /></button><button onClick={() => setShowVersions(true)}><History size={15} /> 버전</button><Link className="new-design-button" href="/#create"><Sparkles size={15} /> 새 디자인</Link><button className="publish-button" onClick={() => setShowPublish(true)}>게시</button></div>
       </header>

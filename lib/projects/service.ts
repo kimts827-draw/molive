@@ -1,6 +1,8 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { didUpdateProject } from "@/lib/projects/persistence";
 import { isProjectSource, type ProjectSource } from "@/lib/project-source";
+export { hasSupabaseServerConfig } from "@/lib/supabase/config";
 
 export type StoredVersion = {
   id: string;
@@ -8,14 +10,6 @@ export type StoredVersion = {
   createdAt: string;
   source: ProjectSource;
 };
-
-export function hasSupabaseServerConfig() {
-  return Boolean(
-    process.env.NEXT_PUBLIC_SUPABASE_URL
-    && process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
-    && process.env.SUPABASE_SECRET_KEY,
-  );
-}
 
 export async function assertProjectOwner(projectId: string, ownerId: string) {
   const admin = createAdminClient();
@@ -27,6 +21,23 @@ export async function assertProjectOwner(projectId: string, ownerId: string) {
     .single();
   if (error || !data) throw new Error("프로젝트를 찾을 수 없습니다.");
   return data;
+}
+
+export async function listProjects(ownerId: string) {
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("projects")
+    .select("id,name,status,current_version_id,updated_at")
+    .eq("owner_id", ownerId)
+    .order("updated_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map((project) => ({
+    id: String(project.id),
+    name: String(project.name),
+    status: String(project.status),
+    currentVersionId: project.current_version_id ? String(project.current_version_id) : null,
+    updatedAt: String(project.updated_at),
+  }));
 }
 
 export async function createProjectWithVersion(ownerId: string, source: ProjectSource, brandBrief: Record<string, unknown>) {
@@ -73,12 +84,15 @@ export async function loadProject(projectId: string, ownerId: string) {
 
 export async function saveDraft(projectId: string, ownerId: string, source: ProjectSource) {
   const admin = createAdminClient();
-  const { error } = await admin
+  const { data, error } = await admin
     .from("projects")
     .update({ current_document: source, name: source.name, updated_at: new Date().toISOString() })
     .eq("id", projectId)
-    .eq("owner_id", ownerId);
+    .eq("owner_id", ownerId)
+    .select("id")
+    .maybeSingle();
   if (error) throw error;
+  return didUpdateProject(data);
 }
 
 export async function createVersion(projectId: string, ownerId: string, label: string, source: ProjectSource) {

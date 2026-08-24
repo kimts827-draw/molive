@@ -27,6 +27,14 @@ npm run dev
 
 `http://localhost:3000`에서 랜딩, `/editor`에서 편집기를 확인합니다. 비밀값은 커밋하지 말고 [`.env.example`](.env.example)의 이름만 기준으로 로컬/Vercel에 설정합니다.
 
+영구 프로젝트 저장에는 다음 세 환경변수가 모두 필요합니다. 하나라도 없으면 프로덕션에서는 생성이 중단되고, 개발환경에서 세 값이 모두 없을 때만 화면에 명시된 메모리 데모 모드로 동작합니다.
+
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+- `SUPABASE_SECRET_KEY` — 서버 전용이며 브라우저에 노출하면 안 됩니다.
+
+원격 DB에는 `supabase db push` 후 `projects`, `site_versions`, `create_project_with_version`, `create_site_version_and_activate` 및 관련 RLS/GRANT가 적용됐는지 Supabase Dashboard 또는 migration 목록에서 직접 확인해야 합니다.
+
 ```bash
 npm run typecheck
 npm test

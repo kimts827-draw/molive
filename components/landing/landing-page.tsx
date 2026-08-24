@@ -13,9 +13,10 @@ import {
 import { Brand } from "@/components/brand";
 import { PromptComposer } from "@/components/landing/prompt-composer";
 
-export function LandingPage() {
+export function LandingPage({ userEmail, persistenceEnabled, demoMode, missingEnv }: { userEmail: string | null; persistenceEnabled: boolean; demoMode: boolean; missingEnv: string[] }) {
   return (
     <main className="marketing-shell">
+      {!persistenceEnabled && <div className="persistence-banner">{demoMode ? "개발 데모 모드 · 영구 저장이 비활성화돼 있습니다." : `영구 저장 설정이 완료되지 않았습니다 · ${missingEnv.join(", ")}`}</div>}
       <nav className="marketing-nav">
         <Brand />
         <div className="nav-links" aria-label="주요 메뉴">
@@ -25,20 +26,18 @@ export function LandingPage() {
         </div>
         <div className="nav-actions">
           <Link className="text-link" href="/editor">데모 열기</Link>
-          <Link className="button button-dark button-small" href="/editor">
-            무료로 시작 <ArrowRight size={15} />
-          </Link>
+          {userEmail ? <><Link className="text-link" href="/projects">내 디자인</Link><span className="nav-user" title={userEmail}>{userEmail}</span><form action="/auth/signout" method="post"><button className="nav-signout" type="submit">로그아웃</button></form></> : persistenceEnabled ? <Link className="button button-dark button-small" href="/login?next=%2F%23create">로그인 <ArrowRight size={15} /></Link> : <span className="nav-disabled">저장 설정 필요</span>}
         </div>
       </nav>
 
-      <section className="hero-section">
+      <section className="hero-section" id="create">
         <div className="eyebrow"><Sparkles size={14} /> Cafe24를 위한 AI 디자인 스튜디오</div>
         <h1>설명하면 만들어지고,<br /><em>클릭하면 바뀝니다.</em></h1>
         <p className="hero-copy">
           브랜드를 말해 주세요. Moiré가 Cafe24의 판매 기능은 그대로 지키면서<br className="desktop-only" />
           레이아웃, 타이포그래피, 컬러와 상품 표현을 새롭게 디자인합니다.
         </p>
-        <PromptComposer />
+        <PromptComposer signedIn={Boolean(userEmail)} persistenceEnabled={persistenceEnabled} demoMode={demoMode} />
         <p className="hero-note"><Check size={13} /> HTML·FTP 작업 없이 Cafe24에 바로 연결</p>
       </section>
 
@@ -160,8 +159,8 @@ export function LandingPage() {
       <section className="final-cta">
         <div><Sparkles size={18} /> 첫 번째 스토어를 디자인해 보세요</div>
         <h2>브랜드는 이미 당신 안에 있습니다.<br />이제 쇼핑몰로 보여주세요.</h2>
-        <Link className="button button-light" href="/editor">AI 스튜디오 열기 <ArrowRight size={17} /></Link>
-        <p>데모 데이터로 바로 체험 · Cafe24 연결은 게시할 때</p>
+        <Link className="button button-light" href="#create">AI 스튜디오 열기 <ArrowRight size={17} /></Link>
+        <p>{persistenceEnabled ? "로그인 후 자동 저장 · Cafe24 연결은 게시할 때" : "개발 데모 데이터로 체험 · 영구 저장 비활성"}</p>
       </section>
 
       <footer className="marketing-footer">

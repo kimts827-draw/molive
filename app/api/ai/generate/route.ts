@@ -1,19 +1,26 @@
 import { z } from "zod";
 import { errorResponse, requireApiUser } from "@/lib/api/auth";
 import { generateProjectSource } from "@/lib/openai/site-generator";
-import { createProjectWithVersion, hasSupabaseServerConfig } from "@/lib/projects/service";
+import { createProjectWithVersion } from "@/lib/projects/service";
+import { hasSupabaseServerConfig, isSupabaseDemoMode, missingSupabaseServerEnv } from "@/lib/supabase/config";
 
 const assetUrl = z.string().refine((value) => value.startsWith("https://") || /^data:image\/(jpeg|png|webp|avif);base64,/.test(value), "지원하지 않는 이미지 형식입니다.");
 const requestSchema = z.object({ prompt: z.string().min(10).max(5000), brandName: z.string().max(120).optional(), colors: z.array(z.string()).max(8).optional(), assetUrls: z.array(assetUrl).max(6).optional(), assetPaths: z.array(z.string().max(500)).max(6).optional(), assetRoles: z.array(z.enum(["logo", "product", "reference", "image"])).max(6).optional() });
 
 export async function POST(request: Request) {
   try {
+    if (!hasSupabaseServerConfig() && !isSupabaseDemoMode()) {
+      return Response.json({ error: `영구 저장 설정이 완료되지 않았습니다. 누락된 환경변수: ${missingSupabaseServerEnv().join(", ")}` }, { status: 503 });
+    }
     const user = await requireApiUser(request);
+    if (hasSupabaseServerConfig() && (user.id === "public-demo-user" || user.id === "local-development-user")) {
+      return Response.json({ error: "프로젝트를 저장하려면 로그인해 주세요." }, { status: 401 });
+    }
     const parsedInput = requestSchema.safeParse(await request.json());
     if (!parsedInput.success) return Response.json({ error: "요청 데이터 형식이 올바르지 않습니다.", issues: parsedInput.error.issues }, { status: 400 });
     try {
       const result = await generateProjectSource(parsedInput.data);
-      if (!hasSupabaseServerConfig()) return Response.json(result);
+      if (!hasSupabaseServerConfig()) return Response.json({ ...result, persistenceMode: "demo" });
       const stored = await createProjectWithVersion(user.id, result.source, {
         prompt: parsedInput.data.prompt,
         brandName: parsedInput.data.brandName ?? null,
