@@ -1,10 +1,11 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { Brand } from "@/components/brand";
 import { ensureUserProfile } from "@/lib/auth/profile";
 import { safeNextPath } from "@/lib/auth/redirect";
+import { readRememberedEmail, updateRememberedEmail } from "@/lib/auth/remembered-email";
 import { createClient } from "@/lib/supabase/client";
 
 type AuthMode = "login" | "signup";
@@ -14,6 +15,7 @@ export function LoginForm({ enabled, missingEnv }: { enabled: boolean; missingEn
   const searchParams = useSearchParams();
   const [mode, setMode] = useState<AuthMode>("login");
   const [email, setEmail] = useState("");
+  const [rememberEmail, setRememberEmail] = useState(false);
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [contactEmail, setContactEmail] = useState("");
@@ -23,6 +25,18 @@ export function LoginForm({ enabled, missingEnv }: { enabled: boolean; missingEn
 
   const next = safeNextPath(searchParams.get("next"));
   const callbackUrl = () => `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`;
+
+  useEffect(() => {
+    try {
+      const savedEmail = readRememberedEmail(window.localStorage);
+      if (savedEmail) {
+        setEmail(savedEmail);
+        setRememberEmail(true);
+      }
+    } catch {
+      // Storage can be unavailable in privacy-restricted browser contexts.
+    }
+  }, []);
 
   function disabledMessage() {
     setMessage(`영구 저장 설정이 비활성화돼 있습니다. 필요한 환경변수: ${missingEnv.join(", ")}`);
@@ -52,6 +66,7 @@ export function LoginForm({ enabled, missingEnv }: { enabled: boolean; missingEn
         const { data, error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
         if (!data.user) throw new Error("로그인 사용자를 확인하지 못했습니다.");
+        try { updateRememberedEmail(window.localStorage, email, rememberEmail); } catch { /* Login must not depend on local storage. */ }
         await ensureUserProfile(supabase, data.user);
         window.location.assign(next);
         return;
@@ -96,6 +111,7 @@ export function LoginForm({ enabled, missingEnv }: { enabled: boolean; missingEn
         {mode === "signup" && <label>이름<input type="text" required maxLength={80} disabled={!enabled} value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="이름 또는 브랜드 담당자명" /></label>}
         <label>로그인 이메일<input type="email" required disabled={!enabled} value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" /></label>
         <label>비밀번호<input type="password" required minLength={8} disabled={!enabled} value={password} onChange={(event) => setPassword(event.target.value)} placeholder="8자 이상" /></label>
+        {mode === "login" && <label className="auth-consent auth-remember"><input type="checkbox" checked={rememberEmail} onChange={(event) => setRememberEmail(event.target.checked)} /><span>이메일 저장</span></label>}
         {mode === "signup" && <><label>연락용 이메일 <span className="optional">선택</span><input type="email" disabled={!enabled} value={contactEmail} onChange={(event) => setContactEmail(event.target.value)} placeholder="로그인 이메일과 달라도 됩니다" /></label><label className="auth-consent"><input type="checkbox" checked={marketingOptIn} onChange={(event) => setMarketingOptIn(event.target.checked)} /><span>제품 업데이트와 마케팅 이메일 수신에 동의합니다. 선택 사항이며 계정 설정에서 철회할 수 있습니다.</span></label></>}
         <button disabled={Boolean(busy) || !enabled}>{busy === mode ? "처리 중..." : mode === "login" ? "이메일로 로그인" : "이메일로 회원가입"}</button>
       </form>

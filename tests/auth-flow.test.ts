@@ -4,6 +4,7 @@ import test from "node:test";
 import { marketingConsentValues, parseProfileUpdate } from "../lib/auth/profile.ts";
 import { safeNextPath } from "../lib/auth/redirect.ts";
 import { applicationRoleFromAppMetadata } from "../lib/auth/roles.ts";
+import { readRememberedEmail, rememberedEmailKey, updateRememberedEmail } from "../lib/auth/remembered-email.ts";
 
 test("safeNextPath keeps local destinations and rejects external redirects", () => {
   assert.equal(safeNextPath("/#create"), "/#create");
@@ -42,6 +43,31 @@ test("login UI uses OAuth and password auth without Magic Link", () => {
   assert.match(login, /signInWithPassword/);
   assert.match(login, /auth\.signUp/);
   assert.doesNotMatch(login, /signInWithOtp/);
+});
+
+test("remembered email stores only the normalized email and supports removal", () => {
+  const values = new Map<string, string>();
+  const storage = {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => values.set(key, value),
+    removeItem: (key: string) => values.delete(key),
+  };
+  updateRememberedEmail(storage, " User@Example.COM ", true);
+  assert.equal(values.get(rememberedEmailKey), "user@example.com");
+  assert.equal(readRememberedEmail(storage), "user@example.com");
+  assert.equal(values.size, 1);
+  updateRememberedEmail(storage, "ignored@example.com", false);
+  assert.equal(readRememberedEmail(storage), "");
+});
+
+test("email save is limited to successful password login", () => {
+  const login = readFileSync(new URL("../components/auth/login-form.tsx", import.meta.url), "utf8");
+  const passwordLogin = login.indexOf("signInWithPassword");
+  const rememberWrite = login.lastIndexOf("updateRememberedEmail");
+  const oauthLogin = login.indexOf("signInWithOAuth");
+  assert.ok(passwordLogin > oauthLogin);
+  assert.ok(rememberWrite > passwordLogin);
+  assert.doesNotMatch(readFileSync(new URL("../lib/auth/remembered-email.ts", import.meta.url), "utf8"), /password/i);
 });
 
 test("generation prompt survives the OAuth round trip", () => {
