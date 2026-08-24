@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { renderProject } from "../lib/component-library/index.ts";
-import { commerceCss, composeCommerce, isolateAiDesignCss, renderHeaderV1, resolveLegacyComposition, verifiedProductLayoutCss } from "../lib/commerce/fixed-components.ts";
+import { commerceCss, composeCommerce, isolateAiDesignCss, renderProjectHeaderV1, resolveLegacyComposition, verifiedProductLayoutCss } from "../lib/commerce/fixed-components.ts";
 import { FOOTER_SHELL_CSS, renderFooterShell } from "../lib/commerce/footer-shell.ts";
 import { buildBridgeCss, buildFooterThemeCss } from "../lib/cafe24/theme-bridge.ts";
 import { buildEditorPreviewDocument } from "../lib/editor/preview-document.ts";
@@ -92,7 +92,7 @@ test("Legacy ProjectSource Preview 출력은 기존 HTML/CSS 직접 렌더링을
   const legacyCommerce = composeCommerce(legacySource.html, "preview", legacySource.commerce, composition, { includeHeader: false });
   const verifiedProductCss = verifiedProductLayoutCss(composition.productLayout);
   const rootValue = "moire-legacy-preview";
-  const shell = `<div id="wrap" data-moire-root="${rootValue}">${renderHeaderV1("preview", composition.headerVariant)}<div id="container"><main id="contents" role="main" data-moire-full="true">${legacyCommerce.html}</main></div>${renderFooterShell("preview")}</div>`;
+  const shell = `<div id="wrap" data-moire-root="${rootValue}">${renderProjectHeaderV1("preview", legacySource)}<div id="container"><main id="contents" role="main" data-moire-full="true">${legacyCommerce.html}</main></div>${renderFooterShell("preview")}</div>`;
   const css = `${buildBridgeCss(legacySource.css)}\n${isolateAiDesignCss(legacySource.css)}\n${commerceCss(legacySource.commerce, composition.headerVariant)}[module="Layout_stateLogon"]{display:none}\n${verifiedProductCss}\n${FOOTER_SHELL_CSS}\n${buildFooterThemeCss(legacySource.css)}`;
 
   assert.equal(preview.kind, "legacy");

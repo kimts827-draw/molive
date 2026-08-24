@@ -1,13 +1,20 @@
 import type { SafetyViolation } from "../cafe24/protection.ts";
 import { renderBlueprintContract, type DesignBlueprint } from "../design-library/blueprint.ts";
 import { HERO_VARIANT_IDS } from "../design-library/variants.ts";
+import { BRAND_IMAGE_POLICY, PRODUCT_AREA_IMAGE_POLICY } from "../assets/asset-policy.ts";
 
 export type DesignGenerationInput = {
   prompt: string;
   brandName?: string;
   colors?: string[];
+  /** 이번 생성 요청의 이미지 세션입니다. 첨부는 이 세션 폴더 안에 있는 것만 인정합니다. */
+  assetSessionId?: string;
   assetUrls?: string[];
   assetRoles?: string[];
+  /** 현재 프로젝트에 명시적으로 연결된 이미지 주소입니다(재생성 시 사용). */
+  projectAssetUrls?: string[];
+  /** 이번 생성 과정에서 새로 만들어 등록한 이미지 주소입니다. */
+  generatedAssetUrls?: string[];
   /** blueprint 조합을 결정적으로 만들 때만 씁니다(테스트/스크립트용). */
   seed?: number;
 };
@@ -21,6 +28,11 @@ Explicit brand colors: ${(input.colors ?? []).join(", ") || "None; infer a palet
 Attached image count: ${(input.assetUrls ?? []).length}
 Attachment roles in order: ${(input.assetRoles ?? []).join(", ") || "Not labelled"}
 Use attachments only through asset:// followed by the zero-based attachment index.
+
+IMAGE SCOPE FOR THIS GENERATION (${PRODUCT_AREA_IMAGE_POLICY} / ${BRAND_IMAGE_POLICY})
+- Product area: the section holding data-cafe24-slot="product-list" carries no img element and no background photography. Cafe24 product image bindings own every product photo.
+- Brand and mood sections: only the ${(input.assetUrls ?? []).length} attachment(s) of this request through asset://N, imagery you compose inside this response, or a fresh stock URL selected for this brief.
+- Stored images from any other project or any earlier request are out of scope even when they belong to the same account. Do not output such an address.
 
 Before coding, make coupled decisions and record them concretely in designRationale and the existing architecture fields: headerVariant (split-utility | centered-brand | overlay-minimal), heroComposition (${heroChoices}), productLayout (grid-four | large-grid), section order and selection, typography scale, image treatment, spacing/density, and content composition. Each decision must follow this brand and would be recognizably wrong for a materially different brand. Do not merely recolor a generic storefront. Then author the complete HTML and CSS.${blueprint ? `\n\n${renderBlueprintContract(blueprint)}` : ""}`;
 }

@@ -5,6 +5,12 @@ import { ensureEditingMetadata, validateNodePatch, validateProjectSource } from 
 import { buildDesignGenerationUserPrompt, validateGeneratedDesignContract, type DesignGenerationInput } from "@/lib/openai/design-generation-contract";
 import { composeDesignBlueprint } from "@/lib/design-library/blueprint";
 import { HERO_VARIANT_IDS } from "@/lib/design-library/variants";
+import { auditAssetReferenceTokens, auditGeneratedAssets, collectAssetReferences, createAssetAllowlist, isFreshlyCreatedImage } from "@/lib/assets/asset-policy";
+import { resolvePreviewProducts, type PreviewProductMock } from "@/lib/component-library/preview-mock";
+import { applyGeneratedPreviewPhotos, previewPhotoTargets } from "@/lib/openai/preview-image-contract";
+import { generatePreviewProductPhotos, regenerateSectionImage, type GeneratedImageStore } from "@/lib/openai/preview-image-generator";
+import { isRepairableVerdict, verifyGeneralImages, type ImageProbe } from "@/lib/assets/image-verification";
+import { repairBrokenImages } from "@/lib/assets/image-repair";
 import { writeGenerationTrace, type GenerationTrace } from "@/lib/openai/dev-trace";
 import { usageEventFromResponse, type OpenAIUsageEvent } from "@/lib/openai/usage";
 import type { ProjectSource } from "@/lib/project-source";
@@ -35,7 +41,15 @@ const commerceSchema = z.object({
   thumbBackground: z.string().min(3),
 });
 
+/** Preview 상품 카드에만 쓰는 이번 생성의 mock 초안입니다. Cafe24 export는 쓰지 않습니다. */
+const previewProductSchema = z.object({
+  name: z.string().trim().min(1).max(60),
+  imageRef: z.string().trim().max(40),
+});
+
 const designSchema = z.object({
+  brandName: z.string().trim().min(1).max(120),
+  previewProducts: z.array(previewProductSchema).length(4),
   name: z.string().min(1),
   designRationale: z.string().min(1),
   architecture: architectureSchema,
@@ -70,13 +84,25 @@ const commerceJsonSchema = {
   },
 } as const;
 
+const previewProductsJsonSchema = {
+  type: "array",
+  minItems: 4,
+  maxItems: 4,
+  items: {
+    type: "object",
+    additionalProperties: false,
+    required: ["name", "imageRef"],
+    properties: { name: { type: "string" }, imageRef: { type: "string" } },
+  },
+} as const;
+
 const designJsonSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["name", "designRationale", "architecture", "commerce", "html", "css"],
+  required: ["brandName", "name", "designRationale", "architecture", "commerce", "previewProducts", "html", "css"],
   properties: {
-    name: { type: "string" }, designRationale: { type: "string" }, architecture: architectureJsonSchema,
-    commerce: commerceJsonSchema, html: { type: "string" }, css: { type: "string" },
+    brandName: { type: "string" }, name: { type: "string" }, designRationale: { type: "string" }, architecture: architectureJsonSchema,
+    commerce: commerceJsonSchema, previewProducts: previewProductsJsonSchema, html: { type: "string" }, css: { type: "string" },
   },
 } as const;
 
@@ -92,6 +118,10 @@ const systemPrompt = `You are the autonomous art director and frontend designer 
 Your primary output is the ACTUAL semantic HTML and CSS that will be stored, previewed, edited, and published. There is no section AST, component renderer, template, or predetermined page skeleton after your response. The architecture summary is audit metadata only and never renders the page.
 
 The user message contains a binding DESIGN BLUEPRINT composed from real Cafe24 reference patterns: one hero variant, an ordered section plan, and density/typography/image-treatment axes. Build exactly that structure — do not add, drop, or reorder sections — and spend your creativity on copy, palette, imagery, proportion, and detail within it. Two briefs with different blueprints must produce structurally different pages, not recolored copies.
+
+IDENTITY FIELDS
+- brandName is the exact customer-facing brand wordmark only (for example, "MAISON DEUX"). Do not append a campaign, collection, season, or design concept.
+- name is the project/design title and may combine brand and concept (for example, "MAISON DEUX — Quiet Form"). Keep these two fields semantically separate.
 
 COMMERCE FIRST
 - This is a real storefront whose job is conversion, not a one-screen brand landing page. Build a complete journey from brand promise to product discovery to trust and a clear next action.
@@ -140,8 +170,20 @@ EDITABILITY AND SAFETY
 - Do not fabricate reviews, customer logos, awards, certifications, sales numbers, or performance claims.
 - Do not use !important. Do not draw border-bottom on the Hero or border-top on the following major section; transition with background, overlap, or spacing instead.
 
+PREVIEW PRODUCT MOCK
+- previewProducts fills the four product cards shown in the editor Preview only. The Cafe24 export ignores it completely and keeps the real product bindings, so it is never merchandise data and never leaves the Preview.
+- Give four sample product names a shopper in THIS industry would actually see on this storefront. An auto-care brief means detailing, washing, and vehicle accessory items; a fashion brief means garments; a dessert brief means desserts. Never carry names over from another brief or another project.
+- imageRef picks the sample photo and accepts only two values: "asset://N" to reuse attachment N of this request, or an empty string. An empty string means a product photo is generated for that name during this same run, which is the normal case. Any stock, stored, or remembered image address here is forbidden.
+- Use asset://N only when attachment N actually shows that product. Otherwise leave imageRef empty so the photo is generated from the name.
+- Because the name drives the generated photo, write names that are concrete and photographable: a specific product a shopper in this industry buys, not a category label or a marketing slogan.
+- Do not invent prices, discounts, review counts, or stock numbers — the price line is a fixed placeholder.
+
 ASSETS AND COPY
-- For attached images use asset://0, asset://1, etc. in attachment order. When none exist, use relevant images.unsplash.com URLs with explicit crop parameters.
+- Image rules are separate for the product area and for brand/mood areas. Never mix the two.
+- PRODUCT AREA: the section that holds data-cafe24-slot="product-list" must contain zero img elements and zero background photography. Product photos are owned by the Cafe24 product image binding and are injected by the verified component at render time. A stock photo, a sample product photo, or an attachment placed inside the product section is a defect, and an unrelated-industry photo there is the worst case.
+- BRAND AND MOOD AREAS (hero, story, editorial, banner, gallery): use, in this order, (1) the attachments of THIS request through asset://N, (2) imagery you compose yourself inside this response such as CSS gradients, colour fields, or inline data:image/svg+xml art, (3) only when neither fits, a fresh images.unsplash.com URL with explicit crop parameters chosen for THIS brief.
+- Never emit a stored asset address that was not attached to this request. Any project-assets storage URL you did not receive in this request belongs to another project and is forbidden.
+- Do not reuse image URLs from earlier briefs, earlier examples, or memory. Every image must be traceable to this request.
 - Write customer-facing copy in Korean unless concise display English is part of the art direction.
 - Output clean production markup, not an explanation embedded in HTML.`;
 
@@ -150,6 +192,74 @@ function model() { return process.env.OPENAI_MODEL || "gpt-5.6"; }
 
 function resolveAssetReferences(value: string, assetUrls: string[]) {
   return value.replace(/asset:\/\/(\d+)/g, (_token, index: string) => assetUrls[Number(index)] ?? "");
+}
+
+/** Preview mock 이미지가 이번 생성/세션 자산 밖에서 오지 않았는지 확인합니다. */
+function auditPreviewProducts(products: readonly PreviewProductMock[], allowlist: ReturnType<typeof createAssetAllowlist>) {
+  return products.flatMap((product) => allowlist.has(product.image) || isFreshlyCreatedImage(product.image)
+    ? []
+    : [{ code: "PREVIEW_PRODUCT_ASSET", message: "Preview 상품 mock 이미지는 이번 요청 첨부이거나 이번 생성에서 만든 이미지여야 합니다.", token: product.image.slice(0, 120) }]);
+}
+
+function previewImageKind(image: string, attachmentUrls: readonly string[]) {
+  if (attachmentUrls.includes(image)) return "attachment";
+  return image.startsWith("data:image/svg+xml") ? "placeholder" : "generated-photo";
+}
+
+/**
+ * Preview 상품 카드에 이번 생성의 업종/컨셉에 맞는 사진을 채웁니다.
+ * 첨부가 붙은 자리는 그대로 두고, 사진 생성이 실패한 자리만 SVG 자리표시자로 남습니다.
+ * 이 단계는 어떤 이유로도 디자인 생성을 실패시키지 않습니다.
+ */
+async function addGeneratedPreviewPhotos(input: {
+  products: PreviewProductMock[];
+  attachmentUrls: readonly string[];
+  brief: Parameters<typeof generatePreviewProductPhotos>[0]["brief"];
+  store?: GeneratedImageStore;
+  onUsage?: (event: OpenAIUsageEvent) => Promise<void>;
+}): Promise<PreviewProductMock[]> {
+  if (!input.store) return input.products;
+  const targets = previewPhotoTargets({ products: input.products, attachmentUrls: input.attachmentUrls });
+  if (!targets.length) return input.products;
+  try {
+    const photos = await generatePreviewProductPhotos({ targets, brief: input.brief, store: input.store, onUsage: input.onUsage });
+    return applyGeneratedPreviewPhotos({ products: input.products, photos, attachmentUrls: input.attachmentUrls });
+  } catch (error) {
+    console.error("Preview 상품 사진 생성을 건너뜁니다", error instanceof Error ? error.message : "unknown error");
+    return input.products;
+  }
+}
+
+/**
+ * 저장하기 전에 일반 섹션 이미지가 실제로 로드되는지 확인하고, 깨진 자리만 고칩니다.
+ * 정상 이미지와 전체 디자인은 다시 만들지 않고, 상품 영역은 검사 대상이 아닙니다.
+ */
+async function verifyAndRepairGeneralImages(input: {
+  source: { html: string; css: string };
+  allowlist: ReturnType<typeof createAssetAllowlist>;
+  brief: Parameters<typeof regenerateSectionImage>[0]["brief"];
+  probe?: ImageProbe;
+  store?: GeneratedImageStore;
+  onUsage?: (event: OpenAIUsageEvent) => Promise<void>;
+}) {
+  if (!input.probe) return null;
+  try {
+    const checks = await verifyGeneralImages({ html: input.source.html, css: input.source.css, allowlist: input.allowlist, probe: input.probe });
+    if (!checks.some((check) => isRepairableVerdict(check.verdict))) return { checks, repair: null };
+    const store = input.store;
+    const repair = await repairBrokenImages({
+      source: input.source,
+      checks,
+      palette: input.brief.palette,
+      // 깨진 자리마다 재생성은 1회입니다. 실패하면 repairBrokenImages가 안전한 fallback으로 마감합니다.
+      regenerate: store ? (request) => regenerateSectionImage({ request, brief: input.brief, store, onUsage: input.onUsage }) : undefined,
+    });
+    return { checks, repair };
+  } catch (error) {
+    // 검증 자체가 실패해도 생성 결과를 버리지 않습니다. 검증 전 상태를 그대로 씁니다.
+    console.error("일반 이미지 검증을 건너뜁니다", error instanceof Error ? error.message : "unknown error");
+    return null;
+  }
 }
 
 function responseTrace(response: { id: string; model: string; output_text: string; usage?: unknown }) {
@@ -166,10 +276,19 @@ async function recordUsage(response: { model: string; usage?: Parameters<typeof 
   }
 }
 
-export async function generateProjectSource(input: DesignGenerationInput, options?: { onUsage?: (event: OpenAIUsageEvent) => Promise<void> }) {
+export async function generateProjectSource(input: DesignGenerationInput, options?: { onUsage?: (event: OpenAIUsageEvent) => Promise<void>; onPreviewImageUsage?: (event: OpenAIUsageEvent) => Promise<void>; previewImageStore?: GeneratedImageStore; imageProbe?: ImageProbe }) {
   const traceId = crypto.randomUUID();
   const createdAt = new Date().toISOString();
   const blueprint = composeDesignBlueprint(input, input.seed);
+  /**
+   * 이번 생성이 쓸 수 있는 이미지 전체입니다.
+   * 이전 프로젝트에 저장된 이미지는 같은 계정의 것이라도 여기에 들어오지 않습니다.
+   */
+  const assetAllowlist = createAssetAllowlist({
+    attachments: input.assetUrls ?? [],
+    projectAssets: input.projectAssetUrls ?? [],
+    generated: input.generatedAssetUrls ?? [],
+  });
   const userPrompt = buildDesignGenerationUserPrompt(input, blueprint);
   const blueprintAudit = {
     industry: blueprint.industry,
@@ -184,7 +303,7 @@ export async function generateProjectSource(input: DesignGenerationInput, option
     imageTreatment: blueprint.imageTreatment,
     seed: blueprint.seed,
   };
-  const trace: GenerationTrace = { traceId, kind: "generate", createdAt, request: { model: model(), systemPrompt, userPrompt, blueprint: blueprintAudit, imageCount: input.assetUrls?.length ?? 0 }, response: [] };
+  const trace: GenerationTrace = { traceId, kind: "generate", createdAt, request: { model: model(), systemPrompt, userPrompt, blueprint: blueprintAudit, imageCount: input.assetUrls?.length ?? 0, assetSessionId: input.assetSessionId ?? null, allowedAssetCount: assetAllowlist.size }, response: [] };
   let previousIssues: string[] = [];
 
   try {
@@ -204,23 +323,68 @@ export async function generateProjectSource(input: DesignGenerationInput, option
       await recordUsage(response, options?.onUsage);
       const parsed = designSchema.parse(JSON.parse(response.output_text));
       const projectId = crypto.randomUUID();
+      // Preview mock의 이미지는 이번 세션 첨부이거나 이번 생성에서 그린 타일뿐입니다.
+      const previewProducts = resolvePreviewProducts({
+        drafts: parsed.previewProducts,
+        assetUrls: input.assetUrls ?? [],
+        palette: { background: parsed.commerce.thumbBackground, accent: parsed.commerce.accent, ink: parsed.commerce.ink },
+      });
+      const assetTokenViolations = auditAssetReferenceTokens({ html: parsed.html, css: parsed.css }, input.assetUrls?.length ?? 0);
       const rawHtml = resolveAssetReferences(parsed.html, input.assetUrls ?? []);
       const html = ensureEditingMetadata(rawHtml, `moire-${projectId.slice(0, 8)}`);
       const css = resolveAssetReferences(parsed.css, input.assetUrls ?? []);
-      const source: ProjectSource = { id: projectId, name: parsed.name, html, css, architecture: parsed.architecture, commerce: parsed.commerce, updatedAt: new Date().toISOString() };
+      const source: ProjectSource = {
+        id: projectId,
+        brandName: input.brandName?.trim() || parsed.brandName,
+        name: parsed.name,
+        html,
+        css,
+        architecture: parsed.architecture,
+        commerce: parsed.commerce,
+        previewProducts,
+        updatedAt: new Date().toISOString(),
+      };
       const baseValidator = validateProjectSource(source);
       const designViolations = validateGeneratedDesignContract(source, blueprint);
+      // 상품 영역과 브랜드/무드 영역의 이미지 규칙을 분리해 감사합니다.
+      const assetViolations = [...assetTokenViolations, ...auditGeneratedAssets(source, assetAllowlist), ...auditPreviewProducts(previewProducts, assetAllowlist)];
       const validator = {
         ...baseValidator,
-        safe: baseValidator.safe && designViolations.length === 0,
-        violations: [...baseValidator.violations, ...designViolations],
+        safe: baseValidator.safe && designViolations.length === 0 && assetViolations.length === 0,
+        violations: [...baseValidator.violations, ...designViolations, ...assetViolations],
       };
       (trace.response as unknown[]).push({ attempt, ...responseTrace(response), rawGenerated: { architecture: parsed.architecture, html: rawHtml, css }, normalizedProjectSource: source, validator });
       if (validator.safe) {
+        const imageBrief = { industry: blueprint.industry, brief: input.prompt, brandName: source.brandName, palette: { surface: parsed.commerce.surface, accent: parsed.commerce.accent, thumbBackground: parsed.commerce.thumbBackground } };
+        // 검증을 통과한 draft에만 Preview 사진을 만듭니다. 실패한 자리는 SVG 자리표시자를 유지합니다.
+        source.previewProducts = await addGeneratedPreviewPhotos({
+          products: previewProducts,
+          attachmentUrls: input.assetUrls ?? [],
+          brief: imageBrief,
+          store: options?.previewImageStore,
+          onUsage: options?.onPreviewImageUsage,
+        });
+        // 저장 전에 일반 섹션 이미지의 실제 로드 가능 여부를 확인하고 깨진 자리만 고칩니다.
+        const imageReport = await verifyAndRepairGeneralImages({
+          source,
+          allowlist: assetAllowlist,
+          brief: imageBrief,
+          probe: options?.imageProbe,
+          store: options?.previewImageStore,
+          onUsage: options?.onPreviewImageUsage,
+        });
+        if (imageReport?.repair) {
+          source.html = imageReport.repair.html;
+          source.css = imageReport.repair.css;
+        }
         trace.generated = source;
         trace.validator = validator;
+        trace.previewProductImages = source.previewProducts.map((product) => ({ name: product.name, kind: previewImageKind(product.image, input.assetUrls ?? []) }));
+        trace.generalImageVerification = imageReport
+          ? { checks: imageReport.checks, repaired: imageReport.repair?.actions ?? [], unverified: imageReport.repair?.unverified ?? imageReport.checks.filter((check) => check.verdict === "unverified").map((check) => check.url) }
+          : null;
         await writeGenerationTrace(trace);
-        return { source, rationale: parsed.designRationale, traceId, validator, blueprint: blueprintAudit };
+        return { source, rationale: parsed.designRationale, traceId, validator, blueprint: blueprintAudit, imageReport: imageReport ? { repaired: imageReport.repair?.actions.length ?? 0, unverified: imageReport.repair?.unverified.length ?? 0 } : null };
       }
       previousIssues = validator.violations.map((item) => `${item.code}: ${item.message}${item.token ? ` (${item.token})` : ""}`).slice(0, 24);
     }
@@ -241,7 +405,7 @@ SELECTED-NODE EDIT MODE
 - Every nodeCss selector must contain the exact selector [data-moire-id="SELECTED_ID"]. This hard boundary prevents changes outside the selected area.
 - Do not refer to styles outside the selected node. Preserve data-cafe24-slot when it exists in the selected subtree.`;
 
-export async function editProjectNode(input: { prompt: string; nodeId: string; nodeType: string; nodeHtml: string; projectCss: string; rootValue: string; architecture: ProjectSource["architecture"] }) {
+export async function editProjectNode(input: { prompt: string; nodeId: string; nodeType: string; nodeHtml: string; projectCss: string; rootValue: string; architecture: ProjectSource["architecture"] }, options?: { onUsage?: (event: OpenAIUsageEvent) => Promise<void> }) {
   const traceId = crypto.randomUUID();
   const createdAt = new Date().toISOString();
   const scopedSystemPrompt = `${editSystemPrompt.replaceAll("SELECTED_ID", input.nodeId)}\nEvery nodeCss selector must also begin with the exact project selector [data-moire-root="${input.rootValue}"].`;
@@ -253,10 +417,15 @@ export async function editProjectNode(input: { prompt: string; nodeId: string; n
       input: [{ role: "system", content: scopedSystemPrompt }, { role: "user", content: userPrompt }],
       text: { format: { type: "json_schema", name: "moire_node_patch", strict: true, schema: nodeEditJsonSchema } },
     });
+    await recordUsage(response, options?.onUsage);
     const parsed = nodeEditSchema.parse(JSON.parse(response.output_text));
     const nodeHtml = ensureEditingMetadata(parsed.nodeHtml, `moire-${input.nodeId.replace(/[^a-z0-9-]/gi, "").slice(0, 24)}`);
     const patch = { nodeHtml, nodeCss: parsed.nodeCss };
-    const validator = validateNodePatch({ nodeId: input.nodeId, rootValue: input.rootValue, ...patch });
+    // 편집은 이미 이 프로젝트에 들어와 있는 이미지만 물려받습니다. 다른 프로젝트의 저장 이미지는 새로 끌어올 수 없습니다.
+    const editAllowlist = createAssetAllowlist({ projectAssets: collectAssetReferences(input.nodeHtml, input.projectCss).map((reference) => reference.url) });
+    const assetViolations = auditGeneratedAssets({ html: patch.nodeHtml, css: patch.nodeCss }, editAllowlist);
+    const nodeValidator = validateNodePatch({ nodeId: input.nodeId, rootValue: input.rootValue, ...patch });
+    const validator = { safe: nodeValidator.safe && assetViolations.length === 0, violations: [...nodeValidator.violations, ...assetViolations] };
     trace.response = responseTrace(response);
     trace.generated = patch;
     trace.validator = validator;

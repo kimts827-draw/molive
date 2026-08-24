@@ -10,6 +10,8 @@ export type GenerationTrace = {
   response?: unknown;
   generated?: unknown;
   validator?: unknown;
+  previewProductImages?: unknown;
+  generalImageVerification?: unknown;
   error?: string;
 };
 

@@ -118,6 +118,40 @@ Cafe24의 Theme Pages 쓰기 API는 특정 클라이언트 승인이 필요하�
 - `service_role`, OpenAI 키, Cafe24 secret, Toss secret은 서버 전용입니다.
 - Cafe24 access/refresh token과 Toss billing key는 `private` 스키마 + 앱 레벨 암호화를 함께 사용합니다.
 - Storefront 이미지 제공용 `project-assets` bucket은 public read이고, 업로드·수정·삭제 경로의 첫 폴더는 `auth.uid()`로 제한합니다.
+- 업로드 경로는 `<uid>/sessions/<assetSessionId>/`(생성 요청 단위)와 `<uid>/projects/<projectId>/`(프로젝트 연결 자산)로 나뉩니다. 계정 공용 staging 폴더는 쓰지 않습니다.
+
+### 이미지 세션 격리
+
+`lib/assets/asset-policy.ts`가 생성·편집 결과의 이미지 출처를 강제합니다.
+
+- 허용 대상은 세 가지뿐입니다. 이번 요청의 첨부(이번 이미지 세션 폴더), 현재 프로젝트에 연결된 자산, 이번 생성에서 만든 이미지(`data:` URI 포함).
+- 이전 프로젝트·이전 세션의 저장 이미지는 소유자가 같아도 자동 재사용하지 않습니다. 요청 단계에서는 400, 생성 결과에서는 `FOREIGN_ASSET`으로 막습니다.
+- 상품 영역과 브랜드/무드 영역의 규칙이 분리됩니다. AI가 쓰는 HTML에서 상품 슬롯을 품은 section에는 이미지가 들어갈 수 없고(`PRODUCT_AREA_IMAGE`), 상품 사진은 Cafe24 상품 이미지 바인딩만 소유합니다.
+- 브랜드/무드 섹션은 첨부 → 이번 응답에서 직접 구성한 이미지 → 이번 brief에 맞춰 새로 고른 스톡 순으로만 이미지를 씁니다.
+
+### 저장 전 일반 이미지 로드 검증
+
+`lib/assets/image-verification.ts`가 저장 직전에 **상품 영역 밖** 이미지의 실제 로드 가능 여부를 확인합니다. 상품 사진과 Cafe24 binding은 코드가 소유하므로 검사 대상이 아닙니다.
+
+- 판정: `ok` / `invalid-reference`(빈 src, 남아 있는 `asset://N`, 지금 로드할 수 없는 테마 로컬 경로) / `out-of-scope`(이번 세션·프로젝트 자산이 아님) / `missing`(확정 4xx 또는 이미지가 아닌 content-type) / `unverified`(전송 오류가 재시도 후에도 계속됨).
+- 네트워크 확인은 URL당 1회이고, 정책만으로 판정되는 건은 요청조차 하지 않습니다. 전송 오류는 1회 재시도합니다.
+- **`unverified`는 고치지 않습니다.** 멀쩡한 이미지를 fallback으로 바꾸는 오탐이 더 나쁩니다.
+- 수리(`lib/assets/image-repair.ts`)는 확정 실패 자리마다 **재생성 1회**만 시도하고, 실패하면 프로젝트 팔레트로 그린 `data:image/svg+xml`(`lib/assets/fallback-image.ts`)로 마감합니다. 깨진 이미지 아이콘이 남지 않습니다.
+- 교체는 `src`/`srcset`/`url()` 안에서만 일어나며, 정상 이미지와 디자인 구조는 다시 만들지 않습니다. dev trace의 `generalImageVerification`에 판정·수리 내역이 남습니다.
+- 환경 변수: `IMAGE_VERIFY_TIMEOUT_MS`(기본 8000).
+
+### Preview 상품 mock과 Cafe24 binding 분리
+
+`lib/component-library/preview-mock.ts`가 Editor Preview 상품 카드 전용 mock을 소유합니다. Cafe24 export 경로는 이 모듈을 쓰지 않습니다.
+
+- 생성 응답의 `previewProducts`(4개, `{ name, imageRef }`)를 `ProjectSource.previewProducts`로 확정해 저장합니다. 이번 생성의 업종/컨셉에 맞는 샘플 상품명이 여기 들어갑니다(자동차용품 → 디테일링·세차·차량 액세서리).
+- `imageRef`는 `asset://N`(이번 세션 첨부)이나 빈 문자열만 인정합니다. 그 외 주소는 버리고, 확정 결과는 `PREVIEW_PRODUCT_ASSET`로 다시 검사합니다.
+- 첨부가 없는 자리는 **이번 생성에서 상품 사진을 만들어** 채웁니다. `lib/openai/preview-image-generator.ts`가 상품명·업종·브리프·팔레트로 프롬프트를 만들어 이미지 모델에 요청하고, 결과를 `<uid>/sessions/<sessionId>/generated-*.webp`에 올린 뒤 그 주소만 씁니다(Supabase가 없으면 data: URI). 저장된 사진은 `project_assets`에 `kind = 'generated'`로 연결됩니다.
+- 사진 생성은 validator를 통과한 draft에서만 1회 실행되고(재시도 중에는 호출하지 않음), `Promise.allSettled` + 타임아웃으로 장별 실패를 격리합니다. **실패한 자리에만** 프로젝트 팔레트로 그린 `data:image/svg+xml` 타일이 남습니다. 사진 생성은 어떤 경우에도 디자인 생성을 실패시키지 않습니다.
+- 환경 변수: `OPENAI_IMAGE_MODEL`(기본 `gpt-image-2`), `PREVIEW_PRODUCT_IMAGES=off`로 기능 차단, `PREVIEW_PRODUCT_IMAGE_TIMEOUT_MS`, 사용량 원가용 `OPENAI_IMAGE_PRICE_USD`. dev trace의 `previewProductImages`가 카드별로 `attachment | generated-photo | placeholder`를 남깁니다.
+- 가격 자리는 고정 문구(`Cafe24 상품 가격`)입니다. 실제 상품 값은 지어내지 않습니다.
+- mock은 `render(target, options)`의 `previewProducts`로만 흐르고 `target === "cafe24"`에서는 전달되지 않습니다. Export는 `{$image_medium}`·`{$product_name}` 등 ProductCardV1의 Cafe24 template을 그대로 내보냅니다. DOM과 class는 양쪽이 동일합니다.
+- `previewProducts`가 없는 기존 프로젝트는 중립 상품명과 중립 타일로 되돌아갑니다. 이전 프로젝트의 mock 상품 데이터는 어떤 경로로도 재사용하지 않습니다.
 - AI 요청은 프로덕션에서 인증 사용자만 허용합니다. 공개 데모는 명시적인 `AI_DEMO_PUBLIC=true`일 때만 same-origin으로 엽니다.
 
 ## 구현 순서

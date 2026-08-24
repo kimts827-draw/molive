@@ -62,8 +62,10 @@ test("Preview는 canonical DOM/class를 유지하고 Cafe24 binding만 sample da
     assert.ok(!/\{\$/.test(html), "Preview에 Cafe24 variable이 남았습니다.");
   }
   assert.ok(header.html.includes("SAMPLE SHOP"));
-  assert.ok(product.html.includes("SAMPLE PRODUCT"));
-  assert.ok(product.html.includes("24,900원"));
+  // 상품 자리표시 값은 업종 신호가 없는 중립 문구와 코드가 그린 도형뿐입니다.
+  assert.ok(product.html.includes("상품명 01"));
+  assert.ok(product.html.includes("Cafe24 상품 가격"));
+  assert.match(product.html.match(/<img[^>]*\ssrc\s*=\s*"([^"]*)"/i)?.[1] ?? "", /^data:image\/svg\+xml/);
 });
 
 test("HeaderV1 Preview/Cafe24의 structural fingerprint가 동일하다", () => {

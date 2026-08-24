@@ -1,3 +1,4 @@
+import { isPreviewProductMock, type PreviewProductMock } from "./component-library/preview-mock.ts";
 import type { CommerceTokens } from "@/lib/commerce/fixed-components";
 
 export type ProjectArchitecture = {
@@ -11,11 +12,18 @@ export type ProjectArchitecture = {
 
 export type ProjectSource = {
   id: string;
+  /** Header wordmark에 쓰는 고객 노출 브랜드명입니다. Project/디자인 제목인 name과 구분합니다. */
+  brandName?: string;
   name: string;
   html: string;
   css: string;
   /** 고정 HeaderV1/ProductSectionV1의 스타일 토큰입니다. 구조는 코드가 정합니다. */
   commerce?: CommerceTokens;
+  /**
+   * Editor Preview 상품 카드에만 쓰는 이번 생성의 mock입니다.
+   * Cafe24 export는 이 값을 무시하고 실제 상품 binding을 내보냅니다.
+   */
+  previewProducts?: PreviewProductMock[];
   architecture: ProjectArchitecture;
   updatedAt: string;
 };
@@ -30,7 +38,10 @@ export function isProjectSource(value: unknown): value is ProjectSource {
   if (!value || typeof value !== "object") return false;
   const source = value as Partial<ProjectSource>;
   const architecture = source.architecture as Partial<ProjectArchitecture> | undefined;
+  const previewProducts = source.previewProducts;
+  if (previewProducts !== undefined && (!Array.isArray(previewProducts) || !previewProducts.every(isPreviewProductMock))) return false;
   return typeof source.id === "string"
+    && (source.brandName === undefined || typeof source.brandName === "string")
     && typeof source.name === "string"
     && typeof source.html === "string"
     && typeof source.css === "string"
@@ -52,6 +63,7 @@ export function cloneProjectSource(source: ProjectSource): ProjectSource {
 export function projectSourceSchemaShape() {
   return {
     id: "string",
+    brandName: "optional string",
     name: "string",
     html: "string",
     css: "string",
@@ -63,6 +75,7 @@ export function projectSourceSchemaShape() {
       typography: "string",
       footer: "string",
     },
+    previewProducts: "optional [{ name: string, image: string }] (Preview 전용 mock)",
     updatedAt: "ISO date string",
   } as const;
 }

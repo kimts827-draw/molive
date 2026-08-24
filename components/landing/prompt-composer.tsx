@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, LoaderCircle, Sparkles, WandSparkles, X } from "lucide-react";
-import { optimizeImageFile, persistProjectAsset } from "@/lib/client-image";
+import { createAssetSessionId, optimizeImageFile, persistProjectAsset } from "@/lib/client-image";
 import type { ProjectSource } from "@/lib/project-source";
 import { generationDestination } from "@/lib/projects/client-flow";
 
@@ -19,6 +19,8 @@ export function PromptComposer({ signedIn, persistenceEnabled, demoMode }: { sig
   const [color, setColor] = useState("#6b6654");
   const [colorSelected, setColorSelected] = useState(false);
   const [assets, setAssets] = useState<AttachedAsset[]>([]);
+  // 생성 요청 하나마다 새 이미지 세션을 씁니다. 이전 프로젝트 첨부가 다음 생성으로 넘어가지 않습니다.
+  const [assetSessionId, setAssetSessionId] = useState(() => createAssetSessionId());
   const [busy, setBusy] = useState(false);
   const [readingFiles, setReadingFiles] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -33,6 +35,12 @@ export function PromptComposer({ signedIn, persistenceEnabled, demoMode }: { sig
       if (draft.colorSelected) setColorSelected(true);
     } catch { /* Ignore an invalid login-return draft. */ }
   }, []);
+
+  /** 생성이 끝나면 첨부와 세션을 함께 비웁니다. 다음 프로젝트가 이번 이미지를 물려받지 않습니다. */
+  function resetAssetSession() {
+    setAssets([]);
+    setAssetSessionId(createAssetSessionId());
+  }
 
   function rememberDraft() {
     sessionStorage.setItem(generationDraftKey, JSON.stringify({ prompt, color, colorSelected }));
@@ -53,7 +61,7 @@ export function PromptComposer({ signedIn, persistenceEnabled, demoMode }: { sig
       const selected = Array.from(files).slice(0, available);
       const next = await Promise.all(selected.map(async (file) => {
         const optimized = await optimizeImageFile(file);
-        const stored = await persistProjectAsset(optimized, kind);
+        const stored = await persistProjectAsset(optimized, kind, { sessionId: assetSessionId });
         return { id: crypto.randomUUID(), kind, name: file.name, url: stored?.url ?? optimized, storagePath: stored?.storagePath };
       }));
       setAssets((current) => kind === "logo"
@@ -83,7 +91,7 @@ export function PromptComposer({ signedIn, persistenceEnabled, demoMode }: { sig
       const response = await fetch("/api/ai/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: prompt.trim(), colors: colorSelected ? [color] : [], assetUrls: assets.map((asset) => asset.url), assetPaths: assets.map((asset) => asset.storagePath ?? ""), assetRoles: assets.map((asset) => asset.kind === "logo" ? "logo" : "reference") }),
+        body: JSON.stringify({ prompt: prompt.trim(), colors: colorSelected ? [color] : [], assetSessionId, assetUrls: assets.map((asset) => asset.url), assetPaths: assets.map((asset) => asset.storagePath ?? ""), assetRoles: assets.map((asset) => asset.kind === "logo" ? "logo" : "reference") }),
       });
       const payload = await response.json() as { source?: ProjectSource; rationale?: string; projectId?: string; versionId?: string; error?: string };
       const destination = generationDestination({ status: response.status, projectId: payload.projectId, persistenceEnabled });
@@ -91,8 +99,10 @@ export function PromptComposer({ signedIn, persistenceEnabled, demoMode }: { sig
       if (!response.ok || !payload.source) throw new Error(payload.error ?? "디자인 생성에 실패했습니다.");
       if (destination.kind === "project") {
         sessionStorage.removeItem(generationDraftKey);
+        resetAssetSession();
         router.push(destination.href);
       } else if (destination.kind === "demo") {
+        resetAssetSession();
         sessionStorage.setItem("moire:generated-source", JSON.stringify(payload.source));
         if (payload.rationale) sessionStorage.setItem("moire:generated-rationale", payload.rationale);
         router.push(destination.href);

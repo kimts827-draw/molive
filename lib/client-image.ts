@@ -1,3 +1,5 @@
+import { buildAssetSessionPath, buildProjectAssetPath, type AssetKind } from "@/lib/assets/asset-policy";
+
 const MAX_SOURCE_BYTES = 12 * 1024 * 1024;
 const MAX_OUTPUT_BYTES = 560 * 1024;
 const MAX_EDGE = 1600;
@@ -56,13 +58,25 @@ export async function optimizeImageFile(file: File): Promise<string> {
   }
 }
 
-export async function persistProjectAsset(dataUrl: string, kind: "logo" | "image") {
+/** 생성 요청 하나가 쓰는 이미지 세션 식별자입니다. 요청이 끝나면 새 세션으로 갈아 끼웁니다. */
+export function createAssetSessionId() {
+  return crypto.randomUUID();
+}
+
+/**
+ * 업로드 이미지를 이번 이미지 세션이나 현재 프로젝트 폴더에만 저장합니다.
+ * 계정 공용 staging 폴더를 쓰지 않으므로 이전 프로젝트 이미지와 경로가 섞이지 않습니다.
+ */
+export async function persistProjectAsset(dataUrl: string, kind: "logo" | "image", scope: { sessionId: string } | { projectId: string }) {
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY) return null;
   const { createClient } = await import("@/lib/supabase/client");
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("이미지를 영구 저장하려면 먼저 로그인해 주세요.");
-  const path = `${user.id}/staging/${kind}-${crypto.randomUUID()}.webp`;
+  const assetKind: AssetKind = kind;
+  const path = "projectId" in scope
+    ? buildProjectAssetPath(user.id, scope.projectId, assetKind, crypto.randomUUID())
+    : buildAssetSessionPath(user.id, scope.sessionId, assetKind, crypto.randomUUID());
   const { error } = await supabase.storage.from("project-assets").upload(path, dataUrlToBlob(dataUrl), { contentType: "image/webp", upsert: false });
   if (error) throw error;
   const { data } = supabase.storage.from("project-assets").getPublicUrl(path);

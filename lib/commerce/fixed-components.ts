@@ -5,6 +5,7 @@
  */
 
 import { renderComponent } from "../component-library/renderer.ts";
+import type { PreviewProductMock } from "../component-library/preview-mock.ts";
 
 export type CommerceVariant = "minimal" | "editorial" | "bold";
 export type HeaderVariant = "split-utility" | "centered-brand" | "overlay-minimal";
@@ -26,8 +27,6 @@ export type CommerceTokens = {
   thumbRatio?: string;
   thumbFit?: "contain" | "cover";
   thumbBackground?: string;
-  /** Preview에서만 쓰는 샘플 사진입니다. Export에는 절대 나가지 않습니다. */
-  sampleImages?: string[];
 };
 
 export type RenderMode = "preview" | "cafe24";
@@ -60,7 +59,7 @@ export function resolveLegacyComposition(architecture?: { header?: string; produ
 const HEADER_V1_CAFE24_TEMPLATE = `<header id="header" class="pocHeader pocHeader--__VARIANT__" data-header-variant="__VARIANT__">
   <div class="pocHeader__inner">
     <h1 class="pocHeader__logo" module="Layout_LogoTop">
-      <a href="/index.html"><img src="{$logo}" alt="{$mall_name}"></a>
+      <a href="/index.html"><span class="pocHeader__logoText">__BRAND_NAME__</span></a>
     </h1>
     <nav class="pocHeader__category" module="Layout_category">
       <ul class="pocHeader__categoryList">
@@ -85,8 +84,6 @@ const HEADER_V1_CAFE24_TEMPLATE = `<header id="header" class="pocHeader pocHeade
 
 function bindPreviewHeader(template: string) {
   const bindings: ReadonlyArray<readonly [string, string]> = [
-    ["{$logo}", "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='198' height='28' viewBox='0 0 198 28'%3E%3Ctext x='99' y='21' text-anchor='middle' font-family='Arial,sans-serif' font-size='18' font-weight='700' letter-spacing='3' fill='%23171310'%3EIVORY FRAME%3C/text%3E%3C/svg%3E"],
-    ["{$mall_name}", "IVORY FRAME"],
     ["{$link_product_list}", "/product/list.html?cate_no=24"],
     ["{$name_or_img_tag}", "SHOP"],
     ["{$action_logout}", "/index.html"],
@@ -97,11 +94,29 @@ function bindPreviewHeader(template: string) {
   return html;
 }
 
+function escapeHeaderText(value: string) {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
 /** Cafe24 Header template 하나를 target별 binding 값으로만 렌더링합니다. */
-export function renderHeaderV1(mode: RenderMode, variant: HeaderVariant = "split-utility") {
+export function renderHeaderV1(mode: RenderMode, variant: HeaderVariant = "split-utility", brandName = "Moiré") {
   if (!HEADER_VARIANTS.has(variant)) throw new Error(`지원하지 않는 HeaderV1 variant입니다: ${variant}`);
-  const template = HEADER_V1_CAFE24_TEMPLATE.replaceAll("__VARIANT__", variant);
+  const brand = brandName.trim() || "Moiré";
+  const template = HEADER_V1_CAFE24_TEMPLATE
+    .replaceAll("__VARIANT__", variant)
+    .replaceAll("__BRAND_NAME__", escapeHeaderText(brand));
   return mode === "cafe24" ? template : bindPreviewHeader(template);
+}
+
+/** 저장된 브랜드명을 Preview와 Cafe24 Header의 같은 텍스트 로고에 전달합니다. */
+export function renderProjectHeaderV1(mode: RenderMode, project: { brandName?: string; name: string; architecture?: { header?: string; productPresentation?: string } }) {
+  const composition = resolveLegacyComposition(project.architecture);
+  return renderHeaderV1(mode, composition.headerVariant, project.brandName?.trim() || project.name);
 }
 
 const VERIFIED_PRODUCT_SECTION_REQUEST = {
@@ -109,9 +124,12 @@ const VERIFIED_PRODUCT_SECTION_REQUEST = {
   variant: "grid-four",
 } as const;
 
-/** 실몰 검증·동결된 ProductSectionV1 artifact를 Registry에서만 가져옵니다. */
-export function renderVerifiedProductSection(mode: RenderMode) {
-  return renderComponent(VERIFIED_PRODUCT_SECTION_REQUEST, mode);
+/**
+ * 실몰 검증·동결된 ProductSectionV1 artifact를 Registry에서만 가져옵니다.
+ * previewProducts는 Preview render에만 전달되고 Cafe24 render는 실제 상품 binding을 그대로 씁니다.
+ */
+export function renderVerifiedProductSection(mode: RenderMode, previewProducts?: readonly PreviewProductMock[]) {
+  return renderComponent(VERIFIED_PRODUCT_SECTION_REQUEST, mode, undefined, mode === "preview" ? { previewProducts } : {});
 }
 
 const VARIANT_CSS: Record<CommerceVariant, string> = {
@@ -368,13 +386,13 @@ export function composeCommerce(
   mode: RenderMode,
   tokens: CommerceTokens = {},
   composition: LegacyComposition = { headerVariant: "split-utility", productLayout: "grid-four" },
-  options: { includeHeader?: boolean } = {},
+  options: { includeHeader?: boolean; previewProducts?: readonly PreviewProductMock[] } = {},
 ) {
   let html = markAiStaticRoot(stripAllElements(bodyHtml, "header"));
   const first = findSlotRange(html, 0);
   if (!first) throw new Error("상품 슬롯(data-cafe24-slot=\"product-list\")이 없습니다. 검증된 ProductSectionV1을 넣을 자리가 필요합니다.");
 
-  const productSection = renderVerifiedProductSection(mode);
+  const productSection = renderVerifiedProductSection(mode, mode === "preview" ? options.previewProducts : undefined);
   html = `${html.slice(0, first.openEnd + 1)}\n${productSection.html}\n${html.slice(first.closeStart)}`;
 
   // ProductSectionV1은 검증된 product_listmain_1을 소유하므로 중복 슬롯에는 상품 모듈을 넣지 않습니다.

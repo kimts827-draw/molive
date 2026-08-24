@@ -6,7 +6,7 @@ import { ArrowLeft, Copy, Eye, EyeOff, GripVertical, History, ImagePlus, LoaderC
 import { Brand } from "@/components/brand";
 import { EditorCanvas } from "@/components/editor/editor-canvas";
 import { PublishModal } from "@/components/editor/publish-modal";
-import { optimizeImageFile, persistProjectAsset } from "@/lib/client-image";
+import { createAssetSessionId, optimizeImageFile, persistProjectAsset } from "@/lib/client-image";
 import { autosaveLabel, type AutosaveState } from "@/lib/editor/autosave-state";
 import { cloneProjectSource, type EditorNodeSelection, type ProjectSource } from "@/lib/project-source";
 
@@ -321,7 +321,7 @@ export function EditorShell({ initialSource, projectId = null, initialVersions =
     if (!snapshot) throw new Error("AI가 수정할 선택 영역을 찾지 못했습니다.");
     const response = await fetch("/api/ai/edit", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt, nodeId: snapshot.id, nodeType: snapshot.type, nodeHtml: snapshot.outerHtml, projectCss: baseSource.css, rootValue: sourceRootValue(baseSource.html), architecture: baseSource.architecture }),
+      body: JSON.stringify({ prompt, nodeId: snapshot.id, nodeType: snapshot.type, nodeHtml: snapshot.outerHtml, projectCss: baseSource.css, rootValue: sourceRootValue(baseSource.html), architecture: baseSource.architecture, projectId }),
     });
     const payload = await response.json() as { nodeHtml?: string; nodeCss?: string; summary?: string; error?: string };
     if (!response.ok || !payload.nodeHtml || payload.nodeCss === undefined) throw new Error(payload.error ?? "AI 영역 편집에 실패했습니다.");
@@ -443,6 +443,8 @@ function NodeInspector({ node, projectId, onText, onAttribute, onStyle }: { node
   const imageInputRef = useRef<HTMLInputElement>(null);
   const [imageBusy, setImageBusy] = useState(false);
   const [imageError, setImageError] = useState<string | null>(null);
+  // 저장된 프로젝트는 프로젝트 폴더에, 데모 편집은 이 편집 세션 폴더에만 이미지를 둡니다.
+  const [assetSessionId] = useState(() => createAssetSessionId());
   const isText = ["h1", "h2", "h3", "h4", "h5", "h6", "p", "a", "button"].includes(node.tagName);
 
   async function upload(file: File | undefined) {
@@ -450,7 +452,7 @@ function NodeInspector({ node, projectId, onText, onAttribute, onStyle }: { node
     setImageBusy(true); setImageError(null);
     try {
       const optimized = await optimizeImageFile(file);
-      const stored = await persistProjectAsset(optimized, "image");
+      const stored = await persistProjectAsset(optimized, "image", projectId ? { projectId } : { sessionId: assetSessionId });
       onAttribute("src", stored?.url ?? optimized);
       if (projectId && stored?.storagePath) {
         const response = await fetch(`/api/projects/${projectId}/assets`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ storagePath: stored.storagePath, kind: "reference" }) });

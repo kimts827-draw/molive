@@ -2,11 +2,16 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { OpenAIUsageEvent } from "@/lib/openai/usage";
 
-export function createGenerationUsageRecorder(input: { generationId: string; userId: string }) {
+export const OPENAI_USAGE_TYPES = ["design_generation", "editor_ai", "preview_image"] as const;
+export type OpenAIUsageType = (typeof OPENAI_USAGE_TYPES)[number];
+
+export function createGenerationUsageRecorder(input: { generationId: string; userId: string; usageType: OpenAIUsageType; projectId?: string | null }) {
   return async (event: OpenAIUsageEvent) => {
     const { error } = await createAdminClient().from("openai_usage_events").insert({
       generation_id: input.generationId,
       user_id: input.userId,
+      project_id: input.projectId ?? null,
+      usage_type: input.usageType,
       model: event.model,
       input_tokens: event.inputTokens,
       cached_input_tokens: event.cachedInputTokens,

@@ -1,5 +1,5 @@
 import { renderProductCardV1 } from "./product-card-v1.ts";
-import type { ComponentDefinition, RenderTarget } from "../types.ts";
+import type { ComponentDefinition, ComponentRenderOptions, RenderTarget } from "../types.ts";
 
 const PRODUCT_SECTION_V1_MODULE_INDEX = 1;
 
@@ -33,10 +33,10 @@ export const PRODUCT_SECTION_V1_CSS = `.moireProductSection.ec-base-product { ma
   .moireProductSection.ec-base-product .prdList .prdList__item { margin: 0 5px; }
 }`;
 
-export function renderProductSectionV1(target: RenderTarget) {
+export function renderProductSectionV1(target: RenderTarget, options: ComponentRenderOptions = {}) {
   const moduleAttribute = ` module="product_listmain_${PRODUCT_SECTION_V1_MODULE_INDEX}"`;
   const sampleCount = target === "preview" ? 4 : 2;
-  const cards = Array.from({ length: sampleCount }, (_value, index) => renderProductCardV1(target, index)).join("\n");
+  const cards = Array.from({ length: sampleCount }, (_value, index) => renderProductCardV1(target, index, options)).join("\n");
   const html = `<div${moduleAttribute} class="ec-base-product moireProductSection">
   <!--
     $count = 8
@@ -65,7 +65,7 @@ export const productSectionV1Definition: ComponentDefinition = {
     cssSha256: "1b9f16e54bec65ff9aac4db8b15af3fd65adc7cb129a58f1ce162f05f165bd41",
   },
   css: PRODUCT_SECTION_V1_CSS,
-  render(target) {
-    return renderProductSectionV1(target);
+  render(target, options) {
+    return renderProductSectionV1(target, options);
   },
 };

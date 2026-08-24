@@ -1,14 +1,15 @@
 import { structuralFingerprint } from "./fingerprint.ts";
 import { verifiedComponentRegistry, type ComponentRegistry } from "./registry.ts";
-import type { ComponentRenderArtifact, ComponentRenderBundle, ComponentRenderRequest, RenderTarget } from "./types.ts";
+import type { ComponentRenderArtifact, ComponentRenderBundle, ComponentRenderOptions, ComponentRenderRequest, RenderTarget } from "./types.ts";
 
 export function renderComponent(
   request: ComponentRenderRequest,
   target: RenderTarget,
-  registry: ComponentRegistry = verifiedComponentRegistry,
+  registry: ComponentRegistry | undefined = verifiedComponentRegistry,
+  options: ComponentRenderOptions = {},
 ): ComponentRenderArtifact {
-  const definition = registry.resolve(request.component, request.variant, target);
-  const html = definition.render(target);
+  const definition = (registry ?? verifiedComponentRegistry).resolve(request.component, request.variant, target);
+  const html = definition.render(target, options);
   return {
     component: definition.id,
     version: definition.version,

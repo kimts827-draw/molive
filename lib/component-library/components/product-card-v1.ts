@@ -1,4 +1,5 @@
-import type { ComponentDefinition, RenderTarget } from "../types.ts";
+import { PREVIEW_PRICE_LABEL, previewProductAt, type PreviewProductMock } from "../preview-mock.ts";
+import type { ComponentDefinition, ComponentRenderOptions, RenderTarget } from "../types.ts";
 
 /**
  * Guide skin17/skin18의 product/list_product.html에서 공통으로 확인된 단일 반복 카드 계약입니다.
@@ -42,39 +43,17 @@ const CLASS_BINDINGS = [
   "{$item_title_display|display}",
 ] as const;
 
-const SAMPLE_PRODUCTS = [
-  {
-    no: "101",
-    image: "https://images.unsplash.com/photo-1539109136881-3be0616acf4b?auto=format&fit=crop&w=900&q=80",
-    name: "울 블렌드 테일러드 재킷",
-    custom: "189,000원",
-    price: "159,000원",
-  },
-  {
-    no: "102",
-    image: "https://images.unsplash.com/photo-1551488831-00ddcb6c6bd3?auto=format&fit=crop&w=900&q=80",
-    name: "소프트 캐시미어 니트",
-    custom: "129,000원",
-    price: "109,000원",
-  },
-  {
-    no: "103",
-    image: "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&w=900&q=80",
-    name: "클래식 플리츠 스커트",
-    custom: "119,000원",
-    price: "98,000원",
-  },
-  {
-    no: "104",
-    image: "https://images.unsplash.com/photo-1539533018447-63fcce2678e3?auto=format&fit=crop&w=900&q=80",
-    name: "에센셜 롱 코트",
-    custom: "279,000원",
-    price: "249,000원",
-  },
-] as const;
+/**
+ * Preview 카드에 넣을 mock 값입니다. 이번 생성의 Preview mock만 씁니다.
+ * 가격은 실제 상품 값을 지어내지 않도록 고정 문구로 둡니다.
+ */
+function previewSample(index: number, product: PreviewProductMock) {
+  const slot = Math.max(0, index);
+  return { no: String(101 + slot), image: product.image, name: product.name, custom: PREVIEW_PRICE_LABEL, price: PREVIEW_PRICE_LABEL };
+}
 
-function bindPreviewProductCard(index: number) {
-  const sample = SAMPLE_PRODUCTS[index] ?? SAMPLE_PRODUCTS[0];
+function bindPreviewProductCard(index: number, product: PreviewProductMock) {
+  const sample = previewSample(index, product);
   let html = PRODUCT_CARD_V1_CAFE24_HTML;
   for (const binding of CLASS_BINDINGS) html = html.replaceAll(binding, "__binding__");
   const bindings: ReadonlyArray<readonly [string, string]> = [
@@ -110,8 +89,10 @@ function bindPreviewProductCard(index: number) {
   return html;
 }
 
-export function renderProductCardV1(target: RenderTarget, sampleIndex = 0) {
-  return target === "cafe24" ? PRODUCT_CARD_V1_CAFE24_HTML : bindPreviewProductCard(sampleIndex);
+/** Cafe24 target은 언제나 원본 template을 그대로 돌려줍니다. mock은 Preview에서만 바인딩됩니다. */
+export function renderProductCardV1(target: RenderTarget, sampleIndex = 0, options: ComponentRenderOptions = {}) {
+  if (target === "cafe24") return PRODUCT_CARD_V1_CAFE24_HTML;
+  return bindPreviewProductCard(sampleIndex, previewProductAt(options.previewProducts, sampleIndex));
 }
 
 export const productCardV1Definition: ComponentDefinition = {
@@ -127,7 +108,7 @@ export const productCardV1Definition: ComponentDefinition = {
     cssSha256: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
   },
   css: "",
-  render(target) {
-    return renderProductCardV1(target);
+  render(target, options) {
+    return renderProductCardV1(target, 0, options);
   },
 };

@@ -34,6 +34,19 @@ test("every successful design retry records an OpenAI usage event", () => {
   assert.match(generator, /await recordUsage\(response, options\?\.onUsage\);/);
   assert.match(route, /createGenerationUsageRecorder/);
   assert.match(route, /attachGenerationUsageToProject/);
+  assert.match(route, /usageType: "design_generation"/);
+  assert.match(route, /usageType: "preview_image"/);
+  assert.match(route, /onPreviewImageUsage/);
+});
+
+test("Editor AI records usage with the authenticated user and owned project", () => {
+  const generator = readFileSync(new URL("../lib/openai/site-generator.ts", import.meta.url), "utf8");
+  const route = readFileSync(new URL("../app/api/ai/edit/route.ts", import.meta.url), "utf8");
+  const editor = readFileSync(new URL("../components/editor/editor-shell.tsx", import.meta.url), "utf8");
+  assert.match(generator, /editProjectNode[\s\S]*await recordUsage\(response, options\?\.onUsage\);/);
+  assert.match(route, /usageType: "editor_ai"/);
+  assert.match(route, /\.eq\("owner_id", user\.id\)/);
+  assert.match(editor, /architecture: baseSource\.architecture, projectId/);
 });
 
 test("usage migration is service-role only and provides admin aggregates", () => {
@@ -47,9 +60,21 @@ test("usage migration is service-role only and provides admin aggregates", () =>
   assert.doesNotMatch(migration, /prompt|api_key|secret_key/i);
 });
 
+test("usage classification migration keeps all aggregates service-role only", () => {
+  const migration = readFileSync(new URL("../supabase/migrations/20260824141714_classify_openai_usage_features.sql", import.meta.url), "utf8");
+  assert.match(migration, /design_generation/);
+  assert.match(migration, /editor_ai/);
+  assert.match(migration, /preview_image/);
+  assert.match(migration, /get_admin_openai_usage_by_feature/);
+  assert.match(migration, /grant execute on function public\.get_admin_openai_usage_by_feature\(\) to service_role/);
+  assert.match(migration, /where usage_type = 'design_generation'/);
+});
+
 test("admin usage page authorizes from server-managed app metadata", () => {
   const page = readFileSync(new URL("../app/admin/usage/page.tsx", import.meta.url), "utf8");
   assert.match(page, /applicationRoleFromAppMetadata/);
   assert.match(page, /!== "admin"\) notFound\(\)/);
   assert.match(page, /getAdminOpenAIUsage/);
+  assert.match(page, /기능별 비용/);
+  assert.match(page, /1회 평균/);
 });

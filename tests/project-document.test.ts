@@ -47,6 +47,7 @@ const projectSpec: ProjectSpecV1 = {
 
 const legacySource: ProjectSource = {
   id: "legacy-source",
+  brandName: "Legacy Brand",
   name: "Legacy HTML project",
   html: '<div data-moire-root="legacy"><main><section data-cafe24-slot="product-list"></section></main></div>',
   css: '[data-moire-root="legacy"]{display:block}',

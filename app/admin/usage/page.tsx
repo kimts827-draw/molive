@@ -13,12 +13,14 @@ function count(value: number) {
   return new Intl.NumberFormat("ko-KR").format(value);
 }
 
+const featureLabels = { design_generation: "디자인 생성", editor_ai: "Editor AI", preview_image: "Preview 이미지" } as const;
+
 export default async function AdminUsagePage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login?next=%2Fadmin%2Fusage");
   if (applicationRoleFromAppMetadata(user.app_metadata as Record<string, unknown>) !== "admin") notFound();
 
-  const { summary, recent } = await getAdminOpenAIUsage();
+  const { summary, byFeature, recent } = await getAdminOpenAIUsage();
   const cards = [
     ["오늘 비용", money(summary.todayCostUsd)],
     ["이번 달 비용", money(summary.monthCostUsd)],
@@ -33,9 +35,13 @@ export default async function AdminUsagePage() {
         <header className="projects-header"><Brand /><div><Link href="/projects">내 디자인</Link><Link href="/account">계정</Link><form action="/auth/signout" method="post"><button type="submit">로그아웃</button></form></div></header>
         <div className="projects-title"><div><span>ADMIN · OPENAI</span><h1>사용량</h1><p>모든 금액은 OpenAI 응답 usage와 저장된 단가표로 계산한 예상 USD 비용입니다.</p></div></div>
         <div className="usage-cards">{cards.map(([label, value]) => <article key={label}><span>{label}</span><strong>{value}</strong></article>)}</div>
+        <section className="usage-features">
+          <div className="usage-section-title"><div><span>BY FEATURE</span><h2>기능별 비용</h2></div></div>
+          <div className="usage-feature-cards">{byFeature.map((item) => <article key={item.usageType}><span>{featureLabels[item.usageType]}</span><strong>{money(item.totalCostUsd)}</strong><small>{count(item.totalOperations)}회 · 1회 평균 {money(item.averageCostUsd)}</small></article>)}</div>
+        </section>
         <section className="usage-recent">
-          <div className="usage-section-title"><div><span>RECENT GENERATIONS</span><h2>최근 생성별 비용</h2></div><small>한국 시간 기준</small></div>
-          {recent.length === 0 ? <div className="projects-empty"><p>아직 기록된 OpenAI 사용량이 없습니다.</p></div> : <div className="usage-table-wrap"><table><thead><tr><th>생성 시각</th><th>모델</th><th>요청</th><th>토큰</th><th>프로젝트</th><th>예상 비용</th></tr></thead><tbody>{recent.map((item) => <tr key={item.generationId}><td>{new Intl.DateTimeFormat("ko-KR", { dateStyle: "short", timeStyle: "short", timeZone: "Asia/Seoul" }).format(new Date(item.createdAt))}</td><td>{item.model}</td><td>{count(item.requestCount)}회</td><td><span className="usage-token-detail">입력 {count(item.inputTokens)} · 캐시 {count(item.cachedInputTokens)} · 출력 {count(item.outputTokens)}{item.imageCount ? ` · 이미지 ${count(item.imageCount)}` : ""}</span></td><td>{item.projectId ? item.projectId.slice(0, 8) : "연결 전"}</td><td><strong>{money(item.estimatedCostUsd)}</strong></td></tr>)}</tbody></table></div>}
+          <div className="usage-section-title"><div><span>RECENT OPERATIONS</span><h2>최근 작업별 비용</h2></div><small>한국 시간 기준</small></div>
+          {recent.length === 0 ? <div className="projects-empty"><p>아직 기록된 OpenAI 사용량이 없습니다.</p></div> : <div className="usage-table-wrap"><table><thead><tr><th>작업 시각</th><th>기능</th><th>모델</th><th>요청</th><th>토큰</th><th>프로젝트</th><th>예상 비용</th></tr></thead><tbody>{recent.map((item) => <tr key={`${item.generationId}:${item.usageType}`}><td>{new Intl.DateTimeFormat("ko-KR", { dateStyle: "short", timeStyle: "short", timeZone: "Asia/Seoul" }).format(new Date(item.createdAt))}</td><td>{featureLabels[item.usageType]}</td><td>{item.model}</td><td>{count(item.requestCount)}회</td><td><span className="usage-token-detail">입력 {count(item.inputTokens)} · 캐시 {count(item.cachedInputTokens)} · 출력 {count(item.outputTokens)}{item.imageCount ? ` · 이미지 ${count(item.imageCount)}` : ""}</span></td><td>{item.projectId ? item.projectId.slice(0, 8) : "연결 전"}</td><td><strong>{money(item.estimatedCostUsd)}</strong></td></tr>)}</tbody></table></div>}
         </section>
       </section>
     </main>

@@ -1,5 +1,15 @@
+import type { PreviewProductMock } from "./preview-mock.ts";
+
 export type ComponentStatus = "verified" | "unverified";
 export type RenderTarget = "preview" | "cafe24";
+
+/**
+ * Preview render에만 전달되는 mock입니다. Cafe24 render는 이 값을 무시하고
+ * 실제 상품 binding template을 그대로 내보냅니다.
+ */
+export type ComponentRenderOptions = {
+  previewProducts?: readonly PreviewProductMock[];
+};
 
 export type ComponentDefinition = {
   readonly id: string;
@@ -15,7 +25,7 @@ export type ComponentDefinition = {
     readonly cssSha256: string;
   };
   readonly css: string;
-  render(target: RenderTarget): string;
+  render(target: RenderTarget, options?: ComponentRenderOptions): string;
 };
 
 export type ComponentRenderRequest = {
