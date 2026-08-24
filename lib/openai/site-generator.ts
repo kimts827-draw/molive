@@ -6,6 +6,7 @@ import { buildDesignGenerationUserPrompt, validateGeneratedDesignContract, type 
 import { composeDesignBlueprint } from "@/lib/design-library/blueprint";
 import { HERO_VARIANT_IDS } from "@/lib/design-library/variants";
 import { writeGenerationTrace, type GenerationTrace } from "@/lib/openai/dev-trace";
+import { usageEventFromResponse, type OpenAIUsageEvent } from "@/lib/openai/usage";
 import type { ProjectSource } from "@/lib/project-source";
 
 const architectureSchema = z.object({
@@ -155,7 +156,17 @@ function responseTrace(response: { id: string; model: string; output_text: strin
   return { id: response.id, model: response.model, outputText: response.output_text, usage: response.usage ?? null };
 }
 
-export async function generateProjectSource(input: DesignGenerationInput) {
+async function recordUsage(response: { model: string; usage?: Parameters<typeof usageEventFromResponse>[0]["usage"] }, onUsage?: (event: OpenAIUsageEvent) => Promise<void>) {
+  if (!onUsage) return;
+  try {
+    await onUsage(usageEventFromResponse(response));
+  } catch (error) {
+    // Metering must be visible in server logs without exposing prompts or breaking generation.
+    console.error("OpenAI usage persistence failed", error instanceof Error ? error.message : "unknown error");
+  }
+}
+
+export async function generateProjectSource(input: DesignGenerationInput, options?: { onUsage?: (event: OpenAIUsageEvent) => Promise<void> }) {
   const traceId = crypto.randomUUID();
   const createdAt = new Date().toISOString();
   const blueprint = composeDesignBlueprint(input, input.seed);
@@ -190,6 +201,7 @@ export async function generateProjectSource(input: DesignGenerationInput) {
         ],
         text: { format: { type: "json_schema", name: "moire_project_source", strict: true, schema: designJsonSchema } },
       });
+      await recordUsage(response, options?.onUsage);
       const parsed = designSchema.parse(JSON.parse(response.output_text));
       const projectId = crypto.randomUUID();
       const rawHtml = resolveAssetReferences(parsed.html, input.assetUrls ?? []);

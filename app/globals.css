@@ -285,6 +285,26 @@ a { color: inherit; text-decoration: none; }
 .account-section button { justify-self: start; padding: 0 18px; }
 .identity-buttons { display: flex; gap: 10px; }
 
+/* Server-authorized OpenAI operations dashboard */
+.admin-usage-panel { width: min(1180px, 100%); }
+.usage-cards { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+.usage-cards article { min-height: 132px; padding: 22px; display: flex; flex-direction: column; justify-content: space-between; background: #fff; border: 1px solid #dedbd3; border-radius: 14px; }
+.usage-cards span { color: #77736a; font-size: 11px; font-weight: 700; }
+.usage-cards strong { font: 400 27px/1 Georgia, serif; letter-spacing: -.035em; }
+.usage-recent { margin-top: 48px; }
+.usage-section-title { margin-bottom: 18px; display: flex; align-items: end; justify-content: space-between; gap: 24px; }
+.usage-section-title > div { display: grid; gap: 8px; }
+.usage-section-title span { color: #77736a; font-size: 10px; font-weight: 800; letter-spacing: .12em; }
+.usage-section-title h2 { margin: 0; font-size: 24px; }
+.usage-section-title small { color: #88837a; }
+.usage-table-wrap { overflow-x: auto; background: #fff; border: 1px solid #dedbd3; border-radius: 14px; }
+.usage-table-wrap table { width: 100%; border-collapse: collapse; font-size: 12px; white-space: nowrap; }
+.usage-table-wrap th, .usage-table-wrap td { padding: 16px 18px; text-align: left; border-bottom: 1px solid #ebe8e1; }
+.usage-table-wrap th { color: #77736a; background: #f8f7f4; font-size: 10px; letter-spacing: .04em; }
+.usage-table-wrap tbody tr:last-child td { border-bottom: 0; }
+.usage-table-wrap td:last-child { text-align: right; }
+.usage-token-detail { color: #67635b; }
+
 @media (max-width: 680px) {
   .nav-user { display: none; }
   .nav-actions { gap: 10px; }
@@ -295,4 +315,9 @@ a { color: inherit; text-decoration: none; }
   .projects-title h1 { font-size: 44px; }
   .oauth-buttons { grid-template-columns: 1fr; }
   .auth-card { padding: 24px; }
+  .usage-cards { grid-template-columns: 1fr 1fr; }
+}
+
+@media (max-width: 460px) {
+  .usage-cards { grid-template-columns: 1fr; }
 }

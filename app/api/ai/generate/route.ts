@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { errorResponse, requireApiUser } from "@/lib/api/auth";
 import { generateProjectSource } from "@/lib/openai/site-generator";
+import { attachGenerationUsageToProject, createGenerationUsageRecorder } from "@/lib/openai/usage-store";
 import { createProjectWithVersion } from "@/lib/projects/service";
 import { hasSupabaseServerConfig, isSupabaseDemoMode, missingSupabaseServerEnv } from "@/lib/supabase/config";
 
@@ -19,7 +20,9 @@ export async function POST(request: Request) {
     const parsedInput = requestSchema.safeParse(await request.json());
     if (!parsedInput.success) return Response.json({ error: "요청 데이터 형식이 올바르지 않습니다.", issues: parsedInput.error.issues }, { status: 400 });
     try {
-      const result = await generateProjectSource(parsedInput.data);
+      const generationId = crypto.randomUUID();
+      const onUsage = hasSupabaseServerConfig() ? createGenerationUsageRecorder({ generationId, userId: user.id }) : undefined;
+      const result = await generateProjectSource(parsedInput.data, { onUsage });
       if (!hasSupabaseServerConfig()) return Response.json({ ...result, persistenceMode: "demo" });
       const stored = await createProjectWithVersion(user.id, result.source, {
         prompt: parsedInput.data.prompt,
@@ -27,6 +30,11 @@ export async function POST(request: Request) {
         colors: parsedInput.data.colors ?? [],
         assetCount: parsedInput.data.assetUrls?.length ?? 0,
       });
+      try {
+        await attachGenerationUsageToProject({ generationId, userId: user.id, projectId: stored.projectId });
+      } catch (error) {
+        console.error("OpenAI usage project link failed", error instanceof Error ? error.message : "unknown error");
+      }
       const assetRows = (parsedInput.data.assetPaths ?? []).flatMap((storagePath, index) => {
         if (!storagePath || !storagePath.startsWith(`${user.id}/`)) return [];
         const role = parsedInput.data.assetRoles?.[index] ?? "reference";
