@@ -26,7 +26,7 @@ export function LandingPage({ userEmail, persistenceEnabled, demoMode, missingEn
         </div>
         <div className="nav-actions">
           <Link className="text-link" href="/editor">데모 열기</Link>
-          {userEmail ? <><Link className="text-link" href="/projects">내 디자인</Link><span className="nav-user" title={userEmail}>{userEmail}</span><form action="/auth/signout" method="post"><button className="nav-signout" type="submit">로그아웃</button></form></> : persistenceEnabled ? <Link className="button button-dark button-small" href="/login?next=%2F%23create">로그인 <ArrowRight size={15} /></Link> : <span className="nav-disabled">저장 설정 필요</span>}
+          {userEmail ? <><Link className="text-link" href="/projects">내 디자인</Link><Link className="text-link" href="/account">계정</Link><span className="nav-user" title={userEmail}>{userEmail}</span><form action="/auth/signout" method="post"><button className="nav-signout" type="submit">로그아웃</button></form></> : persistenceEnabled ? <Link className="button button-dark button-small" href="/login?next=%2F%23create">로그인 <ArrowRight size={15} /></Link> : <span className="nav-disabled">저장 설정 필요</span>}
         </div>
       </nav>
 

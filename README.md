@@ -44,12 +44,14 @@ npm run build
 ## 실제 연동 전 필요한 작업
 
 1. Supabase 프로젝트를 연결하고 `supabase db push`로 migration을 적용합니다. `project-assets`는 storefront 이미지 제공용 public bucket이며 업로드/변경은 사용자 UUID 폴더 RLS로 제한됩니다.
-2. Supabase Auth의 Site URL과 Redirect URL에 실제 HTTPS 주소 및 `/auth/callback`을 등록합니다.
-3. Cafe24 Developers에서 앱을 등록하고 OAuth Redirect URI를 `${NEXT_PUBLIC_APP_URL}/api/cafe24/oauth/callback`과 정확히 일치시킵니다.
-4. Runtime 배포에는 `mall.read_application`, `mall.write_application` 권한이 필요합니다. 테마 직접 쓰기를 켤 때만 디자인 읽기/쓰기 권한을 추가합니다.
-5. Cafe24 앱 API 버전은 현재 코드 기본값과 같은 `2026-03-01`로 설정합니다.
-6. Theme Pages 쓰기 API 사용을 Cafe24 개발센터에 별도로 신청합니다.
-7. Vercel의 Production 환경 변수에 필수값을 등록한 뒤 배포합니다.
+2. Supabase Auth의 Site URL을 실제 HTTPS origin으로 설정하고 Redirect URL에 `${NEXT_PUBLIC_APP_URL}/auth/callback`을 등록합니다.
+3. Supabase Auth에서 Email/Password, Google, Kakao provider와 Manual Identity Linking을 활성화합니다. Google/Kakao의 provider callback은 Supabase Dashboard에 표시되는 `https://<project-ref>.supabase.co/auth/v1/callback`을 사용합니다.
+4. 관리자 사용자는 별도 계정을 만들지 않고 Supabase 서버 관리 API에서 해당 사용자의 `app_metadata.role`을 `admin`으로 설정합니다. `user_metadata`나 `profiles`는 관리자 권한 판정에 사용하지 않습니다.
+5. Cafe24 Developers에서 앱을 등록하고 OAuth Redirect URI를 `${NEXT_PUBLIC_APP_URL}/api/cafe24/oauth/callback`과 정확히 일치시킵니다.
+6. Runtime 배포에는 `mall.read_application`, `mall.write_application` 권한이 필요합니다. 테마 직접 쓰기를 켤 때만 디자인 읽기/쓰기 권한을 추가합니다.
+7. Cafe24 앱 API 버전은 현재 코드 기본값과 같은 `2026-03-01`로 설정합니다.
+8. Theme Pages 쓰기 API 사용을 Cafe24 개발센터에 별도로 신청합니다.
+9. Vercel의 Production 환경 변수에 필수값을 등록한 뒤 배포합니다.
 
 ## Moiré 설치 도우미
 
