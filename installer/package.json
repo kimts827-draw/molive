@@ -8,7 +8,9 @@
     "build": "tsc && node scripts/copy-static.mjs",
     "start": "npm run build && electron .",
     "typecheck": "tsc --noEmit",
-    "test": "npm run build && node --test \"tests/*.test.mjs\""
+    "test": "npm run build && node --test \"tests/*.test.mjs\"",
+    "dist": "npm run build && electron-builder --win",
+    "verify:storage": "npm run build && electron scripts/verify-safe-storage.cjs release/storage-check.json"
   },
   "dependencies": {
     "ssh2": "^1.17.0"
@@ -17,6 +19,48 @@
     "@types/node": "^26.2.0",
     "@types/ssh2": "^1.15.5",
     "electron": "^43.4.1",
+    "electron-builder": "^26.15.3",
     "typescript": "^5.9.3"
+  },
+  "author": "Moiré",
+  "build": {
+    "appId": "com.moire.installer",
+    "productName": "Moire Installer",
+    "copyright": "Moiré",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "dist/**/*",
+      "package.json"
+    ],
+    "asar": true,
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "shortcutName": "Moire 설치 도우미",
+      "artifactName": "Moire-Installer-Setup-${version}.${ext}"
+    },
+    "portable": {
+      "artifactName": "Moire-Installer-${version}-portable.${ext}"
+    }
   }
 }

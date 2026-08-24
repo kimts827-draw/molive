@@ -68,12 +68,16 @@
       <div class="row"><label for="port">접속 포트</label><input id="port" type="number" placeholder="관리자 화면의 접속포트" style="width: 190px" /><span class="hint">쇼핑몰마다 다릅니다</span></div>
       <div class="row"><label for="username">계정</label><input id="username" type="text" placeholder="관리자 화면의 계정" autocomplete="off" /></div>
       <div class="row"><label for="password">비밀번호</label><input id="password" type="password" placeholder="디자인 FTP 비밀번호" autocomplete="off" /></div>
+      <div class="row"><label style="min-width: 0"><input id="rememberPassword" type="checkbox" /> 비밀번호도 이 컴퓨터에 저장하기</label></div>
       <div class="row">
         <button id="connect">접속 확인</button>
         <button id="disconnect" disabled>접속 끊기</button>
         <span id="connectStatus" class="status"></span>
       </div>
-      <p class="note">비밀번호는 이 컴퓨터에서만 사용하며, 어디에도 저장하거나 전송하지 않습니다.</p>
+      <p class="note">
+        FTP 주소·포트·계정은 이 컴퓨터에 저장되어 다음에 열 때 그대로 채워집니다.
+        비밀번호는 위 상자를 켰을 때만 Windows 로그인 계정으로 잠가서 이 컴퓨터에만 보관합니다. 어느 경우에도 외부로 보내지 않습니다.
+      </p>
       <details>
         <summary>디자인 폴더를 못 찾을 때 (직접 지정)</summary>
         <div class="row" style="margin-top: 8px">

@@ -34,7 +34,22 @@ type InstallReport = {
   durationMs: number;
 };
 
+type LoadedSettings = {
+  settings: { host: string; port: number | null; username: string; basePath: string; rememberPassword: boolean };
+  password: string;
+  canRememberPassword: boolean;
+};
+
 interface InstallerBridge {
+  loadSettings(): Promise<LoadedSettings>;
+  saveSettings(input: {
+    host: string;
+    port: number | string;
+    username: string;
+    basePath: string;
+    rememberPassword: boolean;
+    password?: string;
+  }): Promise<{ ok: true; rememberPassword: boolean }>;
   pickZip(): Promise<PickZipResult>;
   connect(input: { host: string; port: number; username: string; password: string; basePath: string }): Promise<ConnectResult>;
   list(input: { path: string }): Promise<{ path: string; directories: string[] }>;
@@ -57,6 +72,11 @@ const installButton = $<HTMLButtonElement>("install");
 const skinSelect = $<HTMLSelectElement>("skin");
 const confirmSkin = $<HTMLInputElement>("confirmSkin");
 const basePathInput = $<HTMLInputElement>("basePath");
+const hostInput = $<HTMLInputElement>("host");
+const portInput = $<HTMLInputElement>("port");
+const usernameInput = $<HTMLInputElement>("username");
+const passwordInput = $<HTMLInputElement>("password");
+const rememberPassword = $<HTMLInputElement>("rememberPassword");
 const bar = $<HTMLProgressElement>("bar");
 const logBox = $<HTMLDivElement>("log");
 const resultBox = $<HTMLDivElement>("result");
@@ -99,6 +119,42 @@ function setStatus(id: string, text: string, kind: "" | "ok" | "err" = "") {
   node.className = `status ${kind}`;
 }
 
+/**
+ * 입력값만 저장한다. 접속 성공 여부 같은 실행 중 상태는 저장하지 않는다.
+ * 비밀번호는 사용자가 저장을 켰고 실제로 접속에 성공했을 때만 함께 넘긴다.
+ */
+async function saveInputs(includePassword: boolean) {
+  try {
+    await window.installer.saveSettings({
+      host: hostInput.value,
+      port: portInput.value,
+      username: usernameInput.value,
+      basePath: basePathInput.value,
+      rememberPassword: rememberPassword.checked,
+      password: includePassword && rememberPassword.checked ? passwordInput.value : undefined,
+    });
+  } catch {
+    // 저장에 실패해도 설치 흐름은 막지 않는다.
+  }
+}
+
+/** 다시 실행했을 때 입력값만 되살린다. 접속 상태는 언제나 '확인 필요'에서 시작한다. */
+async function restoreInputs() {
+  try {
+    const loaded = await window.installer.loadSettings();
+    hostInput.value = loaded.settings.host;
+    portInput.value = loaded.settings.port === null ? "" : String(loaded.settings.port);
+    usernameInput.value = loaded.settings.username;
+    basePathInput.value = loaded.settings.basePath || "/";
+    rememberPassword.disabled = !loaded.canRememberPassword;
+    rememberPassword.checked = loaded.settings.rememberPassword && loaded.canRememberPassword;
+    if (loaded.password) passwordInput.value = loaded.password;
+  } catch {
+    // 저장된 값이 없으면 빈 화면으로 시작한다.
+  }
+  setStatus("connectStatus", "접속 확인이 필요합니다");
+}
+
 function refreshInstallButton() {
   installButton.disabled = !(connected && zipReady && skinSelect.value !== "" && confirmSkin.checked && !installing);
 }
@@ -107,11 +163,12 @@ connectButton.addEventListener("click", async () => {
   connectButton.disabled = true;
   setStatus("connectStatus", "접속하는 중…");
   try {
+    await saveInputs(false);
     const result = await window.installer.connect({
-      host: $<HTMLInputElement>("host").value,
-      port: Number($<HTMLInputElement>("port").value),
-      username: $<HTMLInputElement>("username").value,
-      password: $<HTMLInputElement>("password").value,
+      host: hostInput.value,
+      port: Number(portInput.value),
+      username: usernameInput.value,
+      password: passwordInput.value,
       basePath: basePathInput.value,
     });
     connected = true;
@@ -130,6 +187,8 @@ connectButton.addEventListener("click", async () => {
       skinSelect.append(option);
     }
     if (result.basePath) basePathInput.value = result.basePath;
+    // 접속에 성공한 값만 저장한다. 틀린 비밀번호가 남지 않게 한다.
+    await saveInputs(true);
 
     log(`[접속] 접속한 위치: ${result.home ?? "확인하지 못함"}`);
     log(`[접속] 찾아본 폴더: ${result.candidates.join(", ")}`);
@@ -196,6 +255,19 @@ pickZipButton.addEventListener("click", async () => {
   }
 });
 
+rememberPassword.addEventListener("change", () => {
+  void saveInputs(rememberPassword.checked);
+});
+
+// 접속 확인을 누르지 않고 창을 닫아도 입력값이 남도록 잠깐 멈춘 뒤 저장한다. (비밀번호는 제외)
+let saveTimer = 0;
+for (const input of [hostInput, portInput, usernameInput, basePathInput]) {
+  input.addEventListener("input", () => {
+    window.clearTimeout(saveTimer);
+    saveTimer = window.setTimeout(() => void saveInputs(false), 600);
+  });
+}
+
 skinSelect.addEventListener("change", refreshInstallButton);
 confirmSkin.addEventListener("change", refreshInstallButton);
 
@@ -255,3 +327,5 @@ installButton.addEventListener("click", async () => {
     refreshInstallButton();
   }
 });
+
+void restoreInputs();

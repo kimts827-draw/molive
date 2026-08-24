@@ -1,7 +1,16 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from "electron";
 
-/** 렌더러에는 딱 이 네 가지 동작만 노출한다. Node·fs·ssh2는 넘기지 않는다. */
+/** 렌더러에는 아래 동작만 노출한다. Node·fs·ssh2는 넘기지 않는다. */
 contextBridge.exposeInMainWorld("installer", {
+  loadSettings: () => ipcRenderer.invoke("settings:load"),
+  saveSettings: (input: {
+    host: string;
+    port: number | string;
+    username: string;
+    basePath: string;
+    rememberPassword: boolean;
+    password?: string;
+  }) => ipcRenderer.invoke("settings:save", input),
   pickZip: () => ipcRenderer.invoke("zip:pick"),
   connect: (input: { host: string; port: number; username: string; password: string; basePath: string }) =>
     ipcRenderer.invoke("sftp:connect", input),
