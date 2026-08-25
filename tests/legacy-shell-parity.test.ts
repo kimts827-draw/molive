@@ -5,7 +5,7 @@ import { structuralFingerprint } from "../lib/component-library/fingerprint.ts";
 import { PRODUCT_SECTION_V1_CSS, renderProductSectionV1 } from "../lib/component-library/components/product-section-v1.ts";
 import { buildBridgeCss } from "../lib/cafe24/theme-bridge.ts";
 import { CAFE24_FOOTER_HTML, extractFooterShell, FOOTER_SHELL_CSS, renderFooterShell, replaceFooterShell } from "../lib/commerce/footer-shell.ts";
-import { commerceCss, renderHeaderV1, renderProjectHeaderV1 } from "../lib/commerce/fixed-components.ts";
+import { commerceCss, headerPresentationCss, renderHeaderV1, renderProjectHeaderV1 } from "../lib/commerce/fixed-components.ts";
 
 test("Header Preview는 Cafe24 template의 variable 값만 mock하고 DOM/class를 공유한다", () => {
   const preview = renderHeaderV1("preview", "centered-brand", "MAISON DEUX");
@@ -37,6 +37,43 @@ test("Fashion 브랜드명은 Preview와 Theme ZIP Header의 동일한 텍스트
   assert.match(zipHeader, /<span class="pocHeader__logoText">MAISON DEUX<\/span>/);
   assert.doesNotMatch(zipHeader, /\{\$logo\}|SampleMall/);
   assert.doesNotMatch(zipHeader, /Quiet Form/);
+});
+
+test("편집한 이미지 로고와 띠배너는 Preview와 Cafe24 ZIP Header에서 같은 구조로 렌더된다", () => {
+  const project = {
+    brandName: "MAISON DEUX",
+    name: "Campaign",
+    architecture: { header: "overlay-minimal", productPresentation: "grid-four" },
+    headerPresentation: {
+      logo: { mode: "image" as const, imageUrl: "https://assets.example/logo.webp", imageHeight: 56, text: "MAISON DEUX", textSize: 30 },
+      announcement: { visible: true, text: "오늘만 무료 배송", href: "/event.html", backgroundColor: "#112233", textColor: "#ffffff", height: 42 },
+    },
+  };
+  const preview = renderProjectHeaderV1("preview", project);
+  const cafe24 = renderProjectHeaderV1("cafe24", project);
+  assert.equal(structuralFingerprint(preview), structuralFingerprint(cafe24));
+  assert.match(preview, /<aside class="moireAnnouncementBar"/);
+  assert.match(preview, /<img class="pocHeader__logoImage" src="https:\/\/assets\.example\/logo\.webp"/);
+  assert.match(cafe24, /module="Layout_LogoTop"/);
+  assert.match(cafe24, /class="[^"]*pocHeader__cart"/);
+  const css = headerPresentationCss(project.headerPresentation);
+  assert.match(css, /height:56px/);
+  assert.match(css, /top:42px/);
+  assert.match(css, /max-width:767px/);
+});
+
+test("텍스트 로고 typography는 Preview와 Cafe24 ZIP의 공통 CSS로 렌더된다", () => {
+  const presentation = {
+    logo: { mode: "text" as const, text: "TYPE QA", textSize: 42, imageHeight: 38, fontFamily: "Georgia, serif", lineHeight: 1.25, letterSpacing: 4.5, fontWeight: 600, textColor: "#334455" },
+    announcement: { visible: false, text: "", href: "", backgroundColor: "#171713", textColor: "#ffffff", height: 36 },
+  };
+  const project = { name: "TYPE QA", architecture: { header: "centered-brand", productPresentation: "grid-four" }, headerPresentation: presentation };
+  assert.equal(structuralFingerprint(renderProjectHeaderV1("preview", project)), structuralFingerprint(renderProjectHeaderV1("cafe24", project)));
+  assert.match(renderProjectHeaderV1("cafe24", project), /<span class="pocHeader__logoText">TYPE QA<\/span>/);
+  const css = headerPresentationCss(presentation);
+  for (const declaration of ["font-family:Georgia, serif", "font-size:42px", "font-weight:600", "line-height:1.25", "letter-spacing:4.5px", "color:#334455"]) {
+    assert.ok(css.includes(declaration), declaration);
+  }
 });
 
 test("Product Preview는 Cafe24 card template을 4개 mock 반복하고 Guide 이미지 selector를 쓴다", () => {

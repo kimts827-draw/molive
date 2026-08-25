@@ -46,7 +46,8 @@ test("Editor AI records usage with the authenticated user and owned project", ()
   assert.match(generator, /editProjectNode[\s\S]*await recordUsage\(response, options\?\.onUsage\);/);
   assert.match(route, /usageType: "editor_ai"/);
   assert.match(route, /\.eq\("owner_id", user\.id\)/);
-  assert.match(editor, /architecture: baseSource\.architecture, projectId/);
+  assert.match(editor, /architecture: baseSource\.architecture, renderMetrics/);
+  assert.match(editor, /UUID_PATTERN\.test\(projectId\)[\s\S]*\{ projectId \}/);
 });
 
 test("usage migration is service-role only and provides admin aggregates", () => {

@@ -7,7 +7,7 @@ import { prepareProjectPatch } from "@/lib/cafe24/protection";
 import { buildComponentSpecThemeEntries } from "@/lib/cafe24/component-spec-theme-package";
 import { assetFileName, rewriteAssetUrls, THEME_ASSET_DIR } from "@/lib/cafe24/theme-assets";
 import { buildBridgeCss, buildFooterThemeCss, resolveFooterInk } from "@/lib/cafe24/theme-bridge";
-import { commerceCss, composeCommerce, isolateAiDesignCss, renderProjectHeaderV1, resolveLegacyComposition, verifiedProductLayoutCss } from "@/lib/commerce/fixed-components";
+import { commerceCss, composeCommerce, headerPresentationCss, isolateAiDesignCss, renderProjectHeaderV1, resolveLegacyComposition, verifiedProductLayoutCss } from "@/lib/commerce/fixed-components";
 import { replaceFooterShell } from "@/lib/commerce/footer-shell";
 import {
   BASE_INDEX_PATH,
@@ -92,7 +92,7 @@ function buildLegacyThemeEntries(base: Map<string, Buffer>, source: ProjectSourc
   const rawThemeCss = rewriteAssetUrls(source.css, mapping);
   const composition = resolveLegacyComposition(source.architecture);
   const themeCss = isolateAiDesignCss(rawThemeCss);
-  const protectedCss = `${commerceCss(source.commerce, composition.headerVariant)}\n${verifiedProductLayoutCss(composition.productLayout)}\n${buildFooterThemeCss(rawThemeCss)}`;
+  const protectedCss = `${commerceCss(source.commerce, composition.headerVariant)}${source.headerPresentation ? `\n${headerPresentationCss(source.headerPresentation)}` : ""}\n${verifiedProductLayoutCss(composition.productLayout, source.commerce?.thumbRatioOverride)}\n${buildFooterThemeCss(rawThemeCss)}`;
 
   // 고정 커머스 컴포넌트를 씁니다. 상품 슬롯이 없으면 Guide module로 물러나지 않고 실패합니다.
   const composed = composeCommerce(themeHtml, "cafe24", source.commerce, composition, { includeHeader: false });
@@ -110,7 +110,10 @@ function buildLegacyThemeEntries(base: Map<string, Buffer>, source: ProjectSourc
   files.set(MOIRE_CSS_PATH, Buffer.from(themeCss, "utf8"));
   files.set(MOIRE_BRIDGE_CSS_PATH, Buffer.from(buildBridgeCss(rawThemeCss), "utf8"));
   files.set(MOIRE_LAYOUT_PATH, Buffer.from(buildMoireLayout(baseLayout.toString("utf8"), { rootValue, hasMoireHeader: true }), "utf8"));
-  files.set(MOIRE_HEADER_PATH, Buffer.from(renderProjectHeaderV1("cafe24", source), "utf8"));
+  const exportSource = source.headerPresentation?.logo.imageUrl
+    ? { ...source, headerPresentation: { ...source.headerPresentation, logo: { ...source.headerPresentation.logo, imageUrl: rewriteAssetUrls(source.headerPresentation.logo.imageUrl, mapping) } } }
+    : source;
+  files.set(MOIRE_HEADER_PATH, Buffer.from(renderProjectHeaderV1("cafe24", exportSource), "utf8"));
   files.set(COMMERCE_CSS_PATH, Buffer.from(protectedCss, "utf8"));
   const footerTemplate = base.get(CAFE24_FOOTER_PATH);
   if (!footerTemplate) throw new Error("기준 스킨에 Cafe24 footer template이 없습니다.");

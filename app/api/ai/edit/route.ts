@@ -7,12 +7,13 @@ import { hasSupabaseServerConfig } from "@/lib/supabase/config";
 
 const requestSchema = z.object({
   prompt: z.string().min(2).max(3000),
-  nodeId: z.string().min(1).max(180),
-  nodeType: z.string().min(1).max(80),
-  nodeHtml: z.string().min(10).max(120000),
-  projectCss: z.string().max(180000),
-  rootValue: z.string().min(1).max(180),
+  nodeId: z.string().min(1).max(500),
+  nodeType: z.string().min(1).max(200),
+  nodeHtml: z.string().min(10).max(400000),
+  projectCss: z.string().max(600000),
+  rootValue: z.string().min(1).max(500),
   architecture: z.object({ header: z.string(), hero: z.string(), sections: z.array(z.string()), productPresentation: z.string(), typography: z.string(), footer: z.string() }),
+  renderMetrics: z.object({ width: z.number().finite().nonnegative(), height: z.number().finite().nonnegative(), fontSize: z.number().finite().nonnegative(), lineHeight: z.number().finite().nonnegative(), letterSpacing: z.number().finite(), marginTop: z.number().finite(), marginBottom: z.number().finite(), paddingTop: z.number().finite(), paddingBottom: z.number().finite() }).optional(),
   projectId: z.uuid().nullable().optional(),
 });
 
@@ -20,7 +21,11 @@ export async function POST(request: Request) {
   try {
     const user = await requireApiUser(request);
     const parsedInput = requestSchema.safeParse(await request.json());
-    if (!parsedInput.success) return Response.json({ error: "요청 데이터 형식이 올바르지 않습니다.", issues: parsedInput.error.issues }, { status: 400 });
+    if (!parsedInput.success) {
+      const firstIssue = parsedInput.error.issues[0];
+      const field = firstIssue?.path.join(".") || "요청";
+      return Response.json({ error: `AI 수정 요청의 ${field} 값을 확인해 주세요.`, issues: parsedInput.error.issues }, { status: 400 });
+    }
     const projectId = parsedInput.data.projectId ?? null;
     if (projectId && hasSupabaseServerConfig()) {
       const { data: ownedProject, error } = await createAdminClient().from("projects").select("id").eq("id", projectId).eq("owner_id", user.id).maybeSingle();

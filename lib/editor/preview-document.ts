@@ -1,9 +1,10 @@
-import { commerceCss, composeCommerce, isolateAiDesignCss, renderProjectHeaderV1, resolveLegacyComposition, verifiedProductLayoutCss } from "../commerce/fixed-components.ts";
+import { commerceCss, composeCommerce, headerPresentationCss, isolateAiDesignCss, renderProjectHeaderV1, resolveLegacyComposition, verifiedProductLayoutCss } from "../commerce/fixed-components.ts";
 import { FOOTER_SHELL_CSS, renderFooterShell } from "../commerce/footer-shell.ts";
 import { buildBridgeCss, buildFooterThemeCss } from "../cafe24/theme-bridge.ts";
 import { renderProject, type RenderBundle } from "../component-library/index.ts";
 import type { ProjectDocument } from "../project-document.ts";
 import { isProjectSource } from "../project-source.ts";
+import { OVERFLOW_CLIP_CSS } from "./responsive-style.ts";
 
 export type EditorPreviewDocument = {
   kind: "legacy" | "component-spec";
@@ -13,7 +14,8 @@ export type EditorPreviewDocument = {
 };
 
 function htmlDocument(body: string, css: string) {
-  return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{margin:0;min-height:100%}${css}</style></head><body>${body}</body></html>`;
+  // 오른쪽/아래로 옮긴 요소가 Preview 폭을 늘려 흰 공간을 만들지 않도록 문서 단위에서 잘라 냅니다.
+  return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{margin:0;min-height:100%}${OVERFLOW_CLIP_CSS}${css}</style></head><body>${body}</body></html>`;
 }
 
 function escapeHtml(value: string) {
@@ -54,12 +56,12 @@ export function buildEditorPreviewDocument(document: ProjectDocument): EditorPre
       ?? `moire-${document.id.replace(/[^a-z0-9-]/gi, "").slice(0, 24)}`;
     const canvas = composeCommerce(document.html, "preview", document.commerce, composition, { includeHeader: false, previewProducts: document.previewProducts }).html;
     body = `<div id="wrap" data-moire-root="${rootValue}">${renderProjectHeaderV1("preview", document)}<div id="container"><main id="contents" role="main" data-moire-full="true">${canvas}</main></div>${renderFooterShell("preview")}</div>`;
-    commerce = commerceCss(document.commerce, composition.headerVariant);
+    commerce = `${commerceCss(document.commerce, composition.headerVariant)}${document.headerPresentation ? `\n${headerPresentationCss(document.headerPresentation)}` : ""}`;
   } catch (error) {
     body = `<pre style="margin:0;padding:24px;font:13px/1.6 ui-monospace,monospace;color:#a0392e;white-space:pre-wrap">고정 커머스 컴포넌트를 넣지 못했습니다.\n${error instanceof Error ? error.message : String(error)}</pre>`;
   }
   return {
     kind: "legacy",
-    srcDoc: htmlDocument(body, `${buildBridgeCss(document.css)}\n${isolateAiDesignCss(document.css)}\n${commerce}[module="Layout_stateLogon"]{display:none}\n${verifiedProductLayoutCss(composition.productLayout)}\n${FOOTER_SHELL_CSS}\n${buildFooterThemeCss(document.css)}`),
+    srcDoc: htmlDocument(body, `${buildBridgeCss(document.css)}\n${isolateAiDesignCss(document.css)}\n${commerce}[module="Layout_stateLogon"]{display:none}\n${verifiedProductLayoutCss(composition.productLayout, document.commerce?.thumbRatioOverride)}\n${FOOTER_SHELL_CSS}\n${buildFooterThemeCss(document.css)}`),
   };
 }

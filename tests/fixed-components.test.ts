@@ -140,6 +140,9 @@ test("AI CSS는 unlayered static scope로 Guide보다 강하고 Product boundary
   assert.equal(responsive.includes("calc(100vh - 70px)"), false);
   assert.ok(responsive.includes("min-height:100svh"));
   assert.ok(responsive.includes("font-size:clamp(48px,7vw,76px)"));
+  assert.match(responsive, /max-width:767px[^}]+img\[data-moire-id\][^}]+max-width:100%/);
+  assert.ok(responsive.includes("object-position:center center"));
+  assert.ok(responsive.includes("transform-origin:center center"));
 });
 
 test("AI static root 표식은 Preview/Cafe24 공통 본문에만 추가된다", () => {

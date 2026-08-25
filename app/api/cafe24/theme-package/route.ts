@@ -15,7 +15,8 @@ export async function GET(request: Request) {
     if (!activeVersion) return Response.json({ error: "activeVersion의 Project Source를 찾을 수 없습니다." }, { status: 409 });
 
     const base = await collectBaseSkin(THEME_BASE_DIR);
-    const assets = await fetchThemeAssets(collectAssetUrls(activeVersion.source.html, activeVersion.source.css));
+    const logoImage = "headerPresentation" in activeVersion.source ? activeVersion.source.headerPresentation?.logo.imageUrl ?? "" : "";
+    const assets = await fetchThemeAssets(collectAssetUrls(activeVersion.source.html, activeVersion.source.css, logoImage ? `<img src="${logoImage}">` : ""));
     const built = buildThemeEntries(base, activeVersion.source, assets);
     const zip = createZip(built.entries);
     const name = `moire-skin-${project.id.slice(0, 8)}-${activeVersion.id.slice(0, 8)}.zip`;

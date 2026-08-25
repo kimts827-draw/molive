@@ -6,6 +6,7 @@
 
 import { renderComponent } from "../component-library/renderer.ts";
 import type { PreviewProductMock } from "../component-library/preview-mock.ts";
+import type { ProjectHeaderPresentation } from "../project-source.ts";
 
 export type CommerceVariant = "minimal" | "editorial" | "bold";
 export type HeaderVariant = "split-utility" | "centered-brand" | "overlay-minimal";
@@ -27,7 +28,16 @@ export type CommerceTokens = {
   thumbRatio?: string;
   thumbFit?: "contain" | "cover";
   thumbBackground?: string;
+  /**
+   * 상품 썸네일 표시 비율을 명시적으로 덮어씁니다.
+   * 값이 있을 때만 적용해 기존 프로젝트 진열은 그대로 두고,
+   * Cafe24 상품 binding과 DOM은 건드리지 않은 채 썸네일 상자의 CSS 비율만 바꿉니다.
+   */
+  thumbRatioOverride?: string;
 };
+
+/** Preview에서 Header를 가리키는 편집 ID입니다. Project Source HTML에는 없는 가상 노드입니다. */
+export const HEADER_NODE_ID = "moire-header";
 
 export type RenderMode = "preview" | "cafe24";
 
@@ -103,20 +113,103 @@ function escapeHeaderText(value: string) {
     .replaceAll("'", "&#39;");
 }
 
+const DEFAULT_HEADER_PRESENTATION: ProjectHeaderPresentation = {
+  logo: { mode: "text", textSize: 26, imageHeight: 38, fontFamily: "inherit", lineHeight: 1, letterSpacing: 2, fontWeight: 800 },
+  announcement: { visible: false, text: "새로운 소식을 입력하세요", href: "", backgroundColor: "#171713", textColor: "#ffffff", height: 36 },
+};
+
+function safeHeaderColor(value: string | undefined, fallback: string) {
+  const color = value?.trim() ?? "";
+  return /^(?:#[0-9a-f]{3,8}|rgba?\([\d\s,.%]+\)|hsla?\([\d\s,.%]+\))$/i.test(color) ? color : fallback;
+}
+
+function safeHeaderHref(value: string | undefined) {
+  const href = value?.trim() ?? "";
+  return /^(?:https?:\/\/|\/|#)/i.test(href) ? href : "";
+}
+
+const HEADER_LOGO_FONTS = new Set([
+  "inherit",
+  "Arial, sans-serif",
+  "Pretendard, Arial, sans-serif",
+  "Georgia, serif",
+  "monospace",
+]);
+
+function safeHeaderLogoFont(value: string | undefined) {
+  return value && HEADER_LOGO_FONTS.has(value) ? value : "inherit";
+}
+
+export function resolveHeaderPresentation(value?: Partial<ProjectHeaderPresentation>): ProjectHeaderPresentation {
+  const logoMode = value?.logo?.mode === "image" ? "image" : "text";
+  return {
+    logo: {
+      mode: logoMode,
+      text: value?.logo?.text?.trim() || undefined,
+      imageUrl: value?.logo?.imageUrl?.trim() || undefined,
+      textSize: Math.min(64, Math.max(18, value?.logo?.textSize ?? DEFAULT_HEADER_PRESENTATION.logo.textSize ?? 26)),
+      imageHeight: Math.min(72, Math.max(20, value?.logo?.imageHeight ?? DEFAULT_HEADER_PRESENTATION.logo.imageHeight ?? 38)),
+      fontFamily: safeHeaderLogoFont(value?.logo?.fontFamily),
+      lineHeight: Math.min(2, Math.max(0.7, value?.logo?.lineHeight ?? DEFAULT_HEADER_PRESENTATION.logo.lineHeight ?? 1)),
+      letterSpacing: Math.min(30, Math.max(-10, value?.logo?.letterSpacing ?? DEFAULT_HEADER_PRESENTATION.logo.letterSpacing ?? 2)),
+      fontWeight: [300, 400, 500, 600, 700, 800, 900].includes(value?.logo?.fontWeight ?? 800) ? value?.logo?.fontWeight ?? 800 : 800,
+      textColor: value?.logo?.textColor ? safeHeaderColor(value.logo.textColor, "#171713") : undefined,
+    },
+    announcement: {
+      visible: value?.announcement?.visible ?? false,
+      text: value?.announcement?.text ?? DEFAULT_HEADER_PRESENTATION.announcement.text,
+      href: safeHeaderHref(value?.announcement?.href),
+      backgroundColor: safeHeaderColor(value?.announcement?.backgroundColor, DEFAULT_HEADER_PRESENTATION.announcement.backgroundColor),
+      textColor: safeHeaderColor(value?.announcement?.textColor, DEFAULT_HEADER_PRESENTATION.announcement.textColor),
+      height: Math.min(72, Math.max(24, value?.announcement?.height ?? DEFAULT_HEADER_PRESENTATION.announcement.height)),
+    },
+  };
+}
+
+function renderAnnouncementBar(presentation: ProjectHeaderPresentation) {
+  if (!presentation.announcement.visible) return "";
+  const text = escapeHeaderText(presentation.announcement.text.trim() || "새로운 소식을 입력하세요");
+  const content = presentation.announcement.href
+    ? `<a href="${escapeHeaderText(presentation.announcement.href)}">${text}</a>`
+    : `<span>${text}</span>`;
+  return `<aside class="moireAnnouncementBar" aria-label="공지">${content}</aside>\n`;
+}
+
 /** Cafe24 Header template 하나를 target별 binding 값으로만 렌더링합니다. */
-export function renderHeaderV1(mode: RenderMode, variant: HeaderVariant = "split-utility", brandName = "Moiré") {
+export function renderHeaderV1(mode: RenderMode, variant: HeaderVariant = "split-utility", brandName = "Moiré", presentationValue?: Partial<ProjectHeaderPresentation>) {
   if (!HEADER_VARIANTS.has(variant)) throw new Error(`지원하지 않는 HeaderV1 variant입니다: ${variant}`);
   const brand = brandName.trim() || "Moiré";
+  const presentation = resolveHeaderPresentation(presentationValue);
+  const logo = presentation.logo.mode === "image" && presentation.logo.imageUrl
+    ? `<img class="pocHeader__logoImage" src="${escapeHeaderText(presentation.logo.imageUrl)}" alt="${escapeHeaderText(presentation.logo.text || brand)}" />`
+    : `<span class="pocHeader__logoText">${escapeHeaderText(presentation.logo.text || brand)}</span>`;
   const template = HEADER_V1_CAFE24_TEMPLATE
     .replaceAll("__VARIANT__", variant)
-    .replaceAll("__BRAND_NAME__", escapeHeaderText(brand));
-  return mode === "cafe24" ? template : bindPreviewHeader(template);
+    .replace('<span class="pocHeader__logoText">__BRAND_NAME__</span>', logo);
+  // Preview와 Cafe24는 같은 DOM을 씁니다. Editor 선택용 메타데이터는 Canvas가 iframe에서 붙입니다.
+  const header = mode === "cafe24" ? template : bindPreviewHeader(template);
+  return `${renderAnnouncementBar(presentation)}${header}`;
 }
 
 /** 저장된 브랜드명을 Preview와 Cafe24 Header의 같은 텍스트 로고에 전달합니다. */
-export function renderProjectHeaderV1(mode: RenderMode, project: { brandName?: string; name: string; architecture?: { header?: string; productPresentation?: string } }) {
+export function renderProjectHeaderV1(mode: RenderMode, project: { brandName?: string; name: string; architecture?: { header?: string; productPresentation?: string }; headerPresentation?: ProjectHeaderPresentation }) {
   const composition = resolveLegacyComposition(project.architecture);
-  return renderHeaderV1(mode, composition.headerVariant, project.brandName?.trim() || project.name);
+  return renderHeaderV1(mode, composition.headerVariant, project.brandName?.trim() || project.name, project.headerPresentation);
+}
+
+export function headerPresentationCss(value?: Partial<ProjectHeaderPresentation>) {
+  const presentation = resolveHeaderPresentation(value);
+  const { textSize, imageHeight, fontFamily, lineHeight, letterSpacing, fontWeight, textColor } = presentation.logo;
+  const announcement = presentation.announcement;
+  return `/* Moiré Header logo / Announcement presentation */
+.pocHeader__logoText{font-family:${fontFamily};font-size:${textSize}px;font-weight:${fontWeight};line-height:${lineHeight};letter-spacing:${letterSpacing}px;color:${textColor ?? "inherit"}}
+.pocHeader__logo img.pocHeader__logoImage{display:block;width:auto;height:${imageHeight}px;max-width:min(360px,34vw);object-fit:contain}
+.moireAnnouncementBar{position:relative;z-index:31;box-sizing:border-box;display:flex;align-items:center;justify-content:center;min-height:${announcement.height}px;padding:4px 24px;background:${announcement.backgroundColor};color:${announcement.textColor};font:600 13px/1.35 system-ui,-apple-system,'Apple SD Gothic Neo','Malgun Gothic',sans-serif;text-align:center}
+.moireAnnouncementBar a,.moireAnnouncementBar span{color:inherit;text-decoration:none}
+.moireAnnouncementBar + #header.pocHeader--overlay-minimal{top:${announcement.visible ? announcement.height : 0}px}
+@media (max-width:1024px){.pocHeader__logoText{font-size:min(${textSize}px,3.4vw)}.pocHeader__logo img.pocHeader__logoImage{height:min(${imageHeight}px,5vw)}}
+@media (max-width:767px){.pocHeader__logoText{font-size:min(${textSize}px,26px)}.pocHeader__logo img.pocHeader__logoImage{height:min(${imageHeight}px,32px);max-width:36vw}.moireAnnouncementBar{min-height:min(${announcement.height}px,48px);padding-inline:16px;font-size:12px}}
+`;
 }
 
 const VERIFIED_PRODUCT_SECTION_REQUEST = {
@@ -147,7 +240,7 @@ export function commerceCss(tokens: CommerceTokens = {}, headerVariant: HeaderVa
 .pocHeader__inner{display:flex;align-items:center;gap:32px;box-sizing:border-box;width:calc(100% - 64px);max-width:1280px;margin:0 auto;padding:18px 0}
 .pocHeader__logo{margin:0;font-size:0;line-height:0}
 .pocHeader__logo img{display:block;height:28px;width:auto}
-.pocHeader__logoText{font:800 20px/1 ${t.fontFamily};letter-spacing:.08em}
+.pocHeader__logoText{font:800 24px/1 ${t.fontFamily};letter-spacing:.08em}
 .pocHeader__category{flex:1;min-width:0}
 .pocHeader__categoryList{display:flex;align-items:center;gap:20px;margin:0;padding:0;list-style:none}
 .pocHeader__categoryList a{font:600 13px/1 ${t.fontFamily};letter-spacing:.02em;color:inherit;text-decoration:none;white-space:nowrap}
@@ -252,14 +345,34 @@ ${P} .prdList .icon{margin:8px 0 0}
 };
 
 /** AI CSS와 Guide bridge보다 뒤에서 golden 선언을 같은 값으로 재확정합니다. */
-export function verifiedProductLayoutCss(layout: ProductLayout = "grid-four") {
+/** 4:5, 3/4 같은 표기를 CSS aspect-ratio 값으로 정규화합니다. 해석되지 않으면 무시합니다. */
+export function normalizeThumbRatio(value: string | undefined) {
+  const match = (value ?? "").trim().replace(/\s+/g, "").match(/^(\d+(?:\.\d+)?)[:/](\d+(?:\.\d+)?)$/);
+  if (!match) return null;
+  const width = Number(match[1]);
+  const height = Number(match[2]);
+  return width > 0 && height > 0 ? `${width}/${height}` : null;
+}
+
+/**
+ * 썸네일 상자의 비율만 마지막에 다시 선언합니다.
+ * golden DOM·module·Cafe24 변수는 그대로 두고 상자 비율과 크롭 방식만 바꿉니다.
+ */
+function thumbRatioCss(ratio: string) {
+  return `/* 상품 썸네일 표시 비율 override */
+${P} .prdList .thumbnail a{display:block;overflow:hidden;aspect-ratio:${ratio}}
+${P} .prdList .thumbnail a img{width:100%;height:100%;object-fit:cover}`;
+}
+
+export function verifiedProductLayoutCss(layout: ProductLayout = "grid-four", thumbRatioOverride?: string) {
   if (!PRODUCT_LAYOUTS.has(layout)) throw new Error(`지원하지 않는 Product layout입니다: ${layout}`);
   const contentContract = `${P}{box-sizing:border-box;width:calc(100% - 64px);max-width:1280px;margin-left:auto;margin-right:auto}
 @media all and (max-width:1024px){${P}{width:calc(100% - 48px)}}
 @media all and (max-width:767px){${P}{width:calc(100% - 40px)}}`;
   const canonical = `${stronglyScopeProductCss(renderVerifiedProductSection("preview").css)}\n${contentContract}`;
-  if (layout === "grid-four") return canonical;
-  return `${canonical}\n${PRODUCT_LAYOUT_CSS[layout]}`;
+  const base = layout === "grid-four" ? canonical : `${canonical}\n${PRODUCT_LAYOUT_CSS[layout]}`;
+  const ratio = normalizeThumbRatio(thumbRatioOverride);
+  return ratio ? `${base}\n${thumbRatioCss(ratio)}` : base;
 }
 
 function normalizeResponsiveDesignCss(css: string) {
@@ -323,7 +436,9 @@ function scopeAiStaticCss(css: string) {
 
 /** AI presentation CSS는 정적 본문에만 적용하고 Product slot에서 scope를 끊습니다. */
 export function isolateAiDesignCss(css: string) {
-  return scopeAiStaticCss(normalizeResponsiveDesignCss(css));
+  const scoped = scopeAiStaticCss(normalizeResponsiveDesignCss(css));
+  const mobileImageCentering = `@media all and (max-width:767px){[data-moire-static][data-moire-root] img[data-moire-id]:where(:not([data-cafe24-slot], [data-cafe24-slot] *)){max-width:100%;margin-inline:auto;object-position:center center;transform-origin:center center}}`;
+  return `${scoped}\n${mobileImageCentering}`;
 }
 
 const SLOT_MARK = 'data-cafe24-slot="product-list"';

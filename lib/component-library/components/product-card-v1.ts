@@ -33,6 +33,9 @@ export const PRODUCT_CARD_V1_CAFE24_HTML = `<li id="anchorBoxId_{$product_no}">
   </div>
 </li>`;
 
+/** 아이콘이 없을 때 쓰는 투명 1x1 이미지입니다. Cafe24 template의 {$icon_url}은 그대로 둡니다. */
+const TRANSPARENT_PIXEL = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+
 const CLASS_BINDINGS = [
   "{$icon_class_name}",
   "{$disp_likeprd_class}",
@@ -62,7 +65,8 @@ function bindPreviewProductCard(index: number, product: PreviewProductMock) {
     ["{$image_medium}", sample.image],
     ["{$image_medium_id}", `${sample.no}-image`],
     ["{$seo_alt_tag}", sample.name],
-    ["{$icon_url}", "none"],
+    // Preview 바인딩 값입니다. "none"은 url(none)으로 해석돼 /none 404 요청을 만들므로 투명 픽셀을 씁니다.
+    ["{$icon_url}", TRANSPARENT_PIXEL],
     ["{$disp_likeprd_icon}", "♡"],
     ["{$disp_likeprd_count}", "0"],
     ["{$list_wish_icon}", "♡ "],

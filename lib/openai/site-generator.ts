@@ -13,6 +13,7 @@ import { isRepairableVerdict, verifyGeneralImages, type ImageProbe } from "@/lib
 import { repairBrokenImages } from "@/lib/assets/image-repair";
 import { writeGenerationTrace, type GenerationTrace } from "@/lib/openai/dev-trace";
 import { usageEventFromResponse, type OpenAIUsageEvent } from "@/lib/openai/usage";
+import { classifyAiEditIntent } from "@/lib/editor/ai-edit-intent";
 import type { ProjectSource } from "@/lib/project-source";
 
 const architectureSchema = z.object({
@@ -58,7 +59,8 @@ const designSchema = z.object({
   css: z.string().min(200),
 });
 
-const nodeEditSchema = z.object({ summary: z.string().min(1), nodeHtml: z.string().min(20), nodeCss: z.string() });
+// STYLE-ONLY 편집은 선택 HTML을 그대로 두므로 모델이 HTML을 돌려주지 않아도 됩니다.
+const nodeEditSchema = z.object({ summary: z.string().min(1), nodeHtml: z.string(), nodeCss: z.string() });
 
 const architectureJsonSchema = {
   type: "object",
@@ -403,13 +405,22 @@ SELECTED-NODE EDIT MODE
 - Preserve the selected root data-moire-id exactly. You may completely redesign its descendants and change its semantic tag when appropriate.
 - Keep or add unique data-moire-id/data-moire-type metadata to all editable descendants.
 - Every nodeCss selector must contain the exact selector [data-moire-id="SELECTED_ID"]. This hard boundary prevents changes outside the selected area.
-- Do not refer to styles outside the selected node. Preserve data-cafe24-slot when it exists in the selected subtree.`;
+- Do not refer to styles outside the selected node. Preserve data-cafe24-slot when it exists in the selected subtree.
+- Never use !important in nodeCss. The Inspector's later inline adjustments must remain effective.
+- For a STYLE-ONLY request, preserve the selected outerHTML, tag, text, attributes, children, and every data-moire-id exactly. Apply typography, color, height, responsive spacing, or image positioning only through CSS on the exact selected data-moire-id.
+- Understand ordinary Korean layout language without requiring CSS terminology. Requests to make an area taller/shorter, reduce vertical whitespace, move an image up/down/right/left, or shift its visible center are valid STYLE-ONLY edits.
+- If render metrics are supplied, use them for numeric relative requests. For example, 1.5× height means both height and min-height become current rendered height × 1.5.
+- Map ordinary spacing requests to margin-block/margin-inline for outer space and padding-block/padding-inline for inner space. "위아래 여백" normally means padding-block on a section unless the user clearly asks for space outside it.
+- For an img, use object-position for its crop focal point, translate for an exact visual X/Y move, width/height for size, and aspect-ratio for ratio. Preserve existing transforms by preferring the translate longhand instead of replacing transform.
+- Typography requests may safely use font-family, font-size, color, line-height, letter-spacing, font-weight, font-style, text-decoration, text-align, scale, and translate.
+- Prefer responsive-safe properties and avoid absolute positioning unless the selected node already uses it. Never reject these supported style requests merely because the user did not use CSS terminology.`;
 
-export async function editProjectNode(input: { prompt: string; nodeId: string; nodeType: string; nodeHtml: string; projectCss: string; rootValue: string; architecture: ProjectSource["architecture"] }, options?: { onUsage?: (event: OpenAIUsageEvent) => Promise<void> }) {
+export async function editProjectNode(input: { prompt: string; nodeId: string; nodeType: string; nodeHtml: string; projectCss: string; rootValue: string; architecture: ProjectSource["architecture"]; renderMetrics?: { width: number; height: number; fontSize: number; lineHeight: number; letterSpacing: number; marginTop: number; marginBottom: number; paddingTop: number; paddingBottom: number } }, options?: { onUsage?: (event: OpenAIUsageEvent) => Promise<void> }) {
   const traceId = crypto.randomUUID();
   const createdAt = new Date().toISOString();
-  const scopedSystemPrompt = `${editSystemPrompt.replaceAll("SELECTED_ID", input.nodeId)}\nEvery nodeCss selector must also begin with the exact project selector [data-moire-root="${input.rootValue}"].`;
-  const userPrompt = `Project architecture (context only):\n${JSON.stringify(input.architecture)}\nSelected node type: ${input.nodeType}\nSelected node outerHTML:\n${input.nodeHtml}\nCurrent project CSS for visual context:\n${input.projectCss}\nUser request:\n${input.prompt}`;
+  const editIntent = classifyAiEditIntent(input.prompt);
+  const scopedSystemPrompt = `${editSystemPrompt.replaceAll("SELECTED_ID", input.nodeId)}\nEvery nodeCss selector must also begin with the exact project selector [data-moire-root="${input.rootValue}"].${editIntent === "style-only" ? "\nThis is a STYLE-ONLY request. Return the selected outerHTML unchanged and put the requested visual change only in nodeCss." : ""}`;
+  const userPrompt = `Project architecture (context only):\n${JSON.stringify(input.architecture)}\nSelected node type: ${input.nodeType}\nCurrent selected render metrics (CSS px, use for relative changes):\n${JSON.stringify(input.renderMetrics ?? null)}\nSelected node outerHTML:\n${input.nodeHtml}\nCurrent project CSS for visual context:\n${input.projectCss}\nUser request:\n${input.prompt}`;
   const trace: GenerationTrace = { traceId, kind: "edit", createdAt, request: { model: model(), systemPrompt: scopedSystemPrompt, userPrompt } };
   try {
     const response = await getOpenAI().responses.create({
@@ -419,11 +430,23 @@ export async function editProjectNode(input: { prompt: string; nodeId: string; n
     });
     await recordUsage(response, options?.onUsage);
     const parsed = nodeEditSchema.parse(JSON.parse(response.output_text));
-    const nodeHtml = ensureEditingMetadata(parsed.nodeHtml, `moire-${input.nodeId.replace(/[^a-z0-9-]/gi, "").slice(0, 24)}`);
+    if (editIntent === "style-only" && !parsed.nodeCss.trim()) {
+      throw new Error("AI가 실제로 적용할 스타일 값을 만들지 못했습니다. 변경할 크기나 배율을 더 구체적으로 적어 주세요.");
+    }
+    if (editIntent !== "style-only" && parsed.nodeHtml.trim().length < 20) {
+      throw new Error("AI가 선택 영역의 HTML을 돌려주지 않았습니다. 요청을 조금 더 구체적으로 적어 주세요.");
+    }
+    const candidateHtml = editIntent === "style-only" ? input.nodeHtml : parsed.nodeHtml;
+    const nodeHtml = ensureEditingMetadata(candidateHtml, `moire-${input.nodeId.replace(/[^a-z0-9-]/gi, "").slice(0, 24)}`);
     const patch = { nodeHtml, nodeCss: parsed.nodeCss };
     // 편집은 이미 이 프로젝트에 들어와 있는 이미지만 물려받습니다. 다른 프로젝트의 저장 이미지는 새로 끌어올 수 없습니다.
-    const editAllowlist = createAssetAllowlist({ projectAssets: collectAssetReferences(input.nodeHtml, input.projectCss).map((reference) => reference.url) });
-    const assetViolations = auditGeneratedAssets({ html: patch.nodeHtml, css: patch.nodeCss }, editAllowlist);
+    const existingReferences = collectAssetReferences(input.nodeHtml, input.projectCss);
+    const editAllowlist = createAssetAllowlist({ projectAssets: existingReferences.map((reference) => reference.url) });
+    // 이미 있던 이미지까지 다시 심판하지 않습니다. 보호된 Product DOM이 선택 안에 있다는 이유만으로
+    // 이미지를 건드리지 않는 CSS 수정까지 거부되던 원인입니다.
+    const introduced = new Set(existingReferences.map((reference) => reference.url.slice(0, 120)));
+    const assetViolations = auditGeneratedAssets({ html: patch.nodeHtml, css: patch.nodeCss }, editAllowlist)
+      .filter((violation) => !violation.token || !introduced.has(violation.token));
     const nodeValidator = validateNodePatch({ nodeId: input.nodeId, rootValue: input.rootValue, ...patch });
     const validator = { safe: nodeValidator.safe && assetViolations.length === 0, violations: [...nodeValidator.violations, ...assetViolations] };
     trace.response = responseTrace(response);
