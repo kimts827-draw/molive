@@ -159,7 +159,7 @@ export function PromptComposer({ signedIn, creditBalance, persistenceEnabled, de
           <label className={`brand-color-pill ${colorSelected ? "selected" : ""}`}><i style={{ background: color }} /> {colorSelected ? color : "브랜드 컬러"}<input type="color" value={color} onChange={(event) => { setColor(event.target.value); setColorSelected(true); }} /></label>
         </div>
         <button className="generate-button" type="submit" disabled={prompt.trim().length < 10 || busy || readingFiles}>
-          {busy ? <><LoaderCircle size={15} className="spin" /> 디자인 생성 중</> : readingFiles ? <><LoaderCircle size={15} className="spin" /> 이미지 준비 중</> : <>디자인 생성 <ArrowRight size={16} /></>}
+          {busy ? <><LoaderCircle size={15} className="spin" /> 디자인 생성 중</> : readingFiles ? <><LoaderCircle size={15} className="spin" /> 이미지 준비 중</> : <>생성하기 <ArrowRight size={16} /></>}
         </button>
       </div>
       <span className="prompt-secure-note"><Sparkles size={11} /> 첨부 자료를 브랜드 디자인에 반영합니다</span>
