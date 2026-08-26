@@ -45,6 +45,22 @@ a { color: inherit; text-decoration: none; }
 .hero-copy { margin: 0; color: #585750; font-size: 17px; line-height: 1.75; letter-spacing: -.02em; }
 .prompt-composer { position: relative; width: min(760px, 100%); margin: 46px auto 0; padding: 22px 22px 17px; text-align: left; background: white; border: 1px solid rgba(0,0,0,.16); border-radius: 19px; box-shadow: 0 22px 70px rgba(42, 37, 24, .13), 0 2px 8px rgba(0,0,0,.04); }
 .prompt-composer:before { content: ""; position: absolute; inset: -8px; z-index: -1; border: 1px solid rgba(0,0,0,.08); border-radius: 25px; }
+.prompt-composer.is-generating { padding: 0; overflow: hidden; }
+.generation-loading { min-height: 350px; padding: 48px 38px 32px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+.generation-icon-frame { position: relative; width: 68px; height: 68px; display: grid; place-items: center; color: white; background: var(--ink); border-radius: 22px; box-shadow: 0 18px 42px rgba(21,21,21,.2); animation: generation-enter .55s ease both, generation-float 3s ease-in-out infinite; }
+.generation-icon-frame:after { content: ""; position: absolute; inset: -10px; border: 1px solid rgba(130,108,255,.28); border-radius: 29px; animation: generation-pulse 2.4s ease-in-out infinite; }
+.generation-copy { width: 100%; margin-top: 29px; animation: generation-enter .55s ease both; }
+.generation-copy > span { color: #77736b; font-size: 9px; font-weight: 800; letter-spacing: .16em; }
+.generation-copy h2 { min-height: 31px; margin: 10px 0 0; font-size: 23px; line-height: 1.35; letter-spacing: -.035em; }
+.generation-progress { position: relative; overflow: hidden; width: min(390px, 86%); height: 4px; margin-top: 30px; background: #ece9e1; border-radius: 999px; }
+.generation-progress i { position: absolute; inset: 0 auto 0 0; width: 36%; background: linear-gradient(90deg, var(--violet), #b3a5ff); border-radius: inherit; animation: generation-progress 2.15s ease-in-out infinite; }
+.generation-wait { margin: 17px 0 0; color: #6f6c64; font-size: 11px; line-height: 1.6; }
+.generation-tip { min-height: 34px; margin: 24px 0 0; padding: 9px 13px; display: inline-flex; align-items: center; gap: 7px; color: #625d80; background: #f3f0ff; border-radius: 999px; font-size: 10px; line-height: 1.45; animation: generation-enter .55s ease both; }
+.generation-tip svg { flex: 0 0 auto; }
+@keyframes generation-enter { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes generation-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+@keyframes generation-pulse { 0%, 100% { opacity: .45; transform: scale(.96); } 50% { opacity: 1; transform: scale(1.04); } }
+@keyframes generation-progress { 0% { transform: translateX(-110%); } 100% { transform: translateX(290%); } }
 .prompt-topline { display: flex; align-items: center; gap: 9px; color: #727067; font-size: 13px; }
 .prompt-topline svg { color: var(--violet); }
 .prompt-composer > textarea { display: block; width: 100%; min-height: 62px; margin: 12px 0 16px; padding: 3px 0; color: var(--ink); background: transparent; border: 0; outline: 0; resize: none; font: inherit; font-size: 19px; line-height: 1.5; letter-spacing: -.025em; }
@@ -241,6 +257,11 @@ a { color: inherit; text-decoration: none; }
   .hero-copy { font-size: 14px; }
   .desktop-only { display: none; }
   .prompt-composer { padding: 18px; }
+  .generation-loading { min-height: 330px; padding: 40px 18px 27px; }
+  .generation-copy h2 { min-height: 54px; font-size: 20px; display: grid; place-items: center; }
+  .generation-progress { width: 90%; margin-top: 23px; }
+  .generation-wait { max-width: 270px; }
+  .generation-tip { min-height: 50px; margin-top: 19px; border-radius: 14px; }
   .prompt-composer > textarea { font-size: 16px; }
   .prompt-actions { align-items: flex-end; }
   .attachment-pills { flex-wrap: wrap; }
@@ -362,6 +383,11 @@ a { color: inherit; text-decoration: none; }
 
 @media (max-width: 460px) {
   .usage-cards { grid-template-columns: 1fr; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .generation-icon-frame, .generation-icon-frame:after, .generation-copy, .generation-progress i, .generation-tip { animation-duration: .01ms; animation-iteration-count: 1; }
+  .generation-progress i { width: 100%; opacity: .55; }
 }
 
 /* Open beta pricing and credits */

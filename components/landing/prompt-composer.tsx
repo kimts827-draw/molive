@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowRight, LoaderCircle, Sparkles, WandSparkles, X } from "lucide-react";
+import { ArrowRight, Images, LayoutTemplate, LoaderCircle, MonitorSmartphone, PanelsTopLeft, Sparkles, WandSparkles, X } from "lucide-react";
 import { createAssetSessionId, optimizeImageFile, persistProjectAsset } from "@/lib/client-image";
 import type { ProjectSource } from "@/lib/project-source";
 import { generationDestination } from "@/lib/projects/client-flow";
@@ -13,6 +13,25 @@ type AttachedAsset = { id: string; kind: "logo" | "image"; name: string; url: st
 const initialPrompt = "차분한 올리브 컬러의 수제 가구 브랜드 쇼핑몰";
 
 const generationDraftKey = "moire:generation-draft";
+
+const generationStages = [
+  { message: "브랜드의 분위기를 분석하고 있어요", icon: Sparkles },
+  { message: "쇼핑몰의 전체 구조를 설계하고 있어요", icon: LayoutTemplate },
+  { message: "상품이 돋보이는 레이아웃을 만들고 있어요", icon: PanelsTopLeft },
+  { message: "브랜드에 어울리는 비주얼을 준비하고 있어요", icon: Images },
+  { message: "섹션별 디자인을 세밀하게 다듬고 있어요", icon: WandSparkles },
+  { message: "PC와 모바일 화면의 균형을 맞추고 있어요", icon: MonitorSmartphone },
+  { message: "마지막 디테일을 정리하고 있어요", icon: Sparkles },
+  { message: "MOLIVE가 쇼핑몰을 완성하고 있어요", icon: WandSparkles },
+] as const;
+
+const generationTips = [
+  "생성 후 Editor에서 글자와 색상을 직접 수정할 수 있어요",
+  "마음에 들지 않는 부분은 AI에게 다시 수정 요청할 수 있어요",
+  "완성된 디자인은 ZIP으로 내려받아 Cafe24에 적용할 수 있어요",
+] as const;
+
+const generationTipSequence = [0, 0, 1, 1, 2, 2, 0, 1] as const;
 
 export function PromptComposer({ signedIn, creditBalance, persistenceEnabled, demoMode }: { signedIn: boolean; creditBalance: number | null; persistenceEnabled: boolean; demoMode: boolean }) {
   const router = useRouter();
@@ -25,6 +44,7 @@ export function PromptComposer({ signedIn, creditBalance, persistenceEnabled, de
   const [busy, setBusy] = useState(false);
   const [readingFiles, setReadingFiles] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [generationStage, setGenerationStage] = useState(0);
 
   useEffect(() => {
     const raw = sessionStorage.getItem(generationDraftKey);
@@ -36,6 +56,14 @@ export function PromptComposer({ signedIn, creditBalance, persistenceEnabled, de
       if (draft.colorSelected) setColorSelected(true);
     } catch { /* Ignore an invalid login-return draft. */ }
   }, []);
+
+  useEffect(() => {
+    if (!busy) return;
+    const timer = window.setInterval(() => {
+      setGenerationStage((current) => (current + 1) % generationStages.length);
+    }, 4_800);
+    return () => window.clearInterval(timer);
+  }, [busy]);
 
   /** 생성이 끝나면 첨부와 세션을 함께 비웁니다. 다음 프로젝트가 이번 이미지를 물려받지 않습니다. */
   function resetAssetSession() {
@@ -86,6 +114,7 @@ export function PromptComposer({ signedIn, creditBalance, persistenceEnabled, de
       setError("영구 저장 설정이 완료되지 않아 디자인을 생성할 수 없습니다.");
       return;
     }
+    setGenerationStage(0);
     setBusy(true);
     setError(null);
     try {
@@ -115,7 +144,8 @@ export function PromptComposer({ signedIn, creditBalance, persistenceEnabled, de
   }
 
   return (
-    <form className="prompt-composer" onSubmit={(event) => void submit(event)}>
+    <form className={`prompt-composer${busy ? " is-generating" : ""}`} aria-busy={busy} onSubmit={(event) => void submit(event)}>
+      {busy ? <GenerationLoading stage={generationStage} /> : <>
       <label className="prompt-topline" htmlFor="home-design-prompt"><WandSparkles size={17} /><span>어떤 쇼핑몰을 만들까요?</span></label>
       <textarea id="home-design-prompt" value={prompt} onChange={(event) => setPrompt(event.target.value)} rows={2} aria-label="쇼핑몰 디자인 프롬프트" />
       {assets.length > 0 && <div className="home-asset-list">{assets.map((asset) => <span key={asset.id}><b>{asset.kind === "logo" ? "로고" : "이미지"}</b>{asset.name}<button type="button" onClick={() => setAssets((current) => current.filter((item) => item.id !== asset.id))} aria-label={`${asset.name} 제거`}><X size={11} /></button></span>)}</div>}
@@ -133,6 +163,23 @@ export function PromptComposer({ signedIn, creditBalance, persistenceEnabled, de
         </button>
       </div>
       <span className="prompt-secure-note"><Sparkles size={11} /> 첨부 자료를 브랜드 디자인에 반영합니다</span>
+      </>}
     </form>
   );
+}
+
+function GenerationLoading({ stage }: { stage: number }) {
+  const current = generationStages[stage];
+  const StageIcon = current.icon;
+  const tip = generationTips[generationTipSequence[stage]];
+  return <section className="generation-loading" role="status" aria-live="polite" aria-atomic="true">
+    <div className="generation-icon-frame" key={`icon-${stage}`} aria-hidden="true"><StageIcon size={28} strokeWidth={1.7} /></div>
+    <div className="generation-copy" key={`copy-${stage}`}>
+      <span>MOLIVE DESIGN STUDIO</span>
+      <h2>{current.message}</h2>
+    </div>
+    <div className="generation-progress" role="progressbar" aria-label="AI 디자인 생성 중"><i /></div>
+    <p className="generation-wait">AI 디자인 생성에는 몇 분 정도 걸릴 수 있어요. 창을 닫지 말아주세요.</p>
+    <p className="generation-tip" key={`tip-${tip}`}><Sparkles size={12} aria-hidden="true" /><span>{tip}</span></p>
+  </section>;
 }
