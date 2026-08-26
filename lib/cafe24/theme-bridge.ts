@@ -137,7 +137,7 @@ export function buildFooterThemeCss(css: string) {
 }
 
 /**
- * Cafe24 모듈 마크업을 Moiré 디자인에 맞추는 브리지 CSS입니다.
+ * Cafe24 모듈 마크업을 MOLIVE 디자인에 맞추는 브리지 CSS입니다.
  * moire.css보다 먼저 실려서 Cafe24 기본값은 이기고 AI 디자인에는 양보합니다.
  * 색은 대부분 상속으로 넘겨 섹션 배경/톤이 그대로 유지됩니다.
  */

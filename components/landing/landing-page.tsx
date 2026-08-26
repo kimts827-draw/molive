@@ -23,6 +23,7 @@ export function LandingPage({ userEmail, persistenceEnabled, demoMode, missingEn
           <a href="#product">제품</a>
           <a href="#how">작동 방식</a>
           <a href="#safety">Cafe24 보호</a>
+          <Link href="/guide">사용 방법</Link>
         </div>
         <div className="nav-actions">
           <Link className="text-link" href="/editor">데모 열기</Link>
@@ -31,14 +32,14 @@ export function LandingPage({ userEmail, persistenceEnabled, demoMode, missingEn
       </nav>
 
       <section className="hero-section" id="create">
-        <div className="eyebrow"><Sparkles size={14} /> Cafe24를 위한 AI 디자인 스튜디오</div>
-        <h1>설명하면 만들어지고,<br /><em>클릭하면 바뀝니다.</em></h1>
+        <div className="eyebrow"><Sparkles size={14} /> AI DESIGN PLATFORM FOR CAFE24</div>
+        <h1>쇼핑몰을 만들고, 바꾸고,<br /><em>계속 살아있게.</em></h1>
         <p className="hero-copy">
-          브랜드를 말해 주세요. Moiré가 Cafe24의 판매 기능은 그대로 지키면서<br className="desktop-only" />
-          레이아웃, 타이포그래피, 컬러와 상품 표현을 새롭게 디자인합니다.
+          MOLIVE(몰리브)는 MALL + LIVE에서 시작한 Cafe24 AI 디자인 플랫폼입니다.<br className="desktop-only" />
+          판매 기능은 그대로 지키면서 쇼핑몰을 만들고, 운영 중에도 계속 바꿀 수 있습니다.
         </p>
         <PromptComposer signedIn={Boolean(userEmail)} persistenceEnabled={persistenceEnabled} demoMode={demoMode} />
-        <p className="hero-note"><Check size={13} /> HTML·FTP 작업 없이 Cafe24에 바로 연결</p>
+        <p className="hero-note"><Check size={13} /> 디자인 ZIP과 Installer로 간단하게 Cafe24에 적용</p>
       </section>
 
       <section className="product-stage" id="product" aria-label="제품 편집 화면 미리보기">
@@ -125,7 +126,7 @@ export function LandingPage({ userEmail, persistenceEnabled, demoMode, missingEn
         <div className="safety-copy">
           <div className="section-kicker">COMMERCE, GUARDED BY DESIGN</div>
           <h2>디자인은 바꿔도<br />판매 엔진은 건드리지 않습니다.</h2>
-          <p>Moiré는 Cafe24 기본 스킨의 모듈, 변수, 옵션, 장바구니와 주문 코드를 먼저 식별합니다. AI가 수정할 수 있는 범위를 Presentation 영역으로 제한하고 배포 전후 지문을 대조합니다.</p>
+          <p>MOLIVE는 Cafe24 기본 스킨의 모듈, 변수, 옵션, 장바구니와 주문 코드를 먼저 식별합니다. AI가 수정할 수 있는 범위를 Presentation 영역으로 제한하고 배포 전후 지문을 대조합니다.</p>
           <ul>
             <li><ShieldCheck size={18} /> 50개 Cafe24 주문 보호 파일 자동 잠금</li>
             <li><Code2 size={18} /> module·변수·필수 지시문 변경 시 즉시 차단</li>
@@ -147,27 +148,27 @@ export function LandingPage({ userEmail, persistenceEnabled, demoMode, missingEn
 
       <section className="flow-section">
         <div className="section-kicker">FROM IDEA TO LIVE STORE</div>
-        <h2>FTP 없이, 세 단계면 충분합니다.</h2>
+        <h2>디자인부터 적용까지,<br />한 흐름으로 이어집니다.</h2>
         <div className="flow-grid">
           <div><span>1</span><h3>브랜드 설명</h3><p>프롬프트와 로고, 상품 이미지, 컬러를 추가합니다.</p></div>
           <div><span>2</span><h3>AI 생성 & 클릭 편집</h3><p>완성된 디자인을 보면서 직접 또는 채팅으로 수정합니다.</p></div>
-          <div><span>3</span><h3>Cafe24에 게시</h3><p>OAuth로 연결하고 안전 검사 후 버튼 한 번으로 적용합니다.</p></div>
+          <div><span>3</span><h3>Cafe24에 적용</h3><p>ZIP을 다운로드하고 MOLIVE Installer에서 적용할 스킨을 선택합니다.</p></div>
         </div>
-        <div className="integration-line"><span>Moiré Studio</span><i /><b>OAuth</b><i /><span>Cafe24 Store</span></div>
+        <div className="integration-line"><span>MOLIVE</span><i /><b>Installer</b><i /><span>Cafe24 Store</span></div>
       </section>
 
       <section className="final-cta">
         <div><Sparkles size={18} /> 첫 번째 스토어를 디자인해 보세요</div>
-        <h2>브랜드는 이미 당신 안에 있습니다.<br />이제 쇼핑몰로 보여주세요.</h2>
+        <h2>한 번 만들고 끝내지 마세요.<br />운영하면서 계속 살아 움직이게.</h2>
         <Link className="button button-light" href="#create">AI 스튜디오 열기 <ArrowRight size={17} /></Link>
-        <p>{persistenceEnabled ? "로그인 후 자동 저장 · Cafe24 연결은 게시할 때" : "개발 데모 데이터로 체험 · 영구 저장 비활성"}</p>
+        <p>{persistenceEnabled ? "로그인 후 자동 저장 · 게시에서 ZIP과 Installer 다운로드" : "개발 데모 데이터로 체험 · 영구 저장 비활성"}</p>
       </section>
 
       <footer className="marketing-footer">
         <Brand />
-        <p>AI design studio for Cafe24.</p>
+        <p>AI Design Platform for Cafe24</p>
         <div><a href="#product">제품</a><a href="#safety">안전 설계</a><a href="mailto:hello@example.com">문의</a></div>
-        <span>© 2026 Moiré Studio</span>
+        <span>© 2026 MOLIVE</span>
       </footer>
     </main>
   );

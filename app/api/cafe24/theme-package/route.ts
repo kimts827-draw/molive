@@ -19,7 +19,7 @@ export async function GET(request: Request) {
     const assets = await fetchThemeAssets(collectAssetUrls(activeVersion.source.html, activeVersion.source.css, logoImage ? `<img src="${logoImage}">` : ""));
     const built = buildThemeEntries(base, activeVersion.source, assets);
     const zip = createZip(built.entries);
-    const name = `moire-skin-${project.id.slice(0, 8)}-${activeVersion.id.slice(0, 8)}.zip`;
+    const name = `molive-skin-${project.id.slice(0, 8)}-${activeVersion.id.slice(0, 8)}.zip`;
     return new Response(new Uint8Array(zip), {
       headers: {
         "Content-Type": "application/zip",

@@ -143,11 +143,16 @@ test("AI 채팅은 메시지 영역만 스크롤되고 입력창은 패널 하�
   assert.ok(editorCss.includes(".ai-input-wrap { position: relative; z-index: 1"));
 });
 
-test("게시 UI는 실제 테마 ZIP과 Cafe24 적용만 남기고 POC·내부 용어를 숨긴다", () => {
+test("게시 UI는 ZIP과 Installer 다운로드 및 적용 순서만 안내한다", () => {
   assert.ok(publishSource.includes("ZIP 다운로드"));
   assert.ok(publishSource.includes("디자인 저장 상태"));
-  assert.ok(publishSource.includes("Installer"));
-  assert.ok(publishSource.includes("Cafe24에 적용"));
+  assert.ok(publishSource.includes('href="/api/installer/download"'));
+  for (const step of ["디자인 ZIP 다운로드", "MOLIVE Installer 설치", "Installer에서 ZIP 선택", "Cafe24 접속 확인 → 스킨 선택 → 적용"]) {
+    assert.ok(publishSource.includes(step), step);
+  }
+  assert.equal(publishSource.includes("Cafe24 쇼핑몰 ID"), false);
+  assert.equal(publishSource.includes("/api/cafe24/status"), false);
+  assert.equal(publishSource.includes("/api/cafe24/deploy"), false);
   assert.equal(publishSource.includes("연동 검증 POC ZIP"), false);
   assert.equal(publishSource.includes("Runtime/ScriptTag"), false);
   assert.equal(publishSource.includes("installation</span>"), false);

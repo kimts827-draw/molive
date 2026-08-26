@@ -47,8 +47,8 @@ export function customerKeyForUser(userId: string) {
 }
 
 export const plans = {
-  starter: { id: "starter", name: "Moiré Starter", amount: 29000, intervalDays: 30 },
-  pro: { id: "pro", name: "Moiré Pro", amount: 79000, intervalDays: 30 },
+  starter: { id: "starter", name: "MOLIVE Starter", amount: 29000, intervalDays: 30 },
+  pro: { id: "pro", name: "MOLIVE Pro", amount: 79000, intervalDays: 30 },
 } as const;
 
 export type PlanId = keyof typeof plans;

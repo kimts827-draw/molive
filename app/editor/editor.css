@@ -244,7 +244,26 @@
   .topbar-actions > button { display: none; }
   .topbar-actions .publish-button { display: flex; }
 }
-.publish-modal{width:min(560px,calc(100vw - 32px))}.publish-form{display:grid;gap:16px;padding:22px}.publish-form>p,.publish-warning{margin:0;color:#6d6960;line-height:1.6;font-size:13px}.publish-warning{padding:24px}.publish-connect-row,.publish-buttons{display:flex;gap:9px}.publish-form input,.publish-form select{width:100%;height:42px;border:1px solid #d9d5cc;border-radius:8px;background:#fff;padding:0 11px;font:inherit}.publish-form label{display:grid;gap:7px;font-size:12px;font-weight:700}.publish-form button{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:42px;border:1px solid #d3d0c8;border-radius:8px;background:#fff;padding:0 14px;font-weight:700;white-space:nowrap;cursor:pointer}.publish-form button:disabled{opacity:.5}.publish-form .publish-primary{background:#191915;color:#fff;border-color:#191915;flex:1}.publish-theme{display:grid;gap:11px;padding:14px;border:1px solid #ddd9d0;border-radius:10px;background:#faf9f6}.publish-theme p{margin:0;color:#6d6960;line-height:1.6;font-size:13px}.publish-theme b{color:#191915}.publish-state{display:grid;gap:4px;padding:13px;background:#f5f3ee;border-radius:9px}.publish-state span{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#8c877e}.publish-state small{color:#a0392e;line-height:1.4}.publish-message{margin:0 22px 22px;padding:12px 14px;border-radius:8px;background:#efeee9;font-size:13px;line-height:1.5}
+.publish-modal { width: min(560px, calc(100vw - 32px)); }
+.publish-form { display: grid; gap: 16px; padding: 22px; }
+.publish-warning { margin: 0; padding: 12px 14px; color: #725a27; background: #fff8e7; border-radius: 8px; font-size: 12px; line-height: 1.55; }
+.publish-state { display: grid; gap: 4px; padding: 13px; background: #f5f3ee; border-radius: 9px; }
+.publish-state span { color: #8c877e; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
+.publish-downloads { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.publish-download-card { display: grid; align-content: space-between; gap: 16px; padding: 15px; text-align: left; background: #faf9f6; border: 1px solid #ddd9d0; border-radius: 10px; }
+.publish-download-card > div { display: flex; align-items: flex-start; gap: 10px; }
+.publish-download-card > div > svg { margin-top: 2px; color: #5b49c2; }
+.publish-download-card p { display: grid; gap: 4px; margin: 0; }
+.publish-download-card p b { color: #191915; font-size: 13px; }
+.publish-download-card p span { color: #77736b; font-size: 10px; line-height: 1.4; }
+.publish-form button, .publish-form .publish-secondary { display: inline-flex; min-height: 42px; align-items: center; justify-content: center; gap: 7px; padding: 0 12px; border: 1px solid #d3d0c8; border-radius: 8px; font-size: 11px; font-weight: 700; white-space: nowrap; cursor: pointer; }
+.publish-form button:disabled { opacity: .45; cursor: default; }
+.publish-form .publish-primary { color: #fff; background: #191915; border-color: #191915; }
+.publish-form .publish-secondary { color: #191915; background: #fff; }
+.publish-steps { margin: 0; padding: 5px 0; display: grid; list-style: none; text-align: left; }
+.publish-modal .publish-steps li { min-height: 36px; padding: 5px 2px; display: grid; grid-template-columns: 24px 1fr; align-items: center; gap: 9px; color: #48463f; font-size: 11px; }
+.publish-modal .publish-steps li span { width: 24px; height: 24px; display: grid; place-items: center; color: #5a48b5; background: #e6e1ff; border-radius: 50%; font-size: 9px; }
+.publish-modal .publish-steps li b { font-weight: 650; }
 .header-variant-fields { display: grid; gap: 6px; }
 .header-variant-fields > b { font-size: 11px; }
 .header-variant-fields > span { color: #6f6a7d; font-size: 10px; line-height: 1.55; }
@@ -265,3 +284,6 @@
 .preview-fullscreen .canvas-viewport.viewport-desktop { width: min(1920px, 100%); }
 .preview-fullscreen .topbar-actions > button:not(.preview-fullscreen-button), .preview-fullscreen .topbar-actions > a { display: none; }
 .publish-caution { padding: 12px; color: #725a27 !important; background: #fff8e7; border-radius: 8px; }
+@media (max-width: 520px) {
+  .publish-downloads { grid-template-columns: 1fr; }
+}

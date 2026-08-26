@@ -1,5 +1,5 @@
 /**
- * Moiré 고정 커머스 컴포넌트입니다.
+ * MOLIVE 고정 커머스 컴포넌트입니다.
  * HeaderV1 / ProductSectionV1의 DOM과 class는 Cafe24 실기기에서 검증된 형태 그대로이며,
  * Preview와 Cafe24 Export가 같은 마크업을 씁니다. AI는 스타일 토큰만 정합니다.
  */
@@ -176,9 +176,9 @@ function renderAnnouncementBar(presentation: ProjectHeaderPresentation) {
 }
 
 /** Cafe24 Header template 하나를 target별 binding 값으로만 렌더링합니다. */
-export function renderHeaderV1(mode: RenderMode, variant: HeaderVariant = "split-utility", brandName = "Moiré", presentationValue?: Partial<ProjectHeaderPresentation>) {
+export function renderHeaderV1(mode: RenderMode, variant: HeaderVariant = "split-utility", brandName = "MOLIVE", presentationValue?: Partial<ProjectHeaderPresentation>) {
   if (!HEADER_VARIANTS.has(variant)) throw new Error(`지원하지 않는 HeaderV1 variant입니다: ${variant}`);
-  const brand = brandName.trim() || "Moiré";
+  const brand = brandName.trim() || "MOLIVE";
   const presentation = resolveHeaderPresentation(presentationValue);
   const logo = presentation.logo.mode === "image" && presentation.logo.imageUrl
     ? `<img class="pocHeader__logoImage" src="${escapeHeaderText(presentation.logo.imageUrl)}" alt="${escapeHeaderText(presentation.logo.text || brand)}" />`

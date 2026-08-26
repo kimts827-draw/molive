@@ -38,7 +38,7 @@ app.whenReady().then(async () => {
         host: "ftp.example.test",
         port: 8105,
         username: "myshop",
-        lastZipDirectory: path.join(os.homedir(), "Desktop", "Moireskins"),
+        lastZipDirectory: path.join(os.homedir(), "Desktop", "MOLIVE-skins"),
         rememberPassword: true,
       },
       SECRET,

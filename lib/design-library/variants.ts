@@ -1,5 +1,5 @@
 /**
- * Moiré 디자인 variant 라이브러리입니다.
+ * MOLIVE 디자인 variant 라이브러리입니다.
  * reference-patterns.ts의 실제 Cafe24 레퍼런스 패턴을 AI가 그대로 시공할 수 있는
  * 구조 계약(spec)으로 옮긴 것으로, blueprint.ts가 업종·시드에 따라 조합합니다.
  *

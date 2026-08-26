@@ -4,7 +4,7 @@ import { crc32, deflateRawSync } from "node:zlib";
 import { detectRootPrefix, readZip, stripRootPrefix } from "../dist/core/zip.js";
 import { collectDirectories, joinInsideSkin, normalizeBasePath, normalizeEntryPath, resolveSkinRoot } from "../dist/core/remote-path.js";
 
-/** Moiré 서버의 lib/zip.ts와 같은 방식으로 ZIP을 만든다. (설치기 입력 재현) */
+/** MOLIVE 서버의 lib/zip.ts와 같은 방식으로 ZIP을 만든다. (설치기 입력 재현) */
 function createZip(entries) {
   const locals = [];
   const centrals = [];
@@ -52,9 +52,9 @@ function createZip(entries) {
   return Buffer.concat([...locals, directory, eocd]);
 }
 
-test("Moiré 테마 ZIP을 그대로 읽는다", () => {
+test("MOLIVE 테마 ZIP을 그대로 읽는다", () => {
   const source = [
-    { path: "index.html", data: Buffer.from("<html>Moiré</html>".repeat(20), "utf8") },
+    { path: "index.html", data: Buffer.from("<html>MOLIVE</html>".repeat(20), "utf8") },
     { path: "layout/basic/main.html", data: Buffer.from("layout", "utf8") },
     { path: "css/moire/한글.css", data: Buffer.from("body{}", "utf8") },
   ];

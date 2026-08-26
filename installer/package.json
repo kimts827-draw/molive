@@ -2,7 +2,7 @@
   "name": "moire-installer",
   "version": "0.1.0",
   "private": true,
-  "description": "Moiré에서 만든 디자인을 카페24 쇼핑몰에 설치하는 Windows 데스크톱 도우미",
+  "description": "MOLIVE에서 만든 디자인을 Cafe24 쇼핑몰에 설치하는 Windows 데스크톱 도우미",
   "main": "dist/main.js",
   "scripts": {
     "build": "tsc && node scripts/copy-static.mjs",
@@ -22,11 +22,11 @@
     "electron-builder": "^26.15.3",
     "typescript": "^5.9.3"
   },
-  "author": "Moiré",
+  "author": "MOLIVE",
   "build": {
     "appId": "com.moire.installer",
-    "productName": "Moire Installer",
-    "copyright": "Moiré",
+    "productName": "MOLIVE Installer",
+    "copyright": "MOLIVE",
     "directories": {
       "output": "release",
       "buildResources": "build"
@@ -35,8 +35,19 @@
       "dist/**/*",
       "package.json"
     ],
+    "extraResources": [
+      {
+        "from": "build/icon.ico",
+        "to": "molive_app_icon.ico"
+      }
+    ],
     "asar": true,
+    "electronLanguages": [
+      "ko",
+      "en-US"
+    ],
     "win": {
+      "icon": "build/icon.ico",
       "target": [
         {
           "target": "nsis",
@@ -56,11 +67,20 @@
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
-      "shortcutName": "Moire 설치 도우미",
-      "artifactName": "Moire-Installer-Setup-${version}.${ext}"
+      "installerLanguages": [
+        "ko_KR",
+        "en_US"
+      ],
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerHeaderIcon": "build/icon.ico",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "MOLIVE Installer",
+      "artifactName": "MOLIVE-Installer-Setup-${version}.${ext}"
     },
     "portable": {
-      "artifactName": "Moire-Installer-${version}-portable.${ext}"
+      "artifactName": "MOLIVE-Installer-${version}-portable.${ext}"
     }
   }
 }

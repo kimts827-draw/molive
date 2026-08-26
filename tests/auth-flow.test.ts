@@ -22,12 +22,12 @@ test("marketing consent records grant and withdrawal transitions", () => {
 });
 
 test("profile input keeps login and contact email independent", () => {
-  assert.deepEqual(parseProfileUpdate({ displayName: " Moiré ", contactEmail: "CONTACT@EXAMPLE.COM", marketingEmailsEnabled: true }), {
-    displayName: "Moiré",
+  assert.deepEqual(parseProfileUpdate({ displayName: " MOLIVE ", contactEmail: "CONTACT@EXAMPLE.COM", marketingEmailsEnabled: true }), {
+    displayName: "MOLIVE",
     contactEmail: "contact@example.com",
     marketingEmailsEnabled: true,
   });
-  assert.equal(parseProfileUpdate({ displayName: "Moiré", contactEmail: "bad", marketingEmailsEnabled: false }), null);
+  assert.equal(parseProfileUpdate({ displayName: "MOLIVE", contactEmail: "bad", marketingEmailsEnabled: false }), null);
 });
 
 test("admin role is accepted only from server-managed app metadata", () => {

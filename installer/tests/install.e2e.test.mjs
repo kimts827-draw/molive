@@ -6,7 +6,7 @@ import { SftpSession } from "../dist/core/sftp.js";
 import { startMockSftpServer } from "./sftp-server.mjs";
 
 const theme = () => [
-  { path: "index.html", data: Buffer.from("<html>Moiré</html>", "utf8") },
+  { path: "index.html", data: Buffer.from("<html>MOLIVE</html>", "utf8") },
   { path: "layout/basic/main.html", data: Buffer.from("main", "utf8") },
   { path: "layout/basic/css/main.css", data: Buffer.from("body{color:#111}", "utf8") },
   { path: "css/moire.css", data: Buffer.from(".moire{}", "utf8") },
@@ -36,7 +36,7 @@ test("테마 전체가 선택한 skin 루트에 같은 구조로 올라간다", 
     assert.equal(report.complete, true);
     assert.equal(report.succeeded, 4);
     assert.deepEqual(report.failures, []);
-    assert.equal(server.files.get("/sde_design/skin9/index.html").toString("utf8"), "<html>Moiré</html>");
+    assert.equal(server.files.get("/sde_design/skin9/index.html").toString("utf8"), "<html>MOLIVE</html>");
     assert.equal(server.files.get("/sde_design/skin9/layout/basic/css/main.css").toString("utf8"), "body{color:#111}");
     assert.ok(server.directories.has("/sde_design/skin9/layout/basic/css"));
     // 다른 스킨은 건드리지 않는다.
@@ -49,7 +49,7 @@ test("기존 파일은 덮어쓴다", async () => {
     server.files.set("/sde_design/skin9/index.html", Buffer.from("예전 내용", "utf8"));
     const report = await installTheme(session, { files: theme(), basePath: "/sde_design", skinName: "skin9" }, () => {});
     assert.equal(report.complete, true);
-    assert.equal(server.files.get("/sde_design/skin9/index.html").toString("utf8"), "<html>Moiré</html>");
+    assert.equal(server.files.get("/sde_design/skin9/index.html").toString("utf8"), "<html>MOLIVE</html>");
   });
 });
 
@@ -150,7 +150,7 @@ test("실제 Cafe24 구조(루트 바로 아래 skinXX)를 찾아 설치한다",
 
     const report = await installTheme(session, { files: theme(), basePath: "/", skinName: "skin11" }, () => {});
     assert.equal(report.complete, true);
-    assert.equal(server.files.get("/skin11/index.html").toString("utf8"), "<html>Moiré</html>");
+    assert.equal(server.files.get("/skin11/index.html").toString("utf8"), "<html>MOLIVE</html>");
     assert.ok(server.directories.has("/skin11/layout/basic/css"));
     // 다른 스킨과 base/mobile/web은 건드리지 않는다.
     assert.equal([...server.files.keys()].every((path) => path.startsWith("/skin11/")), true);

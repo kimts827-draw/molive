@@ -74,7 +74,7 @@ export function validateThemeMutation(path: string, before: string, after: strin
 
   const outsideBefore = before.replace(MANAGED_REGION_PATTERN, "");
   const outsideAfter = after.replace(MANAGED_REGION_PATTERN, "");
-  if (before.includes("C24AI:START") && outsideBefore !== outsideAfter) violations.push({ code: "OUTSIDE_MANAGED_REGION", message: "Moiré 관리 영역 밖의 원본 코드가 변경되었습니다." });
+  if (before.includes("C24AI:START") && outsideBefore !== outsideAfter) violations.push({ code: "OUTSIDE_MANAGED_REGION", message: "MOLIVE 관리 영역 밖의 원본 코드가 변경되었습니다." });
   const generatedSource = (after.match(MANAGED_REGION_PATTERN) ?? []).join("\n");
   if (/<script\b/i.test(generatedSource) || /\son\w+\s*=/i.test(generatedSource)) violations.push({ code: "UNSAFE_SCRIPT", message: "AI 생성 HTML에는 script 또는 인라인 이벤트 핸들러를 포함할 수 없습니다." });
   return { safe: violations.length === 0, path: normalized, level, violations };
@@ -194,6 +194,6 @@ export function injectManagedPresentation(original: string, managedHtml: string)
 }
 
 export function inlinePresentationStyles(managedHtml: string, css: string): string {
-  if (!managedHtml.includes("<!-- C24AI:START -->")) throw new Error("Moiré 관리 영역을 찾을 수 없습니다.");
+  if (!managedHtml.includes("<!-- C24AI:START -->")) throw new Error("MOLIVE 관리 영역을 찾을 수 없습니다.");
   return managedHtml.replace("<!-- C24AI:START -->", `<!-- C24AI:START -->\n<style id="c24ai-theme-style">${sanitizePresentationCss(css)}</style>`);
 }

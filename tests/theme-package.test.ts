@@ -99,7 +99,7 @@ test("bind 표시가 없으면 헤더를 그대로 둔다", () => {
   assert.deepEqual(bound.bound, []);
 });
 
-test("홈 레이아웃은 Moiré 헤더를 import하고 Cafe24 푸터를 유지한다", () => {
+test("홈 레이아웃은 MOLIVE 헤더를 import하고 Cafe24 푸터를 유지한다", () => {
   const layout = buildMoireLayout(guideLayout, { rootValue: "atelier", hasMoireHeader: true });
   assert.ok(layout.includes(`<!--@css(/${MOIRE_CSS_PATH})-->`));
   assert.ok(layout.includes(`<!--@import(/${MOIRE_HEADER_PATH})-->`));
@@ -119,7 +119,7 @@ test("서브 레이아웃은 Cafe24 기능을 유지한 채 테마만 연결한�
   assert.ok(layout.includes("<!--@contents-->"));
 });
 
-test("Moiré 헤더가 없으면 서브 레이아웃의 Cafe24 헤더를 건드리지 않는다", () => {
+test("MOLIVE 헤더가 없으면 서브 레이아웃의 Cafe24 헤더를 건드리지 않는다", () => {
   const layout = buildSubLayout(guideSubLayout, { rootValue: "atelier", hasMoireHeader: false });
   assert.ok(layout.includes('<header id="header">'));
   assert.ok(layout.includes("/layout/basic/navigation.html"));

@@ -243,7 +243,7 @@ pickZipButton.addEventListener("click", async () => {
     const detail = $<HTMLElement>("zipDetail");
     detail.textContent = result.hasIndexHtml
       ? `쇼핑몰에 올릴 파일 ${result.fileCount}개를 확인했습니다.`
-      : `파일 ${result.fileCount}개를 읽었지만 디자인 파일이 아닐 수 있습니다. Moiré에서 내려받은 압축 파일이 맞는지 확인해 주세요.`;
+      : `파일 ${result.fileCount}개를 읽었지만 디자인 파일이 아닐 수 있습니다. MOLIVE에서 내려받은 압축 파일이 맞는지 확인해 주세요.`;
     detail.className = result.hasIndexHtml ? "note" : "note err";
     log(`[파일] ${result.filePath}`);
     log(`[파일] ${result.fileCount}개 · ${Math.round(result.totalBytes / 1024)} KB${result.rootPrefix ? ` · 바깥 폴더 "${result.rootPrefix}" 제외` : ""}`);

@@ -53,7 +53,10 @@ function createWindow() {
   mainWindow = new BrowserWindow({
     width: 940,
     height: 900,
-    title: "Moiré 설치 도우미",
+    title: "MOLIVE Installer",
+    icon: app.isPackaged
+      ? path.join(process.resourcesPath, "molive_app_icon.ico")
+      : path.join(app.getAppPath(), "build", "icon.ico"),
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -96,7 +99,7 @@ function fail(error: unknown): never {
 ipcMain.handle("zip:pick", async () => {
   const defaultPath = resolveZipDialogDirectory(settings.lastZipDirectory, app.getPath("downloads"), isUsableDirectory);
   const result = await dialog.showOpenDialog({
-    title: "Moiré에서 내려받은 디자인 파일 고르기",
+    title: "MOLIVE에서 내려받은 디자인 파일 고르기",
     properties: ["openFile"],
     defaultPath,
     filters: [{ name: "디자인 압축 파일 (*.zip)", extensions: ["zip"] }],

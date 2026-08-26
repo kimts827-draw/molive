@@ -127,7 +127,7 @@ export function readZip(buffer: Buffer): ZipFile[] {
 
 /**
  * ZIP 전체가 폴더 하나로 감싸여 있으면 그 폴더 이름을 돌려준다.
- * Moiré 테마 ZIP은 skin 루트 기준이라 보통 null이지만, 사용자가 다시 압축한 경우를 흡수한다.
+ * MOLIVE 테마 ZIP은 skin 루트 기준이라 보통 null이지만, 사용자가 다시 압축한 경우를 흡수한다.
  */
 export function detectRootPrefix(files: ZipFile[]): string | null {
   if (files.length === 0) return null;

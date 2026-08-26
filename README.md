@@ -1,4 +1,4 @@
-# Moiré — Cafe24 AI Shop Maker
+# MOLIVE — AI Design Platform for Cafe24
 
 프롬프트로 Cafe24 쇼핑몰 디자인을 만들고, 화면을 클릭해 수정한 뒤, Cafe24의 커머스 기능을 보존한 채 게시하는 SaaS의 초기 동작 버전입니다.
 
@@ -53,8 +53,15 @@ npm run build
 8. Theme Pages 쓰기 API 사용을 Cafe24 개발센터에 별도로 신청합니다.
 9. Vercel의 Production 환경 변수에 필수값을 등록한 뒤 배포합니다.
 
-## Moiré 설치 도우미
+## MOLIVE Installer
 
 FileZilla 없이 테마를 Cafe24 디자인FTP의 스킨 폴더에 설치하는 데스크톱 앱은 [`installer/`](installer/README.md)에 있습니다. 웹앱과 의존성을 공유하지 않는 별도 Electron 프로젝트입니다.
+
+웹의 Installer 다운로드는 EXE를 Next.js `public`에 넣지 않고 `/api/installer/download`가 외부 HTTPS 파일로 리디렉션합니다. 현재 배포 버전과 Setup EXE URL은 로컬/Vercel의 서버 환경변수로 관리합니다.
+
+- `INSTALLER_VERSION=0.1.0`
+- `INSTALLER_DOWNLOAD_URL=https://<storage-host>/<path>/MOLIVE-Installer-Setup-0.1.0.exe`
+
+일반 사용자 UI에는 Setup EXE만 연결하며 portable 빌드는 노출하지 않습니다. 새 버전 배포 시 외부 Storage에 Setup EXE를 올리고 위 두 값만 갱신하면 됩니다.
 
 구조와 제약은 [Cafe24 스킨 분석](docs/CAFE24_SKIN_ANALYSIS.md)과 [제품 아키텍처](docs/PRODUCT_ARCHITECTURE.md)에 정리되어 있습니다.

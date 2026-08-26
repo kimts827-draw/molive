@@ -89,7 +89,7 @@ export function extractRootValue(html: string) {
   return html.match(/data-moire-root="([^"]+)"/)?.[1] ?? null;
 }
 
-/** Moiré 루트에서 헤더/푸터를 떼어냅니다. 푸터는 Cafe24 것과 중복되므로 홈 본문에서 제거합니다. */
+/** MOLIVE 루트에서 헤더/푸터를 떼어냅니다. 푸터는 Cafe24 것과 중복되므로 홈 본문에서 제거합니다. */
 export function splitMoireChrome(html: string) {
   let body = html;
   const take = (tagName: string) => {
@@ -107,7 +107,7 @@ export function splitMoireChrome(html: string) {
 }
 
 /**
- * Moiré 헤더의 브랜드/네비/계정 자리에 Cafe24 실제 값과 모듈을 꽂습니다.
+ * MOLIVE 헤더의 브랜드/네비/계정 자리에 Cafe24 실제 값과 모듈을 꽂습니다.
  * Cafe24는 {$...} 변수를 module 블록 안에서만 치환하므로, 몰 이름과 로고는 Layout_LogoTop으로 감쌉니다.
  */
 export function bindCafe24Header(headerHtml: string) {
@@ -153,7 +153,7 @@ export function bindCafe24Header(headerHtml: string) {
   return { html, bound };
 }
 
-/** Moiré 상품 slot 안에 Cafe24 상품 진열 module을 그대로 심습니다. */
+/** MOLIVE 상품 slot 안에 Cafe24 상품 진열 module을 그대로 심습니다. */
 export function replaceProductSlot(html: string, moduleHtml: string) {
   const mark = html.indexOf(SLOT_MARK);
   if (mark < 0) return { html, filled: false };
@@ -301,7 +301,7 @@ function injectMoireCss(layout: string) {
   return `${layout.slice(0, headClose)}${includes}${layout.slice(headClose)}`;
 }
 
-/** #wrap에 Moiré 루트 값을 걸어 root-scoped CSS가 페이지 전체에 닿게 합니다. */
+/** #wrap에 MOLIVE 루트 값을 걸어 root-scoped CSS가 페이지 전체에 닿게 합니다. */
 function applyGlobalRoot(layout: string, rootValue: string | null) {
   if (!rootValue || layout.includes("data-moire-root")) return layout;
   return layout.replace('<div id="wrap">', `<div id="wrap" data-moire-root="${rootValue}">`);
@@ -317,7 +317,7 @@ function replaceCafe24Header(layout: string, replacement: string) {
   return layout.slice(0, headerStart) + replacement + layout.slice(after);
 }
 
-/** 홈 전용 레이아웃. 헤더는 Moiré import로 바뀌고 Cafe24 푸터는 유지합니다. */
+/** 홈 전용 레이아웃. 헤더는 MOLIVE import로 바뀌고 Cafe24 푸터는 유지합니다. */
 export function buildMoireLayout(mainHtml: string, options: { rootValue?: string | null; hasMoireHeader?: boolean } = {}) {
   let layout = injectMoireCss(mainHtml);
   layout = applyGlobalRoot(layout, options.rootValue ?? null);

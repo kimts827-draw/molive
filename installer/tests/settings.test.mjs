@@ -93,7 +93,7 @@ test("입력값을 저장했다가 그대로 되살린다", async () => {
         port: 8105,
         username: "myshop",
         basePath: "/",
-        lastZipDirectory: "C:\\Users\\tester\\Desktop\\Moireskins",
+        lastZipDirectory: "C:\\Users\\tester\\Desktop\\MOLIVE-skins",
         rememberPassword: true,
       },
       SECRET,
@@ -104,7 +104,7 @@ test("입력값을 저장했다가 그대로 되살린다", async () => {
     assert.equal(loaded.settings.host, "ftp.example.test");
     assert.equal(loaded.settings.port, 8105);
     assert.equal(loaded.settings.username, "myshop");
-    assert.equal(loaded.settings.lastZipDirectory, "C:\\Users\\tester\\Desktop\\Moireskins");
+    assert.equal(loaded.settings.lastZipDirectory, "C:\\Users\\tester\\Desktop\\MOLIVE-skins");
     assert.equal(loaded.password, SECRET);
   });
 });
@@ -187,7 +187,7 @@ test("깨진 설정 파일은 기본값으로 되돌린다", async () => {
 
 test("마지막 폴더가 없어지면 기본 폴더로 되돌아간다", () => {
   const downloads = "C:\\Users\\tester\\Downloads";
-  const last = "C:\\Users\\tester\\Desktop\\Moireskins";
+  const last = "C:\\Users\\tester\\Desktop\\MOLIVE-skins";
   assert.equal(resolveZipDialogDirectory(last, downloads, (path) => path === last), last);
   assert.equal(resolveZipDialogDirectory(last, downloads, () => false), downloads);
   assert.equal(resolveZipDialogDirectory(null, downloads, () => true), downloads);

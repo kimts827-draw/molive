@@ -100,7 +100,7 @@ export function LoginForm({ enabled, missingEnv }: { enabled: boolean; missingEn
   }
 
   return (
-    <main className="auth-page"><div className="auth-card auth-card-wide"><Brand /><h1>프로젝트에 로그인</h1><p>로그인하면 프로젝트가 자동 저장되고 다른 기기에서도 이어서 편집할 수 있습니다.</p>
+    <main className="auth-page"><div className="auth-card auth-card-wide"><Brand /><h1>MOLIVE에 로그인</h1><p>로그인하면 프로젝트가 자동 저장되고 다른 기기에서도 이어서 편집할 수 있습니다.</p>
       <div className="oauth-buttons">
         <button type="button" className="oauth-button google" disabled={Boolean(busy) || !enabled} onClick={() => void oauth("google")}>{busy === "google" ? "연결 중..." : "Google로 계속하기"}</button>
         <button type="button" className="oauth-button kakao" disabled={Boolean(busy) || !enabled} onClick={() => void oauth("kakao")}>{busy === "kakao" ? "연결 중..." : "Kakao로 계속하기"}</button>
