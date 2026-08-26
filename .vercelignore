@@ -2,9 +2,9 @@ TEST MAKING/
 Guide/*.tar.gz
 .moire/
 coverage/
-installer/
-.claude/
-Guide/
-MOLIVE*.png
-MOLIVE*.pdf
-molive_app_icon.ico
+/installer/
+/.claude/
+/Guide/
+/MOLIVE*.png
+/MOLIVE*.pdf
+/molive_app_icon.ico
