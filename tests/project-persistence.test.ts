@@ -43,7 +43,7 @@ test("생성 RPC가 projects current_document와 최초 site_versions를 함께 
   assert.match(migration, /insert into public\.site_versions \(project_id, label, document_snapshot, source_snapshot, created_by\)/);
   assert.match(migration, /set current_version_id = created_version_id/);
   assert.match(route, /createProjectWithVersion\(user\.id, result\.source/);
-  assert.match(route, /Response\.json\(\{ \.\.\.result, \.\.\.stored \}\)/);
+  assert.match(route, /Response\.json\(\{ \.\.\.result, \.\.\.stored, balance \}\)/);
 });
 
 test("내 디자인은 로그인 사용자의 프로젝트만 최근 수정순으로 열어 준다", async () => {

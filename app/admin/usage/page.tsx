@@ -4,6 +4,7 @@ import { Brand } from "@/components/brand";
 import { getAdminOpenAIUsage } from "@/lib/admin/openai-usage";
 import { applicationRoleFromAppMetadata } from "@/lib/auth/roles";
 import { getCurrentUser } from "@/lib/supabase/server";
+import { AdminNav } from "@/components/admin/admin-nav";
 
 function money(value: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 6 }).format(value);
@@ -32,7 +33,7 @@ export default async function AdminUsagePage() {
   return (
     <main className="projects-page admin-usage-page">
       <section className="projects-panel admin-usage-panel">
-        <header className="projects-header"><Brand /><div><Link href="/projects">내 디자인</Link><Link href="/account">계정</Link><form action="/auth/signout" method="post"><button type="submit">로그아웃</button></form></div></header>
+        <header className="projects-header"><Brand /><div><AdminNav /><Link href="/projects">내 디자인</Link><Link href="/account">계정</Link><form action="/auth/signout" method="post"><button type="submit">로그아웃</button></form></div></header>
         <div className="projects-title"><div><span>ADMIN · OPENAI</span><h1>사용량</h1><p>모든 금액은 OpenAI 응답 usage와 저장된 단가표로 계산한 예상 USD 비용입니다.</p></div></div>
         <div className="usage-cards">{cards.map(([label, value]) => <article key={label}><span>{label}</span><strong>{value}</strong></article>)}</div>
         <section className="usage-features">

@@ -13,7 +13,7 @@ import {
 import { Brand } from "@/components/brand";
 import { PromptComposer } from "@/components/landing/prompt-composer";
 
-export function LandingPage({ userEmail, persistenceEnabled, demoMode, missingEnv }: { userEmail: string | null; persistenceEnabled: boolean; demoMode: boolean; missingEnv: string[] }) {
+export function LandingPage({ userEmail, creditBalance, persistenceEnabled, demoMode, missingEnv }: { userEmail: string | null; creditBalance: number | null; persistenceEnabled: boolean; demoMode: boolean; missingEnv: string[] }) {
   return (
     <main className="marketing-shell">
       {!persistenceEnabled && <div className="persistence-banner">{demoMode ? "개발 데모 모드 · 영구 저장이 비활성화돼 있습니다." : `영구 저장 설정이 완료되지 않았습니다 · ${missingEnv.join(", ")}`}</div>}
@@ -24,6 +24,7 @@ export function LandingPage({ userEmail, persistenceEnabled, demoMode, missingEn
           <a href="#how">작동 방식</a>
           <a href="#safety">Cafe24 보호</a>
           <Link href="/guide">사용 방법</Link>
+          <Link href="/pricing">가격</Link>
         </div>
         <div className="nav-actions">
           <Link className="text-link" href="/editor">데모 열기</Link>
@@ -38,7 +39,7 @@ export function LandingPage({ userEmail, persistenceEnabled, demoMode, missingEn
           MOLIVE(몰리브)는 MALL + LIVE에서 시작한 Cafe24 AI 디자인 플랫폼입니다.<br className="desktop-only" />
           판매 기능은 그대로 지키면서 쇼핑몰을 만들고, 운영 중에도 계속 바꿀 수 있습니다.
         </p>
-        <PromptComposer signedIn={Boolean(userEmail)} persistenceEnabled={persistenceEnabled} demoMode={demoMode} />
+        <PromptComposer signedIn={Boolean(userEmail)} creditBalance={creditBalance} persistenceEnabled={persistenceEnabled} demoMode={demoMode} />
         <p className="hero-note"><Check size={13} /> 디자인 ZIP과 Installer로 간단하게 Cafe24에 적용</p>
       </section>
 

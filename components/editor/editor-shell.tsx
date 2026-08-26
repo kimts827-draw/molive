@@ -165,7 +165,7 @@ function replaceNode(source: ProjectSource, nodeId: string, nodeHtml: string, no
   return { ...source, html: serializeProjectHtml(document), css, updatedAt: new Date().toISOString() };
 }
 
-export function EditorShell({ initialSource, projectId = null, initialVersions = [], currentVersionId = null }: { initialSource: ProjectSource; projectId?: string | null; initialVersions?: SavedVersion[]; currentVersionId?: string | null }) {
+export function EditorShell({ initialSource, projectId = null, initialVersions = [], currentVersionId = null, initialCreditBalance = null }: { initialSource: ProjectSource; projectId?: string | null; initialVersions?: SavedVersion[]; currentVersionId?: string | null; initialCreditBalance?: number | null }) {
   const [hydrated, setHydrated] = useState(false);
   const [source, setSource] = useState(() => cloneProjectSource(initialSource));
   const [selection, setSelection] = useState<EditorNodeSelection | null>(null);
@@ -185,6 +185,7 @@ export function EditorShell({ initialSource, projectId = null, initialVersions =
   const [showPublish, setShowPublish] = useState(false);
   const [chatInput, setChatInput] = useState("");
   const [chatBusy, setChatBusy] = useState(false);
+  const [creditBalance, setCreditBalance] = useState<number | null>(initialCreditBalance);
   const [toast, setToast] = useState<string | null>(null);
   const [previewStylePatch, setPreviewStylePatch] = useState<PreviewStylePatch | null>(null);
   const [previewHeaderPresentation, setPreviewHeaderPresentation] = useState<ProjectHeaderPresentation | null>(null);
@@ -520,7 +521,7 @@ export function EditorShell({ initialSource, projectId = null, initialVersions =
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ prompt, nodeId: snapshot.id, nodeType: snapshot.type, nodeHtml: snapshot.outerHtml, projectCss: baseSource.css, rootValue: sourceRootValue(baseSource.html), architecture: baseSource.architecture, renderMetrics, ...(projectId && UUID_PATTERN.test(projectId) ? { projectId } : {}) }),
     });
-    const payload = await response.json() as { nodeHtml?: string; nodeCss?: string; summary?: string; error?: string };
+    const payload = await response.json() as { nodeHtml?: string; nodeCss?: string; summary?: string; error?: string; balance?: number };
     if (!response.ok || !payload.nodeHtml || payload.nodeCss === undefined) throw new Error(payload.error ?? "AI 영역 편집에 실패했습니다.");
     const before = sourceRef.current;
     const previousFuture = futureRef.current;
@@ -539,6 +540,7 @@ export function EditorShell({ initialSource, projectId = null, initialVersions =
         ? "요청한 스타일은 생성됐지만 현재 레이아웃의 실제 계산 결과가 달라지지 않았습니다. 상위 영역의 고정 크기나 기존 CSS 제약 때문에 적용되지 않았을 수 있습니다. Inspector에서 해당 영역을 다시 선택한 뒤 구체적인 px 또는 배율로 요청해 주세요."
         : "AI가 patch를 만들었지만 실제 문서 구조나 화면 결과가 달라지지 않아 적용을 취소했습니다. 바꿀 대상과 원하는 결과를 조금 더 구체적으로 적어 주세요.");
     }
+    if (typeof payload.balance === "number") setCreditBalance(payload.balance);
     return payload.summary ?? "선택한 영역의 HTML/CSS만 업데이트했습니다.";
   }
 
@@ -706,7 +708,7 @@ export function EditorShell({ initialSource, projectId = null, initialVersions =
             <div className="section-list">{regions.map((region, index) => <div className={`section-list-row ${selection?.id === region.id || selectedNode?.sectionId === region.id ? "active" : ""}`} key={region.id} onClick={() => setSelection({ id: region.id, type: region.type, tagName: region.type })}><GripVertical size={13} /><span>{region.label}</span><div className="row-actions"><button onClick={(event) => { event.stopPropagation(); toggleHidden(region.id); }}>{region.hidden ? <EyeOff size={12} /> : <Eye size={12} />}</button>{region.type !== "header" && region.type !== "footer" && <><button onClick={(event) => { event.stopPropagation(); moveSection(region.id, -1); }} disabled={index === 0}>↑</button><button onClick={(event) => { event.stopPropagation(); moveSection(region.id, 1); }}>↓</button></>}</div></div>)}</div>
             <button className="add-section-button" onClick={() => setShowAddSection(true)}><Plus size={14} /> AI로 새 섹션 설계</button>
             <div className="locked-commerce"><Save size={14} /><div><b>Cafe24 Commerce</b><span>module · 변수 · 결제 hook 보호됨</span></div><span>잠금</span></div>
-          </> : <div className="ai-panel"><div className="ai-panel-title"><div className="ai-orb"><Sparkles /></div><div><b>AI Node Designer</b><span>{selectedNode ? `${selectedNode.type} · ${selectedNode.id}` : "영역을 선택하세요"}</span></div></div><div className="chat-messages">{messages.map((message) => <div className={`chat-message ${message.role}`} key={message.id}>{message.text}</div>)}{chatBusy && <div className="chat-message assistant thinking"><LoaderCircle size={14} /> 선택 영역의 코드를 설계 중</div>}</div><div className="suggestion-chips">{["이 Hero를 더 고급스럽게", "상품 하나를 크게", "구조를 완전히 새롭게"].map((text) => <button key={text} onClick={() => setChatInput(text)}>{text}</button>)}</div><div className="ai-input-wrap"><textarea value={chatInput} onChange={(event) => setChatInput(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void submitAiEdit(); } }} placeholder="선택한 영역의 HTML/CSS만 수정합니다" /><button disabled={!chatInput.trim() || !selection || chatBusy} onClick={() => void submitAiEdit()}><Send size={15} /></button></div></div>}
+          </> : <div className="ai-panel"><div className="ai-panel-title"><div className="ai-orb"><Sparkles /></div><div><b>AI Node Designer</b><span>{selectedNode ? `${selectedNode.type} · ${selectedNode.id}` : "영역을 선택하세요"}</span></div>{creditBalance !== null ? <Link className="editor-credit" href="/pricing">{creditBalance}C · AI 1C</Link> : null}</div><div className="chat-messages">{messages.map((message) => <div className={`chat-message ${message.role}`} key={message.id}>{message.text}</div>)}{chatBusy && <div className="chat-message assistant thinking"><LoaderCircle size={14} /> 선택 영역의 코드를 설계 중</div>}</div><div className="suggestion-chips">{["이 Hero를 더 고급스럽게", "상품 하나를 크게", "구조를 완전히 새롭게"].map((text) => <button key={text} onClick={() => setChatInput(text)}>{text}</button>)}</div><div className="ai-input-wrap"><textarea value={chatInput} onChange={(event) => setChatInput(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void submitAiEdit(); } }} placeholder="선택한 영역의 HTML/CSS만 수정합니다" /><button disabled={!chatInput.trim() || !selection || chatBusy} onClick={() => void submitAiEdit()}><Send size={15} /></button></div></div>}
         </aside>
 
         <section className="editor-stage"><div className="stage-toolbar"><span>{viewport === "desktop" ? "1920 × 1080" : viewport === "tablet" ? "1024 × 768" : "390 × 844"}</span><b>HTML/CSS 직접 렌더링</b></div><div className={`canvas-viewport viewport-${viewport}`}><EditorCanvas source={source} selection={selection} previewStylePatch={previewStylePatch} previewHeaderPresentation={previewHeaderPresentation} viewport={viewport} onSelectionMetrics={handleSelectionMetrics} onSelect={(next) => { setPreviewStylePatch(null); setPreviewHeaderPresentation(null); selectionMetricsRef.current = null; setSelectionMetrics(null); setSelection(next); setRightOpen(true); }} /></div></section>

@@ -363,3 +363,80 @@ a { color: inherit; text-decoration: none; }
 @media (max-width: 460px) {
   .usage-cards { grid-template-columns: 1fr; }
 }
+
+/* Open beta pricing and credits */
+.prompt-credit { margin: -5px 0 12px; display: flex; justify-content: space-between; color: #77736a; font-size: 10px; }
+.prompt-credit a, .home-prompt-error a { color: #5942c8; font-weight: 800; }
+.pricing-page { min-height: 100vh; background: var(--paper); }
+.pricing-page .guide-nav > div { display: flex; gap: 22px; color: #625f58; font-size: 12px; font-weight: 700; }
+.pricing-hero { width: min(980px, calc(100% - 40px)); margin: 0 auto; padding: 100px 0 78px; text-align: center; }
+.pricing-hero > span { color: #6d6960; font-size: 10px; font-weight: 800; letter-spacing: .15em; }
+.pricing-hero h1 { margin: 24px 0; font-size: clamp(52px, 7vw, 84px); line-height: 1; letter-spacing: -.07em; }
+.pricing-hero h1 em { font-family: Georgia, serif; font-weight: 400; }
+.pricing-hero > p { color: #6b675f; line-height: 1.7; }
+.credit-balance-card { width: 230px; margin: 30px auto 0; padding: 18px 20px; display: grid; gap: 5px; color: white; background: #171713; border-radius: 15px; }
+.credit-balance-card span, .credit-balance-card small { color: #aaa69e; font-size: 10px; }
+.credit-balance-card strong { font: 400 34px/1 Georgia, serif; }
+.pricing-content { width: min(1180px, calc(100% - 48px)); margin: 0 auto; padding-bottom: 120px; }
+.pricing-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.pricing-card { position: relative; min-height: 390px; padding: 28px; display: flex; flex-direction: column; background: white; border: 1px solid #dcd8cf; border-radius: 20px; }
+.pricing-card.recommended { border: 2px solid #6d57e8; box-shadow: 0 18px 45px rgba(70, 50, 150, .12); }
+.pricing-recommend { position: absolute; right: 18px; top: 18px; padding: 6px 9px; color: white; background: #6d57e8; border-radius: 999px; font-size: 9px; font-weight: 800; }
+.pricing-card > div > span { color: #77736a; font-size: 11px; font-weight: 800; letter-spacing: .08em; }
+.pricing-card h2 { margin: 18px 0 8px; font: 400 31px/1 Georgia, serif; }
+.pricing-card strong { color: #5f49cc; font-size: 18px; }
+.pricing-card ul { margin: 44px 0 28px; padding: 0; display: grid; gap: 12px; list-style: none; color: #666159; font-size: 12px; }
+.pricing-card li { display: flex; align-items: center; gap: 7px; }
+.pricing-card > button, .pricing-card > a, .bank-order-panel button { min-height: 46px; margin-top: auto; display: inline-flex; align-items: center; justify-content: center; color: white; background: #171713; border: 0; border-radius: 10px; font-weight: 800; cursor: pointer; }
+.bank-order-panel { margin-top: 24px; padding: 28px; display: grid; grid-template-columns: 1fr 1fr; gap: 24px; background: #e7e2ff; border-radius: 20px; }
+.bank-order-panel > div:first-child span { font-size: 9px; font-weight: 800; letter-spacing: .13em; }
+.bank-order-panel h2 { margin: 10px 0; font-size: 24px; }
+.bank-order-panel p { color: #625c74; font-size: 12px; }
+.bank-order-panel dl { margin: 0; padding: 18px; display: grid; gap: 11px; background: rgba(255,255,255,.7); border-radius: 12px; }
+.bank-order-panel dl div { display: flex; justify-content: space-between; gap: 20px; font-size: 12px; }
+.bank-order-panel dt { color: #777168; }
+.bank-order-panel dd { margin: 0; font-weight: 800; }
+.bank-order-panel label { display: grid; gap: 8px; font-size: 12px; font-weight: 800; }
+.bank-order-panel input, .admin-search input, .credit-grant-form input { height: 46px; padding: 0 13px; background: white; border: 1px solid #d2cdc3; border-radius: 9px; }
+.bank-order-panel > div:last-child { align-self: end; display: flex; gap: 8px; }
+.bank-order-panel button { min-width: 150px; padding: 0 16px; }
+.bank-order-panel .bank-cancel { min-width: 80px; color: #4f4a58; background: white; }
+.pricing-message { margin-top: 14px; padding: 14px; color: #4e446f; background: #eeeaff; border-radius: 10px; font-size: 12px; }
+.credit-rules { margin: 55px 0; display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid #dcd8cf; }
+.credit-rules > div { min-height: 120px; padding: 22px; display: flex; flex-direction: column; justify-content: space-between; border-right: 1px solid #dcd8cf; }
+.credit-rules > div:last-child { border-right: 0; }
+.credit-rules b { font: 400 29px/1 Georgia, serif; }
+.credit-rules span { color: #716c63; font-size: 12px; }
+.order-history { margin-top: 64px; }
+.order-history > div:first-child { margin-bottom: 18px; }
+.order-history h2 { margin: 8px 0 0; }
+.order-history > p { color: #777168; }
+.account-credit { margin-bottom: 18px; padding: 22px 24px; display: flex; align-items: center; justify-content: space-between; color: white; background: #171713; border-radius: 16px; }
+.account-credit div { display: grid; gap: 7px; }
+.account-credit span { color: #aaa69e; font-size: 10px; }
+.account-credit strong { font: 400 30px/1 Georgia, serif; }
+.account-credit > a { padding: 10px 13px; color: #171713; background: var(--lime); border-radius: 8px; font-size: 11px; font-weight: 800; }
+.admin-nav { display: inline-flex; gap: 14px; }
+.admin-search { margin-bottom: 16px; display: flex; gap: 8px; }
+.admin-search input { flex: 1; }
+.admin-search button, .admin-action button, .credit-grant-form button { padding: 0 16px; color: white; background: #171713; border: 0; border-radius: 9px; font-weight: 800; cursor: pointer; }
+.credit-user-list { margin-bottom: 20px; display: grid; gap: 7px; }
+.credit-user-list a { padding: 15px 17px; display: flex; justify-content: space-between; background: white; border: 1px solid #dedbd3; border-radius: 10px; }
+.credit-user-list a.active { border-color: #6d57e8; }
+.credit-admin-detail { display: grid; gap: 18px; }
+.credit-current { padding: 22px; display: flex; justify-content: space-between; align-items: center; color: white; background: #171713; border-radius: 14px; }
+.credit-current strong { font: 400 31px/1 Georgia, serif; }
+.credit-grant-form { padding: 20px; display: grid; grid-template-columns: 140px 1fr auto; gap: 12px; align-items: end; background: #fff; border: 1px solid #dedbd3; border-radius: 14px; }
+.credit-grant-form label { display: grid; gap: 7px; font-size: 11px; font-weight: 800; }
+.credit-grant-form button { height: 46px; }
+.credit-grant-form small { grid-column: 1/-1; color: #5c4c9d; }
+.admin-action { display: grid; gap: 5px; }
+.admin-action button { min-height: 38px; white-space: nowrap; }
+.admin-action small { color: #a33d36; }
+
+@media (max-width: 760px) {
+  .pricing-grid, .credit-rules { grid-template-columns: 1fr; }
+  .credit-rules > div { border-right: 0; border-bottom: 1px solid #dcd8cf; }
+  .bank-order-panel { grid-template-columns: 1fr; }
+  .credit-grant-form { grid-template-columns: 1fr; }
+}

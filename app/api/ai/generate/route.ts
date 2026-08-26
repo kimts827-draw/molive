@@ -7,6 +7,7 @@ import { generateProjectSource } from "@/lib/openai/site-generator";
 import { attachGenerationUsageToProject, createGenerationUsageRecorder } from "@/lib/openai/usage-store";
 import { createProjectWithVersion } from "@/lib/projects/service";
 import { hasSupabaseServerConfig, isSupabaseDemoMode, missingSupabaseServerEnv } from "@/lib/supabase/config";
+import { commitAiCredits, releaseAiCredits, reserveAiCredits } from "@/lib/credits/service";
 
 const assetUrl = z.string().refine((value) => value.startsWith("https://") || /^data:image\/(jpeg|png|webp|avif);base64,/.test(value), "지원하지 않는 이미지 형식입니다.");
 const requestSchema = z.object({ prompt: z.string().min(10).max(5000), brandName: z.string().max(120).optional(), colors: z.array(z.string()).max(8).optional(), assetSessionId: z.uuid().optional(), assetUrls: z.array(assetUrl).max(6).optional(), assetPaths: z.array(z.string().max(500)).max(6).optional(), assetRoles: z.array(z.enum(["logo", "product", "reference", "image"])).max(6).optional() });
@@ -25,7 +26,10 @@ export async function POST(request: Request) {
     // 이번 생성 세션 밖의 저장 이미지가 첨부로 들어오면 생성을 시작하지 않습니다.
     const scope = validateAttachmentScope({ ownerId: user.id, sessionId: parsedInput.data.assetSessionId, assetUrls: parsedInput.data.assetUrls, assetPaths: parsedInput.data.assetPaths });
     if (!scope.ok) return Response.json({ error: scope.message }, { status: 400 });
+    let creditReservation: Awaited<ReturnType<typeof reserveAiCredits>> | null = null;
+    let creditCommitted = false;
     try {
+      if (hasSupabaseServerConfig()) creditReservation = await reserveAiCredits(user.id, "design_generation");
       const generationId = crypto.randomUUID();
       const onUsage = hasSupabaseServerConfig() ? createGenerationUsageRecorder({ generationId, userId: user.id, usageType: "design_generation" }) : undefined;
       const onPreviewImageUsage = hasSupabaseServerConfig() ? createGenerationUsageRecorder({ generationId, userId: user.id, usageType: "preview_image" }) : undefined;
@@ -58,10 +62,17 @@ export async function POST(request: Request) {
         const { error } = await createAdminClient().from("project_assets").insert(allRows);
         if (error) throw error;
       }
-      return Response.json({ ...result, ...stored });
+      const balance = creditReservation ? await commitAiCredits(creditReservation.id, user.id, stored.projectId) : null;
+      creditCommitted = true;
+      return Response.json({ ...result, ...stored, balance });
     } catch (error) {
       if (error instanceof z.ZodError) return Response.json({ error: "AI 디자인 결과를 Project Source로 변환하지 못했습니다. 다시 시도해 주세요." }, { status: 422 });
       throw error;
+    } finally {
+      if (creditReservation && !creditCommitted) {
+        try { await releaseAiCredits(creditReservation.id, user.id); }
+        catch (releaseError) { console.error("Credit reservation release failed", releaseError instanceof Error ? releaseError.message : "unknown error"); }
+      }
     }
   } catch (error) { return errorResponse(error); }
 }

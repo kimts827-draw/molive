@@ -287,3 +287,4 @@
 @media (max-width: 520px) {
   .publish-downloads { grid-template-columns: 1fr; }
 }
+.editor-credit { margin-left: auto; padding: 6px 8px; color: #5540bd; background: #eeeaff; border-radius: 6px; font-size: 9px; font-weight: 800; white-space: nowrap; }

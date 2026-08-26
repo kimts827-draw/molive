@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { ArrowRight, LoaderCircle, Sparkles, WandSparkles, X } from "lucide-react";
 import { createAssetSessionId, optimizeImageFile, persistProjectAsset } from "@/lib/client-image";
 import type { ProjectSource } from "@/lib/project-source";
@@ -13,7 +14,7 @@ const initialPrompt = "차분한 올리브 컬러의 수제 가구 브랜드 쇼
 
 const generationDraftKey = "moire:generation-draft";
 
-export function PromptComposer({ signedIn, persistenceEnabled, demoMode }: { signedIn: boolean; persistenceEnabled: boolean; demoMode: boolean }) {
+export function PromptComposer({ signedIn, creditBalance, persistenceEnabled, demoMode }: { signedIn: boolean; creditBalance: number | null; persistenceEnabled: boolean; demoMode: boolean }) {
   const router = useRouter();
   const [prompt, setPrompt] = useState(initialPrompt);
   const [color, setColor] = useState("#6b6654");
@@ -118,7 +119,8 @@ export function PromptComposer({ signedIn, persistenceEnabled, demoMode }: { sig
       <label className="prompt-topline" htmlFor="home-design-prompt"><WandSparkles size={17} /><span>어떤 쇼핑몰을 만들까요?</span></label>
       <textarea id="home-design-prompt" value={prompt} onChange={(event) => setPrompt(event.target.value)} rows={2} aria-label="쇼핑몰 디자인 프롬프트" />
       {assets.length > 0 && <div className="home-asset-list">{assets.map((asset) => <span key={asset.id}><b>{asset.kind === "logo" ? "로고" : "이미지"}</b>{asset.name}<button type="button" onClick={() => setAssets((current) => current.filter((item) => item.id !== asset.id))} aria-label={`${asset.name} 제거`}><X size={11} /></button></span>)}</div>}
-      {error && <p className="home-prompt-error">{error}</p>}
+      <div className="prompt-credit"><span>AI 디자인 생성 10C</span>{signedIn && creditBalance !== null ? <Link href="/pricing">잔액 {creditBalance}C</Link> : null}</div>
+      {error && <p className="home-prompt-error">{error}{error.includes("Credit") ? <> · <Link href="/pricing">Credit 충전</Link></> : null}</p>}
       {!persistenceEnabled && demoMode && <p className="home-prompt-demo">개발 데모 결과입니다. Editor를 닫거나 새로고침하면 수정 내용이 사라집니다.</p>}
       <div className="prompt-actions">
         <div className="attachment-pills">
