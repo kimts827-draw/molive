@@ -414,7 +414,12 @@ a { color: inherit; text-decoration: none; }
 .pricing-card ul { margin: 44px 0 28px; padding: 0; display: grid; gap: 12px; list-style: none; color: #666159; font-size: 12px; }
 .pricing-card li { display: flex; align-items: center; gap: 7px; }
 .pricing-card > button, .pricing-card > a, .bank-order-panel button { min-height: 46px; margin-top: auto; display: inline-flex; align-items: center; justify-content: center; color: white; background: #171713; border: 0; border-radius: 10px; font-weight: 800; cursor: pointer; }
-.bank-order-panel { margin-top: 24px; padding: 28px; display: grid; grid-template-columns: 1fr 1fr; gap: 24px; background: #e7e2ff; border-radius: 20px; }
+.purchase-panel { margin-top: 24px; }
+.payment-method-switch { width: fit-content; margin: 0 0 10px; padding: 4px; display: flex; gap: 4px; background: #e5e1d8; border-radius: 12px; }
+.payment-method-switch button { min-height: 40px; padding: 0 16px; color: #6b675f; background: transparent; border: 0; border-radius: 9px; font-weight: 800; cursor: pointer; }
+.payment-method-switch button.active { color: white; background: #171713; }
+.payment-method-switch small { margin-left: 3px; color: #9d8eff; font-size: 9px; }
+.bank-order-panel { margin-top: 0; padding: 28px; display: grid; grid-template-columns: 1fr 1fr; gap: 24px; background: #e7e2ff; border-radius: 20px; }
 .bank-order-panel > div:first-child span { font-size: 9px; font-weight: 800; letter-spacing: .13em; }
 .bank-order-panel h2 { margin: 10px 0; font-size: 24px; }
 .bank-order-panel p { color: #625c74; font-size: 12px; }
@@ -427,7 +432,23 @@ a { color: inherit; text-decoration: none; }
 .bank-order-panel > div:last-child { align-self: end; display: flex; gap: 8px; }
 .bank-order-panel button { min-width: 150px; padding: 0 16px; }
 .bank-order-panel .bank-cancel { min-width: 80px; color: #4f4a58; background: white; }
+.toss-test-panel { padding: 28px; display: flex; align-items: end; justify-content: space-between; gap: 28px; background: #e8eeff; border-radius: 20px; }
+.toss-test-panel > div:first-child span { color: #4e56a6; font-size: 9px; font-weight: 800; letter-spacing: .13em; }
+.toss-test-panel h2 { margin: 10px 0; font-size: 24px; }
+.toss-test-panel p { max-width: 650px; margin: 0; color: #5d6279; font-size: 12px; line-height: 1.7; }
+.toss-test-panel > div:last-child { display: flex; gap: 8px; flex: 0 0 auto; }
+.toss-test-panel button { min-height: 46px; padding: 0 18px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; color: white; background: #3156d3; border: 0; border-radius: 10px; font-weight: 800; cursor: pointer; }
+.toss-test-panel button:disabled { opacity: .45; cursor: not-allowed; }
+.toss-test-panel .bank-cancel { color: #4f4a58; background: white; }
 .pricing-message { margin-top: 14px; padding: 14px; color: #4e446f; background: #eeeaff; border-radius: 10px; font-size: 12px; }
+.toss-result-page { min-height: 100vh; background: var(--paper); }
+.toss-result-card { width: min(680px, calc(100% - 40px)); margin: 0 auto; padding: 110px 0 140px; text-align: center; }
+.toss-result-card > span { color: #655bdd; font-size: 10px; font-weight: 800; letter-spacing: .14em; }
+.toss-result-card h1 { margin: 20px 0 14px; font-size: clamp(36px, 6vw, 58px); letter-spacing: -.055em; }
+.toss-result-card > p { margin: 0 auto; color: #666159; line-height: 1.75; }
+.toss-result-notice { margin: 30px 0; padding: 22px; color: #2e2860; background: #e8e3ff; border-radius: 16px; font-weight: 800; }
+.toss-result-detail { margin: 0 0 30px; display: grid; gap: 8px; color: #68645d; font-size: 12px; }
+.toss-result-card > a { min-height: 48px; padding: 0 22px; display: inline-flex; align-items: center; justify-content: center; color: white; background: #171713; border-radius: 10px; font-weight: 800; }
 .credit-rules { margin: 55px 0; display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid #dcd8cf; }
 .credit-rules > div { min-height: 120px; padding: 22px; display: flex; flex-direction: column; justify-content: space-between; border-right: 1px solid #dcd8cf; }
 .credit-rules > div:last-child { border-right: 0; }
@@ -464,5 +485,8 @@ a { color: inherit; text-decoration: none; }
   .pricing-grid, .credit-rules { grid-template-columns: 1fr; }
   .credit-rules > div { border-right: 0; border-bottom: 1px solid #dcd8cf; }
   .bank-order-panel { grid-template-columns: 1fr; }
+  .toss-test-panel { align-items: stretch; flex-direction: column; }
+  .toss-test-panel > div:last-child { flex-wrap: wrap; }
+  .toss-test-panel button { flex: 1; }
   .credit-grant-form { grid-template-columns: 1fr; }
 }
