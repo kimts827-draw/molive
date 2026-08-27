@@ -398,22 +398,13 @@ a { color: inherit; text-decoration: none; }
 .pricing-hero { width: min(980px, calc(100% - 40px)); margin: 0 auto; padding: 100px 0 78px; text-align: center; }
 .pricing-hero > span { color: #6d6960; font-size: 10px; font-weight: 800; letter-spacing: .15em; }
 .pricing-hero h1 { margin: 24px 0; font-size: clamp(52px, 7vw, 84px); line-height: 1; letter-spacing: -.07em; }
-.pricing-hero h1 em { font-family: Georgia, serif; font-weight: 400; }
+.pricing-hero h1 em { font-family: Inter, Pretendard, "Noto Sans KR", Arial, sans-serif; font-style: normal; font-weight: 400; }
 .pricing-hero > p { color: #6b675f; line-height: 1.7; }
 .credit-balance-card { width: 230px; margin: 30px auto 0; padding: 18px 20px; display: grid; gap: 5px; color: white; background: #171713; border-radius: 15px; }
 .credit-balance-card span, .credit-balance-card small { color: #aaa69e; font-size: 10px; }
-.credit-balance-card strong { font: 400 34px/1 Georgia, serif; }
+.credit-balance-card strong { font: 400 34px/1 Inter, Pretendard, "Noto Sans KR", Arial, sans-serif; }
 .pricing-content { width: min(1180px, calc(100% - 48px)); margin: 0 auto; padding-bottom: 120px; }
-.pricing-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
-.pricing-card { position: relative; min-height: 390px; padding: 28px; display: flex; flex-direction: column; background: white; border: 1px solid #dcd8cf; border-radius: 20px; }
-.pricing-card.recommended { border: 2px solid #6d57e8; box-shadow: 0 18px 45px rgba(70, 50, 150, .12); }
-.pricing-recommend { position: absolute; right: 18px; top: 18px; padding: 6px 9px; color: white; background: #6d57e8; border-radius: 999px; font-size: 9px; font-weight: 800; }
-.pricing-card > div > span { color: #77736a; font-size: 11px; font-weight: 800; letter-spacing: .08em; }
-.pricing-card h2 { margin: 18px 0 8px; font: 400 31px/1 Georgia, serif; }
-.pricing-card strong { color: #5f49cc; font-size: 18px; }
-.pricing-card ul { margin: 44px 0 28px; padding: 0; display: grid; gap: 12px; list-style: none; color: #666159; font-size: 12px; }
-.pricing-card li { display: flex; align-items: center; gap: 7px; }
-.pricing-card > button, .pricing-card > a, .bank-order-panel button { min-height: 46px; margin-top: auto; display: inline-flex; align-items: center; justify-content: center; color: white; background: #171713; border: 0; border-radius: 10px; font-weight: 800; cursor: pointer; }
+.bank-order-panel button { min-height: 46px; margin-top: auto; display: inline-flex; align-items: center; justify-content: center; color: white; background: #171713; border: 0; border-radius: 10px; font-weight: 800; cursor: pointer; }
 .purchase-panel { margin-top: 24px; }
 .payment-method-switch { width: fit-content; margin: 0 0 10px; padding: 4px; display: flex; gap: 4px; background: #e5e1d8; border-radius: 12px; }
 .payment-method-switch button { min-height: 40px; padding: 0 16px; color: #6b675f; background: transparent; border: 0; border-radius: 9px; font-weight: 800; cursor: pointer; }
@@ -449,10 +440,10 @@ a { color: inherit; text-decoration: none; }
 .toss-result-notice { margin: 30px 0; padding: 22px; color: #2e2860; background: #e8e3ff; border-radius: 16px; font-weight: 800; }
 .toss-result-detail { margin: 0 0 30px; display: grid; gap: 8px; color: #68645d; font-size: 12px; }
 .toss-result-card > a { min-height: 48px; padding: 0 22px; display: inline-flex; align-items: center; justify-content: center; color: white; background: #171713; border-radius: 10px; font-weight: 800; }
-.credit-rules { margin: 55px 0; display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid #dcd8cf; }
-.credit-rules > div { min-height: 120px; padding: 22px; display: flex; flex-direction: column; justify-content: space-between; border-right: 1px solid #dcd8cf; }
+.credit-rules { overflow: hidden; margin: 55px 0; display: grid; grid-template-columns: repeat(3, 1fr); background: white; border: 1px solid #d7d3ca; border-radius: 20px; }
+.credit-rules > div { min-height: 120px; padding: 26px 30px; display: flex; flex-direction: column; justify-content: space-between; border-right: 1px solid #e4e1da; }
 .credit-rules > div:last-child { border-right: 0; }
-.credit-rules b { font: 400 29px/1 Georgia, serif; }
+.credit-rules b { font: 800 29px/1 Inter, Pretendard, "Noto Sans KR", Arial, sans-serif; font-style: normal; letter-spacing: -.045em; }
 .credit-rules span { color: #716c63; font-size: 12px; }
 .order-history { margin-top: 64px; }
 .order-history > div:first-child { margin-bottom: 18px; }
@@ -482,8 +473,8 @@ a { color: inherit; text-decoration: none; }
 .admin-action small { color: #a33d36; }
 
 @media (max-width: 760px) {
-  .pricing-grid, .credit-rules { grid-template-columns: 1fr; }
-  .credit-rules > div { border-right: 0; border-bottom: 1px solid #dcd8cf; }
+  .credit-rules { grid-template-columns: 1fr; }
+  .credit-rules > div { border-right: 0; border-bottom: 1px solid #e4e1da; }
   .bank-order-panel { grid-template-columns: 1fr; }
   .toss-test-panel { align-items: stretch; flex-direction: column; }
   .toss-test-panel > div:last-child { flex-wrap: wrap; }

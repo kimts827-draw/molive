@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, LoaderCircle } from "lucide-react";
+import { ArrowRight, LoaderCircle } from "lucide-react";
 import { CREDIT_PLANS, type CreditPlanId } from "@/lib/credits/catalog";
+import { PlanCards } from "@/components/pricing/plan-cards";
 
 type BankConfig = { bankName: string; accountNumber: string; accountHolder: string; available: boolean };
 type PaymentMethod = "bank" | "card";
@@ -65,12 +66,9 @@ export function OrderPanel({ signedIn, bank, tossTestClientKey }: { signedIn: bo
   }
 
   return <>
-    <div className="pricing-grid">{CREDIT_PLANS.map((item) => <article className={`pricing-card${item.recommended ? " recommended" : ""}`} key={item.id}>
-      {item.recommended ? <span className="pricing-recommend">추천</span> : null}
-      <div><span>{item.name}</span><h2>{item.price.toLocaleString("ko-KR")}원</h2><strong>{item.credits}C</strong></div>
-      <ul><li><Check size={14} /> AI 디자인 {Math.floor(item.credits / 10)}회 이상</li><li><Check size={14} /> 직접 편집·ZIP·Installer 무료</li></ul>
-      {signedIn ? <button type="button" onClick={() => { setSelected(item.id); setPaymentMethod("bank"); setMessage(null); }}>이 플랜 구매</button> : <Link href="/login?next=%2Fpricing">로그인 후 구매</Link>}
-    </article>)}</div>
+    <PlanCards action={(item) => signedIn
+      ? <button type="button" onClick={() => { setSelected(item.id); setPaymentMethod("bank"); setMessage(null); }}>선택하기 <ArrowRight size={15} /></button>
+      : <Link href="/login?next=%2Fpricing">선택하기 <ArrowRight size={15} /></Link>} />
     {signedIn && plan ? <section className="purchase-panel">
       <div className="payment-method-switch" aria-label="결제 방법 선택">
         <button type="button" className={paymentMethod === "bank" ? "active" : ""} aria-pressed={paymentMethod === "bank"} onClick={() => { setPaymentMethod("bank"); setMessage(null); }}>계좌이체</button>

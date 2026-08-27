@@ -1,11 +1,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import { readFileSync } from "node:fs";
 
 const landing = await readFile(new URL("../components/landing/landing-page.tsx", import.meta.url), "utf8");
 const composer = await readFile(new URL("../components/landing/prompt-composer.tsx", import.meta.url), "utf8");
 const resultGallery = await readFile(new URL("../components/landing/result-gallery.tsx", import.meta.url), "utf8");
 const styles = await readFile(new URL("../components/landing/landing-sales.module.css", import.meta.url), "utf8");
+const planCards = await readFile(new URL("../components/pricing/plan-cards.tsx", import.meta.url), "utf8");
+const planCardStyles = await readFile(new URL("../components/pricing/plan-cards.module.css", import.meta.url), "utf8");
 const siteInfo = await readFile(new URL("../lib/site-info.ts", import.meta.url), "utf8");
 const siteFooter = await readFile(new URL("../components/site/site-footer.tsx", import.meta.url), "utf8");
 const siteHeader = await readFile(new URL("../components/site/site-header.tsx", import.meta.url), "utf8");
@@ -27,7 +30,8 @@ test("초보자용 판매 랜딩은 요청된 핵심 흐름을 짧은 섹션으�
     "내 쇼핑몰이라면",
   ]) assert.match(landingCopy, new RegExp(copy));
   assert.match(landing, /\["AI 생성", "Editor", "Download", "Installer", "Cafe24"\]/);
-  assert.match(landing, /CREDIT_PLANS\.map/);
+  assert.match(landing, /<PlanCards /);
+  assert.match(planCards, /CREDIT_PLANS\.map/);
   assert.match(landing, /CREDIT_COSTS\.designGeneration/);
 });
 
@@ -37,7 +41,7 @@ test("랜딩 v1 카피와 메뉴, 가격 사용 횟수를 요청대로 표시한
   assert.match(landingCopy, /쇼핑몰을 제작하는데,꼭 큰 비용부터/);
   assert.match(landingCopy, /첫 번째 디자인이정답일 필요는/);
   assert.match(landingCopy, /HTML이나 CSS를몰라도 됩니다/);
-  assert.match(landing, /Math\.floor\(plan\.credits \/ CREDIT_COSTS\.designGeneration\)/);
+  assert.match(planCards, /Math\.floor\(plan\.credits \/ CREDIT_COSTS\.designGeneration\)/);
   const headerMenu = siteHeader.match(/<div className="nav-links"[\s\S]*?<\/div>/)?.[0] ?? "";
   assert.match(headerMenu, />가격</);
   assert.match(headerMenu, />사용 방법</);
@@ -80,6 +84,18 @@ test("Cafe24 적용 비교와 Editor 수정 영역은 실제 로컬 이미지를
   assert.match(styles, /\.compareImageFrame[^}]*aspect-ratio: 2\.1 \/ 1/);
   assert.match(styles, /\.compareImage \{ object-fit: contain/);
   assert.match(styles, /\.editorShowcaseImage[^}]*height: auto[^}]*object-fit: contain/);
+});
+
+test("가격 카드는 랜딩과 /pricing이 같은 컴포넌트·스타일을 쓰고 serif/italic을 쓰지 않는다", () => {
+  const orderPanel = readFileSync(new URL("../components/pricing/order-panel.tsx", import.meta.url), "utf8");
+  for (const source of [landing, orderPanel]) {
+    assert.match(source, /<PlanCards /);
+    assert.match(source, /components\/pricing\/plan-cards/);
+  }
+  assert.doesNotMatch(planCardStyles, /(?<!sans-)serif|italic|oblique/);
+  assert.match(planCardStyles, /font-family: Inter, Pretendard, "Noto Sans KR", Arial, sans-serif/);
+  assert.match(planCardStyles, /font-style: normal/);
+  assert.doesNotMatch(styles, /\.priceGrid|\.planUsage/);
 });
 
 test("랜딩은 하나의 sans-serif 계열과 정식 Footer 설정 구조를 사용한다", () => {
@@ -137,6 +153,6 @@ test("요청된 강조 범위와 무료 Credit·가격 안내 문구를 사용�
   assert.match(heroSecondLine, /카페24 쇼핑몰을 만들어보세요/);
   assert.doesNotMatch(heroSecondLine, /headlineAccent/);
   assert.equal((landing.match(/가입 즉시 15 Credit 증정/g) ?? []).length, 3);
-  assert.match(landing, /쇼핑몰 디자인 생성 최대 \{Math\.floor/);
+  assert.match(planCards, /쇼핑몰 디자인 생성 최대 \{Math\.floor/);
   assert.match(landing, /쇼핑몰 디자인 생성 \{CREDIT_COSTS\.designGeneration\}C · AI 수정/);
 });

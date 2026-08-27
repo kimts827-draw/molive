@@ -18,7 +18,8 @@ import { PromptComposer } from "@/components/landing/prompt-composer";
 import { ResultGallery } from "@/components/landing/result-gallery";
 import { SiteFooter } from "@/components/site/site-footer";
 import { SiteHeader } from "@/components/site/site-header";
-import { CREDIT_COSTS, CREDIT_PLANS } from "@/lib/credits/catalog";
+import { CREDIT_COSTS } from "@/lib/credits/catalog";
+import { PlanCards } from "@/components/pricing/plan-cards";
 import styles from "./landing-sales.module.css";
 
 const editFeatures = [
@@ -115,7 +116,7 @@ export function LandingPage({ userEmail, creditBalance, persistenceEnabled, demo
 
       <section className={`${styles.section} ${styles.price}`} id="price">
         <SectionTitle title={<>디자인을 사는 대신, <span className={styles.headlineAccent}>만들어보세요.</span></>} />
-        <div className={styles.priceGrid}>{CREDIT_PLANS.map((plan) => <article className={plan.recommended ? styles.priceRecommended : undefined} key={plan.id}>{plan.recommended ? <span>추천</span> : null}<small>{plan.name}</small><h3>{plan.price.toLocaleString("ko-KR")}원</h3><strong>{plan.credits} Credit</strong><div className={styles.planUsage}><b>쇼핑몰 디자인 생성 최대 {Math.floor(plan.credits / CREDIT_COSTS.designGeneration)}회</b><p>또는 AI 수정에 자유롭게 사용</p></div><Link href="/pricing">선택하기 <ArrowRight size={15} /></Link></article>)}</div>
+        <PlanCards action={() => <Link href="/pricing">선택하기 <ArrowRight size={15} /></Link>} />
         <div className={styles.priceNotes}><p>쇼핑몰 디자인 생성 {CREDIT_COSTS.designGeneration}C · AI 수정 {CREDIT_COSTS.editorAi}C</p><p>직접 수정 · 다운로드 · Cafe24 적용은 추가 Credit 없음</p></div>
       </section>
 

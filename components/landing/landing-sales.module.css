@@ -143,17 +143,6 @@
 .finalCta small { margin-top: 16px; color: rgba(255,255,255,.82); font-size: 20px; font-weight: 600; }
 
 .price .sectionTitle { margin-left: auto; margin-right: auto; text-align: center; }
-.priceGrid { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; }
-.priceGrid article { position: relative; min-height: 390px; padding: 30px; display: flex; flex-direction: column; background: white; border: 1px solid #d7d3ca; border-radius: 20px; }
-.priceGrid article > span { position: absolute; right: 18px; top: 18px; padding: 6px 10px; color: white; background: #6c55da; border-radius: 999px; font-size: 9px; font-weight: 800; }
-.priceGrid small { color: #77736a; font-size: 13px; font-weight: 800; letter-spacing: .08em; }
-.priceGrid h3 { margin: 35px 0 10px; font-size: clamp(38px, 3.2vw, 46px); font-weight: 800; line-height: 1; letter-spacing: -.055em; }
-.priceGrid strong { color: #5e48c7; font-size: 19px; }
-.planUsage { margin-top: 32px; display: grid; gap: 7px; }
-.planUsage b { font-size: 16px; }
-.planUsage p { margin: 0; color: #77736a; font-size: 13px; }
-.priceGrid a { min-height: 44px; margin-top: auto; display: flex; align-items: center; justify-content: center; gap: 7px; color: white; background: #171713; border-radius: 9px; font-size: 12px; font-weight: 800; }
-.priceGrid .priceRecommended { border: 2px solid #6c55da; box-shadow: 0 20px 50px rgba(80,58,164,.12); }
 .priceNotes { margin-top: 25px; text-align: center; color: #6b675f; font-size: 12px; line-height: 1.6; }
 .priceNotes p { margin: 5px 0; }
 
@@ -197,7 +186,7 @@
   .editorBody { grid-template-columns: 125px minmax(0,1fr); }
   .editorControls { display: none !important; }
   .editorCanvas { margin: 24px; min-width: 620px; }
-  .how ol, .priceGrid { grid-template-columns: 1fr 1fr; }
+  .how ol { grid-template-columns: 1fr 1fr; }
   .how li:nth-child(2) { border-right: 0; }
   .how li { border-bottom: 1px solid #d6d2c8; }
   .how li:nth-child(n+3) { border-bottom: 0; }
@@ -243,7 +232,7 @@
   .editorShowcase { height: auto; }
   .editFeatureList { gap: 6px; }
   .editFeatureList > div { min-height: 38px; padding: 0 11px; font-size: 10px; }
-  .how ol, .priceGrid { grid-template-columns: 1fr; }
+  .how ol { grid-template-columns: 1fr; }
   .how li { min-height: 115px; border-right: 0; border-bottom: 1px solid #d6d2c8 !important; }
   .how li:last-child { border-bottom: 0 !important; }
   .products { width: calc(100% - 16px); padding: 55px 25px; border-radius: 22px; }
@@ -253,7 +242,6 @@
   .productVisual > div { width: 105px; height: 125px; }
   .trial { width: calc(100% - 16px); min-height: 500px; padding: 65px 22px; border-radius: 22px; }
   .trial h2 { font-size: 45px; }
-  .priceGrid article { min-height: 350px; }
   .faq { width: calc(100% - 32px); }
   .faq summary { min-height: 72px; font-size: 14px; }
   .finalCta { padding: 92px 20px; }

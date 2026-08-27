@@ -1,0 +1,20 @@
+.priceGrid { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; font-family: Inter, Pretendard, "Noto Sans KR", Arial, sans-serif; font-style: normal; }
+.priceGrid article { position: relative; min-height: 390px; padding: 30px; display: flex; flex-direction: column; background: white; border: 1px solid #d7d3ca; border-radius: 20px; font-style: normal; }
+.priceGrid article > span { position: absolute; right: 18px; top: 18px; padding: 6px 10px; color: white; background: #6c55da; border-radius: 999px; font-size: 9px; font-weight: 800; }
+.priceGrid small { color: #77736a; font-size: 13px; font-weight: 800; letter-spacing: .08em; }
+.priceGrid h3 { margin: 35px 0 10px; font-size: clamp(38px, 3.2vw, 46px); font-weight: 800; line-height: 1; letter-spacing: -.055em; }
+.priceGrid strong { color: #5e48c7; font-size: 19px; }
+.planUsage { margin-top: 32px; display: grid; gap: 7px; }
+.planUsage b { font-size: 16px; }
+.planUsage p { margin: 0; color: #77736a; font-size: 13px; }
+.priceGrid a, .priceGrid button { min-height: 44px; margin-top: auto; display: flex; align-items: center; justify-content: center; gap: 7px; color: white; background: #171713; border: 0; border-radius: 9px; font-family: inherit; font-size: 12px; font-weight: 800; font-style: normal; cursor: pointer; }
+.priceGrid .priceRecommended { border: 2px solid #6c55da; box-shadow: 0 20px 50px rgba(80,58,164,.12); }
+
+@media (max-width: 980px) {
+  .priceGrid { grid-template-columns: 1fr 1fr; }
+}
+
+@media (max-width: 680px) {
+  .priceGrid { grid-template-columns: 1fr; }
+  .priceGrid article { min-height: 350px; }
+}
