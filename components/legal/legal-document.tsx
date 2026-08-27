@@ -4,6 +4,7 @@ import path from "node:path";
 import type { ReactNode } from "react";
 import { SiteFooter } from "@/components/site/site-footer";
 import { SiteHeader } from "@/components/site/site-header";
+import { moliveSiteInfo } from "@/lib/site-info";
 import { hasSupabaseServerConfig } from "@/lib/supabase/config";
 import { getCurrentUser } from "@/lib/supabase/server";
 import styles from "./legal-document.module.css";
@@ -14,6 +15,23 @@ function readLegalSource(document: LegalDocumentName) {
   if (document === "terms") return readFile(path.join(process.cwd(), "content", "legal", "terms.md"), "utf8");
   if (document === "privacy") return readFile(path.join(process.cwd(), "content", "legal", "privacy.md"), "utf8");
   return readFile(path.join(process.cwd(), "content", "legal", "refund.md"), "utf8");
+}
+
+function applyBusinessInfo(source: string, business: ReturnType<typeof moliveSiteInfo>["business"]) {
+  const values = {
+    name: business.name,
+    representative: business.representative,
+    registrationNumber: business.registrationNumber,
+    mailOrderNumber: business.mailOrderNumber,
+    address: business.address,
+    supportEmail: business.supportEmail,
+    supportPhone: business.supportPhone,
+  };
+
+  return Object.entries(values).reduce(
+    (result, [key, value]) => result.replaceAll(`{{${key}}}`, value),
+    source,
+  );
 }
 
 function inlineMarkdown(text: string, keyPrefix: string) {
@@ -93,7 +111,8 @@ function renderMarkdown(source: string) {
 export async function LegalDocument({ document, pathname }: { document: LegalDocumentName; pathname: string }) {
   const persistenceEnabled = hasSupabaseServerConfig();
   const user = persistenceEnabled ? await getCurrentUser() : null;
-  const source = await readLegalSource(document);
+  const siteInfo = moliveSiteInfo();
+  const source = applyBusinessInfo(await readLegalSource(document), siteInfo.business);
 
   return <main className={styles.page}>
     <SiteHeader userEmail={user?.email ?? null} persistenceEnabled={persistenceEnabled} loginNext={pathname} />

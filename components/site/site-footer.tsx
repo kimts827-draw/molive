@@ -17,6 +17,7 @@ export function SiteFooter() {
         <div><dt>통신판매업 신고번호</dt><dd>{siteInfo.business.mailOrderNumber}</dd></div>
         <div><dt>사업장 주소</dt><dd>{siteInfo.business.address}</dd></div>
         <div><dt>고객문의 이메일</dt><dd><a href={`mailto:${siteInfo.business.supportEmail}`}>{siteInfo.business.supportEmail}</a></dd></div>
+        <div><dt>고객문의 전화</dt><dd><a href={`tel:${siteInfo.business.supportPhone.replaceAll("-", "")}`}>{siteInfo.business.supportPhone}</a></dd></div>
       </dl>
     </div>
     <p className={styles.copyright}>© MOLIVE. All rights reserved.</p>

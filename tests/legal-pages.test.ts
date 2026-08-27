@@ -28,3 +28,17 @@ test("Footer 정책 링크는 실제 내부 경로를 사용하고 준비 중 �
   assert.match(landing, /<SiteFooter \/>/);
   assert.match(landing, /<SiteHeader/);
 });
+
+test("사업자 고객문의 전화는 공통 설정에서 Footer와 정책 문서에 제공한다", async () => {
+  assert.match(siteInfo, /supportPhone: "010-5105-8033"/);
+  assert.match(siteInfo, /MOLIVE_SUPPORT_PHONE/);
+  assert.match(footer, /siteInfo\.business\.supportPhone/);
+  assert.match(footer, /href=\{`tel:/);
+  assert.match(legalDocument, /applyBusinessInfo/);
+
+  for (const filename of ["terms.md", "privacy.md", "refund.md"]) {
+    const source = await readFile(new URL(`../content/legal/${filename}`, import.meta.url), "utf8");
+    assert.match(source, /\{\{supportPhone\}\}/);
+    assert.doesNotMatch(source, /010-5105-8033/);
+  }
+});

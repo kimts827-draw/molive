@@ -7,6 +7,7 @@ const businessDefaults = {
   mailOrderNumber: "제 2023-경기파주-3071 호",
   address: "경기도 파주시 청석로 272, 1004-F190호(동패동, 센타프라자1, 공유오피스)",
   supportEmail: "kimts827@gmail.com",
+  supportPhone: "010-5105-8033",
 } as const;
 
 export function moliveSiteInfo() {
@@ -18,6 +19,7 @@ export function moliveSiteInfo() {
       mailOrderNumber: process.env.MOLIVE_MAIL_ORDER_NUMBER?.trim() || businessDefaults.mailOrderNumber,
       address: process.env.MOLIVE_BUSINESS_ADDRESS?.trim() || businessDefaults.address,
       supportEmail: process.env.MOLIVE_SUPPORT_EMAIL?.trim() || businessDefaults.supportEmail,
+      supportPhone: process.env.MOLIVE_SUPPORT_PHONE?.trim() || businessDefaults.supportPhone,
     },
     policies: [
       { label: "이용약관", href: "/terms" },

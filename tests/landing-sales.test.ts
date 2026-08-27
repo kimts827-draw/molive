@@ -97,6 +97,7 @@ test("랜딩은 하나의 sans-serif 계열과 정식 Footer 설정 구조를 �
     "MOLIVE_MAIL_ORDER_NUMBER",
     "MOLIVE_BUSINESS_ADDRESS",
     "MOLIVE_SUPPORT_EMAIL",
+    "MOLIVE_SUPPORT_PHONE",
   ]) assert.match(siteInfo, new RegExp(key));
   for (const path of ["/terms", "/privacy", "/refund"]) assert.match(siteInfo, new RegExp(path));
   for (const businessValue of [
@@ -106,8 +107,10 @@ test("랜딩은 하나의 sans-serif 계열과 정식 Footer 설정 구조를 �
     "제 2023-경기파주-3071 호",
     "경기도 파주시 청석로 272, 1004-F190호(동패동, 센타프라자1, 공유오피스)",
     "kimts827@gmail.com",
+    "010-5105-8033",
   ]) assert.match(siteInfo, new RegExp(businessValue.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   assert.match(siteFooter, /href=\{`mailto:\$\{siteInfo\.business\.supportEmail\}`\}/);
+  assert.match(siteFooter, /siteInfo\.business\.supportPhone/);
 });
 
 test("주요 헤드카피는 중간 굵기 문장과 제한된 MOLIVE 포인트 강조를 사용한다", () => {
