@@ -61,6 +61,7 @@ test("업종별 실제 결과 이미지를 crop preview와 전체 보기로 제�
   assert.match(resultGallery, /Escape/);
   assert.match(resultGallery, /event\.target === event\.currentTarget/);
   assert.match(resultGallery, /aria-label="전체 보기 닫기"/);
+  assert.equal((resultGallery.match(/unoptimized/g) ?? []).length, 2);
   assert.match(styles, /@media \(max-width: 680px\)/);
   assert.match(styles, /\.resultPreview[^}]*aspect-ratio: 5 \/ 4/);
   assert.match(styles, /\.resultPreviewImage \{ object-fit: cover/);
@@ -75,6 +76,7 @@ test("Cafe24 적용 비교와 Editor 수정 영역은 실제 로컬 이미지를
   ]) assert.match(landing, new RegExp(imagePath.replaceAll("/", "\\/")));
   assert.match(landing, /MOLIVE Editor/);
   assert.match(landing, /실제 Cafe24 적용/);
+  assert.equal((landing.match(/unoptimized/g) ?? []).length, 3);
   assert.match(styles, /\.compareImageFrame[^}]*aspect-ratio: 2\.1 \/ 1/);
   assert.match(styles, /\.compareImage \{ object-fit: contain/);
   assert.match(styles, /\.editorShowcaseImage[^}]*height: auto[^}]*object-fit: contain/);

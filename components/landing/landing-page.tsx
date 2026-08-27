@@ -48,7 +48,7 @@ function SectionTitle({ title, description }: { title: ReactNode; description?: 
 
 function EditorShowcase() {
   return <div className={styles.editorShowcase} aria-label="MOLIVE Editor 화면 예시">
-    <Image className={styles.editorShowcaseImage} src="/samples/editor/editor-view.png" alt="MOLIVE Editor 편집 화면" width={1915} height={909} sizes="(max-width: 680px) calc(100vw - 16px), (max-width: 980px) calc(100vw - 32px), 1360px" />
+    <Image className={styles.editorShowcaseImage} src="/samples/editor/editor-view.png" alt="MOLIVE Editor 편집 화면" width={1915} height={909} unoptimized sizes="(max-width: 680px) calc(100vw - 16px), (max-width: 980px) calc(100vw - 32px), 1360px" />
   </div>;
 }
 
@@ -77,9 +77,9 @@ export function LandingPage({ userEmail, creditBalance, persistenceEnabled, demo
         <SectionTitle title={<><span className={styles.headlineAccent}>보기만 하는</span> 디자인이 아닙니다.</>} description={"Editor에서 원하는 부분을 바꾼 뒤\n실제 Cafe24 스킨에 적용할 수 있습니다."} />
         <div className={styles.applySteps}>{["AI 생성", "Editor", "Download", "Installer", "Cafe24"].map((step, index) => <div key={step}><span>{String(index + 1).padStart(2, "0")}</span><b>{step}</b>{index < 4 ? <ArrowRight size={16} /> : null}</div>)}</div>
         <div className={styles.applyCompare}>
-          <article><span>MOLIVE Editor</span><div className={styles.compareImageFrame}><Image className={styles.compareImage} src="/samples/cafe24/editor.png" alt="MOLIVE Editor Preview" fill sizes="(max-width: 980px) calc(100vw - 68px), 560px" /></div></article>
+          <article><span>MOLIVE Editor</span><div className={styles.compareImageFrame}><Image className={styles.compareImage} src="/samples/cafe24/editor.png" alt="MOLIVE Editor Preview" fill unoptimized sizes="(max-width: 980px) calc(100vw - 68px), 560px" /></div></article>
           <div><ArrowRight /><span>그대로 적용</span></div>
-          <article><span>실제 Cafe24 적용</span><div className={styles.compareImageFrame}><Image className={styles.compareImage} src="/samples/cafe24/cafe24.png" alt="실제 Cafe24 적용 결과" fill sizes="(max-width: 980px) calc(100vw - 68px), 560px" /></div></article>
+          <article><span>실제 Cafe24 적용</span><div className={styles.compareImageFrame}><Image className={styles.compareImage} src="/samples/cafe24/cafe24.png" alt="실제 Cafe24 적용 결과" fill unoptimized sizes="(max-width: 980px) calc(100vw - 68px), 560px" /></div></article>
         </div>
       </section>
 

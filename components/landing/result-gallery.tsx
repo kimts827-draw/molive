@@ -60,6 +60,7 @@ export function ResultGallery() {
             src={sample.src}
             alt={`${sample.category} MOLIVE 쇼핑몰 디자인 미리보기`}
             fill
+            unoptimized
             sizes="(max-width: 980px) calc(100vw - 16px), 50vw"
             style={{ objectPosition: sample.position }}
           />
@@ -90,6 +91,7 @@ export function ResultGallery() {
           alt={`${selected.category} MOLIVE 쇼핑몰 전체 디자인`}
           width={selected.width}
           height={selected.height}
+          unoptimized
           sizes="(max-width: 720px) 100vw, 1180px"
         />
       </div>
