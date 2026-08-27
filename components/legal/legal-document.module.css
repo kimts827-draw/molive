@@ -1,0 +1,29 @@
+.page { min-height: 100vh; overflow: hidden; color: #171713; background: #f4f2ec; font-family: Inter, Pretendard, "Noto Sans KR", Arial, sans-serif; }
+.document { width: min(960px, calc(100% - 64px)); margin: 0 auto; padding: 88px 0 132px; }
+.document h1 { margin: 0 0 28px; font-size: clamp(42px, 6vw, 68px); font-weight: 650; line-height: 1.08; letter-spacing: -.055em; }
+.document h2 { margin: 72px 0 22px; padding-top: 8px; font-size: 27px; font-weight: 700; line-height: 1.35; letter-spacing: -.035em; }
+.document h3 { margin: 38px 0 15px; font-size: 19px; font-weight: 700; line-height: 1.45; letter-spacing: -.025em; }
+.document p { margin: 0 0 18px; color: #514e47; font-size: 15px; line-height: 1.9; letter-spacing: -.012em; }
+.document strong { color: #24211d; font-weight: 750; }
+.document hr { height: 1px; margin: 48px 0; background: #d6d2c9; border: 0; }
+.document ol, .document ul { margin: 0 0 24px; padding-left: 25px; color: #514e47; }
+.document li { padding-left: 5px; font-size: 15px; line-height: 1.85; }
+.document li + li { margin-top: 7px; }
+.tableWrap { overflow-x: auto; margin: 26px 0 34px; border: 1px solid #d6d2c9; border-radius: 14px; }
+.document table { width: 100%; min-width: 640px; border-collapse: collapse; background: rgba(255,255,255,.48); font-size: 13px; line-height: 1.65; }
+.document th, .document td { padding: 15px 17px; border-right: 1px solid #dedad1; border-bottom: 1px solid #dedad1; text-align: left; vertical-align: top; }
+.document th { color: #28251f; background: #ebe8e0; font-weight: 750; }
+.document th:last-child, .document td:last-child { border-right: 0; }
+.document tbody tr:last-child td { border-bottom: 0; }
+
+@media (max-width: 680px) {
+  .document { width: calc(100% - 32px); padding: 56px 0 92px; }
+  .document h1 { margin-bottom: 24px; font-size: 38px; }
+  .document h2 { margin-top: 56px; font-size: 23px; }
+  .document h3 { margin-top: 32px; font-size: 18px; }
+  .document p, .document li { font-size: 14px; line-height: 1.85; }
+  .document hr { margin: 38px 0; }
+  .tableWrap { margin-right: -16px; border-radius: 12px 0 0 12px; }
+  .document table { min-width: 600px; font-size: 12px; }
+  .document th, .document td { padding: 13px 14px; }
+}

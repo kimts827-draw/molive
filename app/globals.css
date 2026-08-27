@@ -25,7 +25,7 @@ a { color: inherit; text-decoration: none; }
 .nav-links { display: flex; align-items: center; gap: 34px; color: #4f4e49; font-size: 14px; }
 .nav-links a, .text-link { transition: opacity .2s ease; }
 .nav-links a:hover, .text-link:hover { opacity: .55; }
-.nav-actions { justify-self: end; display: flex; align-items: center; gap: 22px; font-size: 14px; }
+.nav-actions { position: relative; justify-self: end; display: flex; align-items: center; gap: 22px; font-size: 14px; }
 .nav-actions form { margin: 0; }
 .nav-user { max-width: 180px; overflow: hidden; color: #66645e; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .nav-signout, .nav-disabled { padding: 0; color: #77746d; background: transparent; border: 0; font: inherit; font-size: 11px; }
@@ -207,18 +207,18 @@ a { color: inherit; text-decoration: none; }
 .marketing-footer > span { grid-column: 1/-1; margin-top: -60px; color: #999; }
 
 /* Installer guide */
-.guide-page { min-height: 100vh; background: var(--paper); }
+.guide-page { min-height: 100vh; background: var(--paper); font-family: Inter, Pretendard, "Noto Sans KR", Arial, sans-serif; }
 .guide-nav { width: min(1180px, calc(100% - 64px)); height: 80px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); }
 .guide-nav > a:last-child { display: inline-flex; align-items: center; gap: 7px; color: #66635c; font-size: 12px; font-weight: 700; }
 .guide-hero { width: min(920px, calc(100% - 40px)); margin: 0 auto; padding: 110px 0 125px; text-align: center; }
 .guide-hero h1 { margin: 26px 0 24px; font-size: clamp(54px, 7vw, 88px); line-height: .99; letter-spacing: -.07em; }
-.guide-hero h1 em { font-family: Georgia, "Times New Roman", serif; font-weight: 400; }
+.guide-hero h1 em { font-family: inherit; font-style: normal; font-weight: 600; }
 .guide-hero > p { margin: 0; color: #65625a; font-size: 16px; line-height: 1.7; }
 .guide-download { margin-top: 38px; }
 .guide-hero > span { display: block; margin-top: 13px; color: #89857d; font-size: 10px; }
 .guide-workflow { padding: 100px max(32px, calc((100vw - 1180px) / 2)); display: grid; grid-template-columns: .75fr 1.25fr; gap: 100px; color: #fff; background: #171717; }
 .guide-workflow > div > span, .guide-details article > span { color: #aaa69e; font-size: 10px; font-weight: 800; letter-spacing: .14em; }
-.guide-workflow h2 { max-width: 300px; margin: 20px 0 0; font: 400 48px/1.04 Georgia, serif; letter-spacing: -.05em; }
+.guide-workflow h2 { max-width: 300px; margin: 20px 0 0; font-size: 48px; font-weight: 600; line-height: 1.04; letter-spacing: -.05em; }
 .guide-workflow ol { margin: 0; padding: 0; list-style: none; }
 .guide-workflow li { min-height: 102px; padding: 22px 0; display: grid; grid-template-columns: 45px 1fr; gap: 18px; border-bottom: 1px solid rgba(255,255,255,.13); }
 .guide-workflow li:first-child { padding-top: 0; }
