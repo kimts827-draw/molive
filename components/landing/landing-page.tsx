@@ -54,13 +54,13 @@ function EditorShowcase() {
 }
 
 export function LandingPage({ userEmail, creditBalance, persistenceEnabled, demoMode, missingEnv }: { userEmail: string | null; creditBalance: number | null; persistenceEnabled: boolean; demoMode: boolean; missingEnv: string[] }) {
-  const startHref = userEmail ? "#create" : "/login?next=%2F%23create";
+  const startHref = userEmail ? "/" : "/login?next=%2F";
   return (
     <main className={`marketing-shell ${styles.salesPage}`}>
       {!persistenceEnabled ? <div className="persistence-banner">{demoMode ? "개발 데모 모드 · 영구 저장이 비활성화돼 있습니다." : `영구 저장 설정이 완료되지 않았습니다 · ${missingEnv.join(", ")}`}</div> : null}
-      <SiteHeader userEmail={userEmail} persistenceEnabled={persistenceEnabled} priceHref="#price" loginNext="/#create" />
+      <SiteHeader userEmail={userEmail} persistenceEnabled={persistenceEnabled} priceHref="#price" loginNext="/" />
 
-      <section className={styles.hero} id="create">
+      <section className={styles.hero}>
         <div className="eyebrow"><Sparkles size={14} /> AI DESIGN PLATFORM FOR CAFE24</div>
         <h1><span className={styles.heroLineFirst}><span className={styles.headlineAccent}>10분 만에</span>, 내 브랜드에 맞는</span><span className={styles.heroLineSecond}>카페24 쇼핑몰을 만들어보세요.</span></h1>
         <p>브랜드와 상품을 설명하면 AI가 쇼핑몰 디자인을 만듭니다.<br />마음에 드는 부분은 직접 바꾸고, Cafe24에 적용할 수 있어요.</p>

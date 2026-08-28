@@ -77,7 +77,7 @@ export function PromptComposer({ signedIn, creditBalance, persistenceEnabled, de
 
   function goToLogin() {
     rememberDraft();
-    router.push("/login?next=%2F%23create");
+    router.push("/login?next=%2F");
   }
 
   async function addFiles(files: FileList | null, kind: AttachedAsset["kind"]) {

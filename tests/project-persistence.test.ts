@@ -10,7 +10,7 @@ const read = (path: string) => readFile(new URL(`../${path}`, import.meta.url), 
 test("미로그인 AI 생성은 JSON 오류 화면 대신 기존 로그인/next 흐름으로 보낸다", () => {
   assert.deepEqual(generationDestination({ status: 401, persistenceEnabled: true }), {
     kind: "login",
-    href: "/login?next=%2F%23create",
+    href: "/login?next=%2F",
   });
 });
 

@@ -73,8 +73,17 @@ test("email save is limited to successful password login", () => {
 test("generation prompt survives the OAuth round trip", () => {
   const composer = readFileSync(new URL("../components/landing/prompt-composer.tsx", import.meta.url), "utf8");
   assert.match(composer, /moire:generation-draft/);
-  assert.match(composer, /rememberDraft\(\);\s*router\.push\("\/login\?next=%2F%23create"\)/);
+  assert.match(composer, /rememberDraft\(\);\s*router\.push\("\/login\?next=%2F"\)/);
   assert.match(composer, /sessionStorage\.getItem\(generationDraftKey\)/);
+});
+
+test("home creation entry paths do not persist a hero hash that hides the header", () => {
+  const landing = readFileSync(new URL("../components/landing/landing-page.tsx", import.meta.url), "utf8");
+  const projects = readFileSync(new URL("../app/projects/page.tsx", import.meta.url), "utf8");
+  const editor = readFileSync(new URL("../components/editor/editor-shell.tsx", import.meta.url), "utf8");
+  assert.doesNotMatch(landing, /id="create"|%23create|#create/);
+  assert.doesNotMatch(projects, /\/#create/);
+  assert.doesNotMatch(editor, /\/#create/);
 });
 
 test("project ownership RLS remains unchanged by the profile migration", () => {
