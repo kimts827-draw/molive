@@ -45,6 +45,8 @@ export type ProjectSource = {
   commerce?: CommerceTokens;
   /** 고정 HeaderV1의 로고와 Header 위 독립 Announcement Bar 표시 설정입니다. */
   headerPresentation?: ProjectHeaderPresentation;
+  /** 고정 HeaderV1의 로고를 제외한 카테고리·유틸 텍스트와 아이콘 색상입니다. */
+  headerContentColor?: "dark" | "light";
   /**
    * Editor Preview 상품 카드에만 쓰는 이번 생성의 mock입니다.
    * Cafe24 export는 이 값을 무시하고 실제 상품 binding을 내보냅니다.
@@ -99,6 +101,7 @@ export function isProjectSource(value: unknown): value is ProjectSource {
   )) return false;
   return typeof source.id === "string"
     && (source.brandName === undefined || typeof source.brandName === "string")
+    && (source.headerContentColor === undefined || source.headerContentColor === "dark" || source.headerContentColor === "light")
     && typeof source.name === "string"
     && typeof source.html === "string"
     && typeof source.css === "string"
@@ -146,6 +149,7 @@ export function projectSourceSchemaShape() {
     previewProducts: "optional [{ name: string, image: string }] (Preview 전용 mock)",
     pagePlan: "optional Page Composition (본문 섹션 종류·순서·variant·시각 축)",
     headerPresentation: "optional fixed Header logo and announcement presentation",
+    headerContentColor: "optional dark | light Header content color (logo excluded)",
     updatedAt: "ISO date string",
   } as const;
 }

@@ -159,9 +159,11 @@ test("게시 UI는 ZIP과 Installer 다운로드 및 적용 순서만 안내한�
 });
 
 test("Header Inspector는 로고 두 방식·띠배너·크기 조절과 전체화면 Preview를 제공한다", () => {
-  for (const text of ["텍스트 로고", "이미지 로고", "띠배너", "표시 높이", "글자 크기", "전체화면 보기", "Editor로 돌아가기"]) {
+  for (const text of ["글자·아이콘 색상", "검정", "흰색", "텍스트 로고", "이미지 로고", "띠배너", "표시 높이", "글자 크기", "전체화면 보기", "Editor로 돌아가기"]) {
     assert.ok(editorSource.includes(text), text);
   }
+  assert.ok(editorSource.includes("headerContentColor={source.headerContentColor ?? \"dark\"}"));
+  assert.ok(editorSource.includes("commit({ ...current, headerContentColor"));
   assert.ok(editorSource.includes('persistProjectAsset(optimized, "logo"'));
   assert.ok(editorCss.includes(".preview-fullscreen .editor-left-panel"));
   assert.ok(editorCss.includes(".canvas-viewport.viewport-desktop { width: 100%"));

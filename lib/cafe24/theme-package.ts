@@ -7,7 +7,7 @@ import { prepareProjectPatch } from "@/lib/cafe24/protection";
 import { buildComponentSpecThemeEntries } from "@/lib/cafe24/component-spec-theme-package";
 import { assetFileName, rewriteAssetUrls, THEME_ASSET_DIR } from "@/lib/cafe24/theme-assets";
 import { buildBridgeCss, buildFooterThemeCss, resolveFooterInk } from "@/lib/cafe24/theme-bridge";
-import { commerceCss, composeCommerce, headerPresentationCss, isolateAiDesignCss, renderProjectHeaderV1, resolveLegacyComposition, verifiedProductLayoutCss } from "@/lib/commerce/fixed-components";
+import { commerceCss, composeCommerce, headerContentColorCss, headerPresentationCss, isolateAiDesignCss, renderProjectHeaderV1, resolveLegacyComposition, verifiedProductLayoutCss } from "@/lib/commerce/fixed-components";
 import { replaceFooterShell } from "@/lib/commerce/footer-shell";
 import {
   BASE_INDEX_PATH,
@@ -92,7 +92,7 @@ function buildLegacyThemeEntries(base: Map<string, Buffer>, source: ProjectSourc
   const rawThemeCss = rewriteAssetUrls(source.css, mapping);
   const composition = resolveLegacyComposition(source.architecture);
   const themeCss = isolateAiDesignCss(rawThemeCss);
-  const protectedCss = `${commerceCss(source.commerce, composition.headerVariant)}${source.headerPresentation ? `\n${headerPresentationCss(source.headerPresentation)}` : ""}\n${verifiedProductLayoutCss(composition.productLayout, source.commerce?.thumbRatioOverride)}\n${buildFooterThemeCss(rawThemeCss)}`;
+  const protectedCss = `${commerceCss(source.commerce, composition.headerVariant)}${source.headerPresentation ? `\n${headerPresentationCss(source.headerPresentation)}` : ""}${source.headerContentColor ? `\n${headerContentColorCss(source.headerContentColor)}` : ""}\n${verifiedProductLayoutCss(composition.productLayout, source.commerce?.thumbRatioOverride)}\n${buildFooterThemeCss(rawThemeCss)}`;
 
   // 고정 커머스 컴포넌트를 씁니다. 상품 슬롯이 없으면 Guide module로 물러나지 않고 실패합니다.
   const composed = composeCommerce(themeHtml, "cafe24", source.commerce, composition, { includeHeader: false });

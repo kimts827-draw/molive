@@ -131,9 +131,10 @@ test("기존 ProjectSource serialization은 html/css/commerce/architecture를 �
   assert.equal(isProjectSource(restored), true);
 });
 
-test("Header 로고와 띠배너 설정도 ProjectSource 저장·복구에서 손실되지 않는다", () => {
+test("Header 로고·띠배너·글자 아이콘 색상 설정도 ProjectSource 저장·복구에서 손실되지 않는다", () => {
   const source: ProjectSource = {
     ...legacySource,
+    headerContentColor: "light",
     headerPresentation: {
       logo: { mode: "image", text: "Legacy Brand", imageUrl: "https://assets.example/logo.webp", imageHeight: 52, textSize: 30, fontFamily: "Georgia, serif", lineHeight: 1.2, letterSpacing: 3, fontWeight: 700, textColor: "#223344" },
       announcement: { visible: true, text: "무료 배송", href: "/event.html", backgroundColor: "#112233", textColor: "#ffffff", height: 40 },

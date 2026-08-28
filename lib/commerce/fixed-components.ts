@@ -197,6 +197,13 @@ export function renderProjectHeaderV1(mode: RenderMode, project: { brandName?: s
   return renderHeaderV1(mode, composition.headerVariant, project.brandName?.trim() || project.name, project.headerPresentation);
 }
 
+export function headerContentColorCss(value: "dark" | "light") {
+  return `/* Moiré Header content color (logo excluded) */
+#header.pocHeader .pocHeader__inner > :not(.pocHeader__logo){color:${value === "light" ? "#ffffff" : "#171713"}}
+#header.pocHeader .pocHeader__inner > :not(.pocHeader__logo) svg{color:inherit}
+`;
+}
+
 export function headerPresentationCss(value?: Partial<ProjectHeaderPresentation>) {
   const presentation = resolveHeaderPresentation(value);
   const { textSize, imageHeight, fontFamily, lineHeight, letterSpacing, fontWeight, textColor } = presentation.logo;

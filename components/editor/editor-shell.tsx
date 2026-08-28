@@ -261,10 +261,11 @@ export function EditorShell({ initialSource, projectId = null, initialVersions =
 
   const commit = useCallback((next: ProjectSource, historyKey?: string) => {
     const current = sourceRef.current;
-    // Header variant와 상품 썸네일 비율은 HTML/CSS 밖에 있으므로 함께 비교해야 변경이 사라지지 않습니다.
+    // Header variant·content color와 상품 썸네일 비율은 HTML/CSS 밖에 있으므로 함께 비교해야 변경이 사라지지 않습니다.
     if (next.html === current.html && next.css === current.css && next.name === current.name
       && JSON.stringify(next.architecture) === JSON.stringify(current.architecture)
       && JSON.stringify(next.commerce) === JSON.stringify(current.commerce)
+      && next.headerContentColor === current.headerContentColor
       && JSON.stringify(next.headerPresentation) === JSON.stringify(current.headerPresentation)) return;
     if (!historyKey || historyGroupRef.current !== historyKey) {
       pastRef.current = [...pastRef.current.slice(-49), current];
@@ -569,6 +570,11 @@ export function EditorShell({ initialSource, projectId = null, initialVersions =
     commit({ ...current, headerPresentation: next, updatedAt: new Date().toISOString() });
   }
 
+  function applyHeaderContentColor(headerContentColor: "dark" | "light") {
+    const current = sourceRef.current;
+    commit({ ...current, headerContentColor, updatedAt: new Date().toISOString() });
+  }
+
   async function submitAiEdit() {
     const prompt = chatInput.trim();
     if (!prompt || !selection || chatBusy) return;
@@ -713,7 +719,7 @@ export function EditorShell({ initialSource, projectId = null, initialVersions =
 
         <section className="editor-stage"><div className="stage-toolbar"><span>{viewport === "desktop" ? "1920 × 1080" : viewport === "tablet" ? "1024 × 768" : "390 × 844"}</span><b>HTML/CSS 직접 렌더링</b></div><div className={`canvas-viewport viewport-${viewport}`}><EditorCanvas source={source} selection={selection} previewStylePatch={previewStylePatch} previewHeaderPresentation={previewHeaderPresentation} viewport={viewport} onSelectionMetrics={handleSelectionMetrics} onSelect={(next) => { setPreviewStylePatch(null); setPreviewHeaderPresentation(null); selectionMetricsRef.current = null; setSelectionMetrics(null); setSelection(next); setRightOpen(true); }} /></div></section>
 
-        {rightOpen && <aside className="editor-inspector"><div className="inspector-title"><div><span>선택 노드</span><b>{selectedNode ? `${selectedNode.tagName} · ${selectedNode.type}` : "선택 없음"}</b></div><button onClick={() => setRightOpen(false)} aria-label="Inspector 닫기"><X size={16} /></button></div>{selectedNode ? <NodeInspector node={selectedNode} renderMetrics={selectionMetrics?.nodeId === selectedNode.id ? selectionMetrics : null} projectId={projectId} productPresentation={source.architecture.productPresentation} thumbRatioOverride={source.commerce?.thumbRatioOverride} headerVariant={(source.architecture.header as EditorHeaderVariant) ?? "split-utility"} headerPresentation={resolveHeaderPresentation(source.headerPresentation)} onPreviewHeaderPresentation={setPreviewHeaderPresentation} onHeaderPresentation={applyHeaderPresentation} onHeaderVariant={(variant) => { if (!applyHeaderVariant(variant)) setToast("헤더가 이미 그 형식입니다"); }} onText={updateText} onAttribute={updateAttribute} onStyle={updateStyle} onStyles={updateStyles} onPreviewStyle={previewStyle} onImageSource={updateImageSource} /> : <p className="empty-inspector">미리보기에서 텍스트, 이미지, 버튼 또는 섹션을 클릭하세요.</p>}{sectionNodeId() && <div className="section-actions"><button onClick={duplicateSection}><Copy size={14} /> 복제</button><button onClick={() => toggleHidden()}><EyeOff size={14} /> 숨김</button><button className="danger" onClick={deleteSection}><Trash2 size={14} /> 삭제</button></div>}<button className="inspector-ai-button" onClick={() => setLeftPanel("ai")}><Sparkles size={15} /> AI로 선택 영역 다시 설계</button></aside>}
+        {rightOpen && <aside className="editor-inspector"><div className="inspector-title"><div><span>선택 노드</span><b>{selectedNode ? `${selectedNode.tagName} · ${selectedNode.type}` : "선택 없음"}</b></div><button onClick={() => setRightOpen(false)} aria-label="Inspector 닫기"><X size={16} /></button></div>{selectedNode ? <NodeInspector node={selectedNode} renderMetrics={selectionMetrics?.nodeId === selectedNode.id ? selectionMetrics : null} projectId={projectId} productPresentation={source.architecture.productPresentation} thumbRatioOverride={source.commerce?.thumbRatioOverride} headerVariant={(source.architecture.header as EditorHeaderVariant) ?? "split-utility"} headerContentColor={source.headerContentColor ?? "dark"} headerPresentation={resolveHeaderPresentation(source.headerPresentation)} onPreviewHeaderPresentation={setPreviewHeaderPresentation} onHeaderContentColor={applyHeaderContentColor} onHeaderPresentation={applyHeaderPresentation} onHeaderVariant={(variant) => { if (!applyHeaderVariant(variant)) setToast("헤더가 이미 그 형식입니다"); }} onText={updateText} onAttribute={updateAttribute} onStyle={updateStyle} onStyles={updateStyles} onPreviewStyle={previewStyle} onImageSource={updateImageSource} /> : <p className="empty-inspector">미리보기에서 텍스트, 이미지, 버튼 또는 섹션을 클릭하세요.</p>}{sectionNodeId() && <div className="section-actions"><button onClick={duplicateSection}><Copy size={14} /> 복제</button><button onClick={() => toggleHidden()}><EyeOff size={14} /> 숨김</button><button className="danger" onClick={deleteSection}><Trash2 size={14} /> 삭제</button></div>}<button className="inspector-ai-button" onClick={() => setLeftPanel("ai")}><Sparkles size={15} /> AI로 선택 영역 다시 설계</button></aside>}
       </div>
 
       {toast && <div className="editor-toast"><Save size={14} /> {toast}</div>}
@@ -814,7 +820,7 @@ function positionParts(value: string) {
   return [parsePart(parts[0]), parsePart(parts[1])] as const;
 }
 
-function HeaderInspector({ projectId, headerVariant, presentation, onHeaderVariant, onPreviewPresentation, onPresentation }: { projectId: string | null; headerVariant: EditorHeaderVariant; presentation: ProjectHeaderPresentation; onHeaderVariant: (variant: EditorHeaderVariant) => void; onPreviewPresentation: (value: ProjectHeaderPresentation) => void; onPresentation: (value: ProjectHeaderPresentation) => void }) {
+function HeaderInspector({ projectId, headerVariant, headerContentColor, presentation, onHeaderVariant, onContentColor, onPreviewPresentation, onPresentation }: { projectId: string | null; headerVariant: EditorHeaderVariant; headerContentColor: "dark" | "light"; presentation: ProjectHeaderPresentation; onHeaderVariant: (variant: EditorHeaderVariant) => void; onContentColor: (value: "dark" | "light") => void; onPreviewPresentation: (value: ProjectHeaderPresentation) => void; onPresentation: (value: ProjectHeaderPresentation) => void }) {
   const imageInputRef = useRef<HTMLInputElement>(null);
   const [imageBusy, setImageBusy] = useState(false);
   const [imageError, setImageError] = useState<string | null>(null);
@@ -840,6 +846,7 @@ function HeaderInspector({ projectId, headerVariant, presentation, onHeaderVaria
 
   return <div className="inspector-fields header-inspector-fields">
     <div className="header-variant-fields"><b>헤더 형식</b><span>검색·로그인·장바구니 Cafe24 기능은 그대로 유지됩니다.</span><div className="option-grid header-variant-grid">{HEADER_VARIANT_OPTIONS.map((option) => <button type="button" key={option.value} className={headerVariant === option.value ? "active" : ""} onClick={() => onHeaderVariant(option.value)}>{option.label}</button>)}</div></div>
+    <section className="header-control-section"><b>글자·아이콘 색상</b><div className="option-grid"><button type="button" className={headerContentColor === "dark" ? "active" : ""} onClick={() => onContentColor("dark")}>검정</button><button type="button" className={headerContentColor === "light" ? "active" : ""} onClick={() => onContentColor("light")}>흰색</button></div></section>
     <section className="header-control-section"><b>로고</b><div className="option-grid logo-mode-grid"><button type="button" className={presentation.logo.mode === "text" ? "active" : ""} onClick={() => updateLogo({ mode: "text" })}>텍스트 로고</button><button type="button" className={presentation.logo.mode === "image" ? "active" : ""} onClick={() => updateLogo({ mode: "image" })}>이미지 로고</button></div>
       {presentation.logo.mode === "text" ? <>
         <label><span>로고 문구</span><DraftInput syncKey="header-logo-text" value={presentation.logo.text ?? ""} onCommit={(text) => updateLogo({ text })} placeholder="브랜드명" /></label>
@@ -857,7 +864,7 @@ function HeaderInspector({ projectId, headerVariant, presentation, onHeaderVaria
   </div>;
 }
 
-function NodeInspector({ node, renderMetrics, projectId, productPresentation, thumbRatioOverride, headerVariant, headerPresentation, onPreviewHeaderPresentation, onHeaderPresentation, onHeaderVariant, onText, onAttribute, onStyle, onStyles, onPreviewStyle, onImageSource }: { node: NodeSnapshot; renderMetrics: SelectionRenderMetrics | null; projectId: string | null; productPresentation: string; thumbRatioOverride?: string; headerVariant: EditorHeaderVariant; headerPresentation: ProjectHeaderPresentation; onPreviewHeaderPresentation: (value: ProjectHeaderPresentation) => void; onHeaderPresentation: (value: ProjectHeaderPresentation) => void; onHeaderVariant: (variant: EditorHeaderVariant) => void; onText: (value: string) => void; onAttribute: (name: string, value: string) => void; onStyle: (property: string, value: string) => void; onStyles: (styles: Record<string, string>) => void; onPreviewStyle: (property: string, value: string) => void; onImageSource: (value: string, kind: ImageEditKind) => void }) {
+function NodeInspector({ node, renderMetrics, projectId, productPresentation, thumbRatioOverride, headerVariant, headerContentColor, headerPresentation, onPreviewHeaderPresentation, onHeaderContentColor, onHeaderPresentation, onHeaderVariant, onText, onAttribute, onStyle, onStyles, onPreviewStyle, onImageSource }: { node: NodeSnapshot; renderMetrics: SelectionRenderMetrics | null; projectId: string | null; productPresentation: string; thumbRatioOverride?: string; headerVariant: EditorHeaderVariant; headerContentColor: "dark" | "light"; headerPresentation: ProjectHeaderPresentation; onPreviewHeaderPresentation: (value: ProjectHeaderPresentation) => void; onHeaderContentColor: (value: "dark" | "light") => void; onHeaderPresentation: (value: ProjectHeaderPresentation) => void; onHeaderVariant: (variant: EditorHeaderVariant) => void; onText: (value: string) => void; onAttribute: (name: string, value: string) => void; onStyle: (property: string, value: string) => void; onStyles: (styles: Record<string, string>) => void; onPreviewStyle: (property: string, value: string) => void; onImageSource: (value: string, kind: ImageEditKind) => void }) {
   const imageInputRef = useRef<HTMLInputElement>(null);
   const [imageBusy, setImageBusy] = useState(false);
   const [imageError, setImageError] = useState<string | null>(null);
@@ -931,9 +938,9 @@ function NodeInspector({ node, renderMetrics, projectId, productPresentation, th
     setTranslate("y", -Math.round(value), preview);
   }
 
-  // Header의 기능 DOM은 고정하고, 로고·띠배너·variant 표시 설정만 Project Source에 저장합니다.
+  // Header의 기능 DOM은 고정하고, content color·로고·띠배너·variant 표시 설정만 Project Source에 저장합니다.
   if (node.isHeader) {
-    return <HeaderInspector projectId={projectId} headerVariant={headerVariant} presentation={headerPresentation} onHeaderVariant={onHeaderVariant} onPreviewPresentation={onPreviewHeaderPresentation} onPresentation={onHeaderPresentation} />;
+    return <HeaderInspector projectId={projectId} headerVariant={headerVariant} headerContentColor={headerContentColor} presentation={headerPresentation} onHeaderVariant={onHeaderVariant} onContentColor={onHeaderContentColor} onPreviewPresentation={onPreviewHeaderPresentation} onPresentation={onHeaderPresentation} />;
   }
 
   return <div className="inspector-fields">
