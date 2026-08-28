@@ -22,7 +22,8 @@
 .topbar-actions .publish-button { min-width: 58px; color: #fff; background: #171717; font-weight: 700; }
 .topbar-actions .publish-button:hover { background: #383838; }
 .topbar-actions .new-design-button { color: #5945c2; background: #efecff; }
-.topbar-actions > a.new-design-button { min-width: 31px; height: 32px; padding: 0 9px; display: flex; align-items: center; justify-content: center; gap: 6px; border-radius: 6px; font-size: 11px; text-decoration: none; }
+.topbar-actions .standalone-preview-button { color: #36342e; background: #f3f2ee; }
+.topbar-actions > a.new-design-button, .topbar-actions > a.standalone-preview-button { min-width: 31px; height: 32px; padding: 0 9px; display: flex; align-items: center; justify-content: center; gap: 6px; border-radius: 6px; font-size: 11px; text-decoration: none; white-space: nowrap; }
 
 .editor-workspace { height: calc(100vh - 58px); display: grid; grid-template-columns: 330px minmax(0, 1fr) 390px; }
 .editor-left-panel, .editor-inspector { position: relative; z-index: 20; min-width: 0; background: #fff; }
@@ -231,6 +232,7 @@
   .editor-workspace { grid-template-columns: 200px minmax(0, 1fr); }
   .editor-inspector { position: absolute; top: 58px; right: 0; bottom: 0; width: 390px; box-shadow: -7px 0 25px rgba(0,0,0,.1); }
   .topbar-actions > button:not(.publish-button) { font-size: 0; }
+  .topbar-actions > a.standalone-preview-button { font-size: 0; }
 }
 
 @media (max-width: 720px) {
