@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { errorResponse, requireApiUser } from "@/lib/api/auth";
 import { editProjectNode } from "@/lib/openai/site-generator";
+import { projectPagePlan } from "@/lib/project-source";
 import { createGenerationUsageRecorder } from "@/lib/openai/usage-store";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { hasSupabaseServerConfig } from "@/lib/supabase/config";
@@ -14,6 +15,9 @@ const requestSchema = z.object({
   projectCss: z.string().max(600000),
   rootValue: z.string().min(1).max(500),
   architecture: z.object({ header: z.string(), hero: z.string(), sections: z.array(z.string()), productPresentation: z.string(), typography: z.string(), footer: z.string() }),
+  // 저장된 page plan을 참고 컨텍스트로만 받습니다. 형식이 어긋나면 projectPagePlan()이 null로 떨어뜨리고
+  // plan 없는 기존 프로젝트와 같은 경로로 처리하므로, 여기서 요청을 거절하지 않습니다.
+  pagePlan: z.unknown().optional(),
   renderMetrics: z.object({ width: z.number().finite().nonnegative(), height: z.number().finite().nonnegative(), fontSize: z.number().finite().nonnegative(), lineHeight: z.number().finite().nonnegative(), letterSpacing: z.number().finite(), marginTop: z.number().finite(), marginBottom: z.number().finite(), paddingTop: z.number().finite(), paddingBottom: z.number().finite() }).optional(),
   projectId: z.uuid().nullable().optional(),
 });
@@ -41,7 +45,7 @@ export async function POST(request: Request) {
     try {
       if (hasSupabaseServerConfig()) creditReservation = await reserveAiCredits(user.id, "editor_ai", projectId);
       const onUsage = hasSupabaseServerConfig() ? createGenerationUsageRecorder({ generationId: crypto.randomUUID(), userId: user.id, projectId, usageType: "editor_ai" }) : undefined;
-      const result = await editProjectNode(parsedInput.data, { onUsage });
+      const result = await editProjectNode({ ...parsedInput.data, pagePlan: projectPagePlan(parsedInput.data) ?? undefined }, { onUsage });
       const balance = creditReservation ? await commitAiCredits(creditReservation.id, user.id, projectId) : null;
       creditCommitted = true;
       return Response.json({ ...result, balance });

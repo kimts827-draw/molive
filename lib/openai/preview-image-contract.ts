@@ -5,6 +5,11 @@
  * 이전 프로젝트 이미지는 어떤 경로로도 들어오지 않고, 생성에 실패한 자리만
  * 코드가 그리는 SVG 자리표시자로 되돌아갑니다.
  * Cafe24 export는 이 파일과 무관하며 {$image_medium} 실제 상품 이미지를 그대로 씁니다.
+ *
+ * 상품군 보존: 사진 프롬프트에는 내부 업종 키가 아니라 page plan이 확정한
+ * 사람이 읽는 업종 라벨과 판매 상품군(productCategory)이 들어갑니다.
+ * 예전에는 "food-dessert" 같은 내부 키가 그대로 들어가서 "프리미엄 식품" 브리프가
+ * 반복적으로 디저트·베이커리 사진으로 쏠렸습니다.
  */
 
 import type { PreviewProductMock } from "../component-library/preview-mock.ts";
@@ -12,11 +17,15 @@ import type { PreviewProductMock } from "../component-library/preview-mock.ts";
 export type PreviewImagePalette = { surface?: string; accent?: string; thumbBackground?: string };
 
 export type PreviewImageBrief = {
-  /** blueprint가 판정한 업종입니다. */
+  /** 사람이 읽는 업종 라벨입니다(예: "프리미엄 정육"). 내부 업종 키를 넣지 않습니다. */
   industry: string;
   /** 사용자가 쓴 생성 브리프입니다. */
   brief: string;
   brandName?: string;
+  /** 이 몰이 실제로 파는 상품군입니다. 사진이 다른 상품군으로 새지 않게 잠급니다. */
+  productCategory?: string;
+  /** 이 몰의 대표 상품 예시입니다. */
+  productExamples?: readonly string[];
   palette?: PreviewImagePalette;
 };
 
@@ -25,9 +34,21 @@ function backdropDescription(palette?: PreviewImagePalette) {
   return tone ? `a plain seamless studio backdrop in ${tone}` : "a plain seamless light grey studio backdrop";
 }
 
+/** 상품군을 붙잡는 공통 문장입니다. 두 프롬프트가 같은 규칙을 씁니다. */
+function categoryLock(brief: PreviewImageBrief) {
+  const category = brief.productCategory?.trim();
+  if (!category) return [];
+  const examples = (brief.productExamples ?? []).map((item) => item.trim()).filter(Boolean);
+  return [
+    `Product category of this store: ${category}.`,
+    examples.length ? `Products this store actually sells: ${examples.join(", ")}.` : "",
+    `Stay strictly inside "${category}". Do not substitute a neighbouring or more photogenic category, and do not default to desserts, bakery, coffee or flowers unless the category itself says so.`,
+  ].filter(Boolean);
+}
+
 /**
  * 상품 하나의 사진 프롬프트입니다.
- * 업종·브리프·상품명을 함께 넣어 업종과 무관한 사진이 나오지 않게 합니다.
+ * 업종 라벨·상품군·브리프·상품명을 함께 넣어 업종과 무관한 사진이 나오지 않게 합니다.
  */
 export function buildPreviewImagePrompt(productName: string, brief: PreviewImageBrief) {
   const name = productName.trim();
@@ -35,6 +56,7 @@ export function buildPreviewImagePrompt(productName: string, brief: PreviewImage
   return [
     "Product catalogue photograph for a Korean online store product list thumbnail.",
     `Industry: ${brief.industry}.`,
+    ...categoryLock(brief),
     `Store brief: ${brief.brief.trim()}.`,
     brandLine,
     `Product: ${name}.`,
@@ -54,6 +76,7 @@ export function buildSectionImagePrompt(label: string | undefined, brief: Previe
   return [
     "Editorial photograph for a section of a Korean online store landing page.",
     `Industry: ${brief.industry}.`,
+    ...categoryLock(brief),
     `Store brief: ${brief.brief.trim()}.`,
     brandLine,
     scene ? `Scene: ${scene}.` : "Scene: a mood image that matches this store's industry and tone.",

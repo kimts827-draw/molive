@@ -5,7 +5,7 @@
  * variants.ts의 variant 정의가 어떤 실제 사례에 근거하는지 추적하는 용도입니다.
  */
 
-export type ReferencePatternKind = "hero" | "category" | "product-context" | "story" | "social" | "cta" | "footer";
+export type ReferencePatternKind = "hero" | "category" | "product-context" | "story" | "social" | "cta" | "promotion" | "footer";
 
 export type ReferencePattern = {
   id: string;
@@ -181,6 +181,15 @@ export const REFERENCE_PATTERNS: ReferencePattern[] = [
     name: "마퀴 티커 스트립",
     observedIn: ["PTMD846911"],
     traits: "흐르는 텍스트 스트립으로 시즌 키워드를 반복 노출. 장식이므로 한 페이지 한 번만.",
+  },
+
+  // 기획전 / 프로모션
+  {
+    id: "promotion/project-board",
+    kind: "promotion",
+    name: "기획전 타일 보드",
+    observedIn: ["skin4:Layout_project"],
+    traits: "기본 스킨 skin4의 Layout_project 모듈. \"기획전\" 헤딩 아래 같은 크기의 카테고리 이미지 타일을 목록으로 나열해 기획 단위 진입을 만든다. 우리 시스템에서는 module을 쓰지 않고 같은 인상의 정적 타일 보드로 대체한다.",
   },
 
   // Footer mood

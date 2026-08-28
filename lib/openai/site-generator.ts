@@ -3,7 +3,8 @@ import OpenAI from "openai";
 import { z } from "zod";
 import { ensureEditingMetadata, validateNodePatch, validateProjectSource } from "@/lib/cafe24/protection";
 import { buildDesignGenerationUserPrompt, validateGeneratedDesignContract, type DesignGenerationInput } from "@/lib/openai/design-generation-contract";
-import { composeDesignBlueprint } from "@/lib/design-library/blueprint";
+import { generatePagePlan } from "@/lib/openai/page-plan-generator";
+import { pagePlanSectionRefs, pagePlanSignature, renderPagePlanEditContext, type PagePlan } from "@/lib/design-library/page-plan";
 import { HERO_VARIANT_IDS } from "@/lib/design-library/variants";
 import { auditAssetReferenceTokens, auditGeneratedAssets, collectAssetReferences, createAssetAllowlist, isFreshlyCreatedImage } from "@/lib/assets/asset-policy";
 import { resolvePreviewProducts, type PreviewProductMock } from "@/lib/component-library/preview-mock";
@@ -119,7 +120,7 @@ const systemPrompt = `You are the autonomous art director and frontend designer 
 
 Your primary output is the ACTUAL semantic HTML and CSS that will be stored, previewed, edited, and published. There is no section AST, component renderer, template, or predetermined page skeleton after your response. The architecture summary is audit metadata only and never renders the page.
 
-The user message contains a binding DESIGN BLUEPRINT composed from real Cafe24 reference patterns: one hero variant, an ordered section plan, and density/typography/image-treatment axes. Build exactly that structure — do not add, drop, or reorder sections — and spend your creativity on copy, palette, imagery, proportion, and detail within it. Two briefs with different blueprints must produce structurally different pages, not recolored copies.
+The user message contains a binding PAGE COMPOSITION. It was designed for THIS brand in an earlier planning step of this same generation, from the merchant's own brief: which body sections exist, in what order, with which registry variant and which alignment/media/density/tone axes. Build exactly that composition — do not add, drop, or reorder sections — and spend your creativity on copy, palette, imagery, proportion, and detail within it. The composition differs from project to project by design, so never fall back on a familiar hero → category → products → story → CTA rhythm that the plan did not ask for.
 
 IDENTITY FIELDS
 - brandName is the exact customer-facing brand wordmark only (for example, "MAISON DEUX"). Do not append a campaign, collection, season, or design concept.
@@ -134,16 +135,16 @@ COMMERCE FIRST
 
 REFERENCE-DERIVED DESIGN GRAMMAR
 - Derive a genuinely project-specific page architecture from the brief and assets. The AI-owned canvas starts after fixed HeaderV1 and includes Hero, Category/Collection expression, product surroundings, Brand Story, editorial imagery, Benefit/Trust, Banner/CTA, social-style gallery, and an optional short brand closing. It never includes Cafe24 function DOM.
-- Hero must follow the blueprint's hero variant. The library spans a committed full-bleed composition, a purposeful split-editorial composition, a banner-stack board, a typographic-marquee statement, a cinematic-still, and a product-forward compact banner; build the one the blueprint names to its structural spec. Vary crop, focal point, text anchoring, layering, and vertical rhythm instead of merely swapping colours.
+- Hero must follow the composition's hero variant. The library spans a committed full-bleed composition, a purposeful split-editorial composition, a banner-stack board, a typographic-marquee statement, a cinematic-still, and a product-forward compact banner; build the one the plan names to its structural spec. Vary crop, focal point, text anchoring, layering, and vertical rhythm instead of merely swapping colours.
 - The product surroundings may feel commerce-forward and dense or editorial and spacious, but ProductSectionV1 itself remains untouched.
 - Brand Story should use split-media or a strong editorial composition, not another generic card row.
-- Category, CTA, Benefit/Trust, gallery, and editorial sections are optional. Select and order them according to industry, buying intent, available imagery, and brand voice.
+- Every body section carries its own alignment, media position, density and tone axis. Honour them: two sections of the same registry type in one page must not look alike, and adjacent sections must not share a background tone.
 - Avoid a page whose hero is polished but everything below becomes repeated equal cards. Alternate composition, scale, image/text relationships, and background rhythm while keeping one coherent design language.
 - Before writing HTML, commit to headerVariant, heroComposition, productLayout, section order/selection, typography scale, image treatment, spacing/density, and content composition. Do not return vague labels such as modern, premium, or clean by themselves.
-- Encode the deterministic choices in the existing architecture object exactly: header = split-utility | centered-brand | overlay-minimal, hero = the blueprint's hero variant id (full-bleed | split-editorial | banner-stack | typographic-marquee | cinematic-still | product-forward), productPresentation = the blueprint's presentation id (grid-four | large-grid | editorial-two | featured-grid | compact-five). architecture.sections is the actual ordered section plan and must record the blueprint's section refs in order.
+- Encode the deterministic choices in the existing architecture object exactly: header = split-utility | centered-brand | overlay-minimal, hero = the composition's hero variant id (full-bleed | split-editorial | banner-stack | typographic-marquee | cinematic-still | product-forward), productPresentation = the composition's presentation id (grid-four | large-grid | editorial-two | featured-grid | compact-five). architecture.sections must record the composition's sections in order as "type/variant — 헤딩".
 - A materially different brief must produce visibly different decisions across those six axes, not a recoloured copy of the same page.
 - Keep decoration subordinate to product discovery and purchase flow. Use effects sparingly and preserve scanability, readable contrast, and obvious actions.
-- The product cards render through the verified presentation named by the blueprint (standard four-column, large three-column, editorial two-column, featured-plus-grid, or compact five-column, each with its own crop, density, and mobile reflow owned by code). Express the brief through the surrounding section rather than authoring card CSS.
+- The product cards render through the verified presentation named by the composition (standard four-column, large three-column, editorial two-column, featured-plus-grid, or compact five-column, each with its own crop, density, and mobile reflow owned by code). Express the brief through the surrounding section rather than authoring card CSS.
 - Use semantic main, section/article, and optional brand-level footer markup. Every desktop composition must define a deliberate mobile stack/reflow; preserve content order, crop focal points, touch spacing, and readable type. Do not return Tailwind classes or JavaScript.
 
 CAFE24 BASE-SKIN CONTRACT
@@ -174,7 +175,7 @@ EDITABILITY AND SAFETY
 
 PREVIEW PRODUCT MOCK
 - previewProducts fills the four product cards shown in the editor Preview only. The Cafe24 export ignores it completely and keeps the real product bindings, so it is never merchandise data and never leaves the Preview.
-- Give four sample product names a shopper in THIS industry would actually see on this storefront. An auto-care brief means detailing, washing, and vehicle accessory items; a fashion brief means garments; a dessert brief means desserts. Never carry names over from another brief or another project.
+- Give four sample product names a shopper would actually see in THIS shop, inside the product category the composition names. An auto-care brief means detailing, washing, and vehicle accessory items; a fashion brief means garments; a premium meat brief means cuts of meat and gift sets, not desserts. Never widen, narrow, or swap the category, and never carry names over from another brief or another project.
 - imageRef picks the sample photo and accepts only two values: "asset://N" to reuse attachment N of this request, or an empty string. An empty string means a product photo is generated for that name during this same run, which is the normal case. Any stock, stored, or remembered image address here is forbidden.
 - Use asset://N only when attachment N actually shows that product. Otherwise leave imageRef empty so the photo is generated from the name.
 - Because the name drives the generated photo, write names that are concrete and photographable: a specific product a shopper in this industry buys, not a category label or a marketing slogan.
@@ -278,10 +279,18 @@ async function recordUsage(response: { model: string; usage?: Parameters<typeof 
   }
 }
 
-export async function generateProjectSource(input: DesignGenerationInput, options?: { onUsage?: (event: OpenAIUsageEvent) => Promise<void>; onPreviewImageUsage?: (event: OpenAIUsageEvent) => Promise<void>; previewImageStore?: GeneratedImageStore; imageProbe?: ImageProbe }) {
+export async function generateProjectSource(input: DesignGenerationInput, options?: { onUsage?: (event: OpenAIUsageEvent) => Promise<void>; onPreviewImageUsage?: (event: OpenAIUsageEvent) => Promise<void>; previewImageStore?: GeneratedImageStore; imageProbe?: ImageProbe; pagePlan?: PagePlan }) {
   const traceId = crypto.randomUUID();
   const createdAt = new Date().toISOString();
-  const blueprint = composeDesignBlueprint(input, input.seed);
+  /**
+   * 1단계: 이번 몰의 본문 구성을 먼저 설계합니다.
+   * 섹션 종류·개수·순서·variant·시각 축이 여기서 정해지고, 2단계는 그 계획을 시공합니다.
+   * planner가 실패해도 고정 템플릿으로 물러나지 않고 업종 가중치 기반 조합기가 대신합니다.
+   */
+  const planResult = options?.pagePlan
+    ? { plan: options.pagePlan, source: "provided" as const, error: undefined }
+    : await generatePagePlan(input, { onUsage: options?.onUsage });
+  const plan = planResult.plan;
   /**
    * 이번 생성이 쓸 수 있는 이미지 전체입니다.
    * 이전 프로젝트에 저장된 이미지는 같은 계정의 것이라도 여기에 들어오지 않습니다.
@@ -291,21 +300,23 @@ export async function generateProjectSource(input: DesignGenerationInput, option
     projectAssets: input.projectAssetUrls ?? [],
     generated: input.generatedAssetUrls ?? [],
   });
-  const userPrompt = buildDesignGenerationUserPrompt(input, blueprint);
-  const blueprintAudit = {
-    industry: blueprint.industry,
-    flowId: blueprint.flowId,
-    header: blueprint.header.id,
-    hero: blueprint.hero.id,
-    productPresentation: blueprint.productPresentation.id,
-    sections: blueprint.sections.map((section) => section.ref),
-    footerMood: blueprint.footerMood,
-    density: blueprint.density,
-    typeScale: blueprint.typeScale,
-    imageTreatment: blueprint.imageTreatment,
-    seed: blueprint.seed,
+  const userPrompt = buildDesignGenerationUserPrompt(input, plan);
+  const planAudit = {
+    planSource: planResult.source,
+    planError: planResult.error ?? null,
+    industry: plan.industry,
+    industryLabel: plan.industryLabel,
+    productCategory: plan.productCategory,
+    header: plan.header,
+    hero: plan.hero.variant,
+    productPresentation: plan.productPresentation,
+    sections: plan.sections.map((section) => `${section.type}/${section.variant}`),
+    signature: pagePlanSignature(plan),
+    footerMood: plan.footerMood,
+    typeScale: plan.typeScale,
+    imageTreatment: plan.imageTreatment,
   };
-  const trace: GenerationTrace = { traceId, kind: "generate", createdAt, request: { model: model(), systemPrompt, userPrompt, blueprint: blueprintAudit, imageCount: input.assetUrls?.length ?? 0, assetSessionId: input.assetSessionId ?? null, allowedAssetCount: assetAllowlist.size }, response: [] };
+  const trace: GenerationTrace = { traceId, kind: "generate", createdAt, request: { model: model(), systemPrompt, userPrompt, pagePlan: plan, planAudit, imageCount: input.assetUrls?.length ?? 0, assetSessionId: input.assetSessionId ?? null, allowedAssetCount: assetAllowlist.size }, response: [] };
   let previousIssues: string[] = [];
 
   try {
@@ -344,10 +355,11 @@ export async function generateProjectSource(input: DesignGenerationInput, option
         architecture: parsed.architecture,
         commerce: parsed.commerce,
         previewProducts,
+        pagePlan: plan,
         updatedAt: new Date().toISOString(),
       };
       const baseValidator = validateProjectSource(source);
-      const designViolations = validateGeneratedDesignContract(source, blueprint);
+      const designViolations = validateGeneratedDesignContract(source, plan);
       // 상품 영역과 브랜드/무드 영역의 이미지 규칙을 분리해 감사합니다.
       const assetViolations = [...assetTokenViolations, ...auditGeneratedAssets(source, assetAllowlist), ...auditPreviewProducts(previewProducts, assetAllowlist)];
       const validator = {
@@ -357,7 +369,11 @@ export async function generateProjectSource(input: DesignGenerationInput, option
       };
       (trace.response as unknown[]).push({ attempt, ...responseTrace(response), rawGenerated: { architecture: parsed.architecture, html: rawHtml, css }, normalizedProjectSource: source, validator });
       if (validator.safe) {
-        const imageBrief = { industry: blueprint.industry, brief: input.prompt, brandName: source.brandName, palette: { surface: parsed.commerce.surface, accent: parsed.commerce.accent, thumbBackground: parsed.commerce.thumbBackground } };
+        // 저장되는 architecture.sections는 plan에서 파생한 정규 ref로 고정합니다.
+        // 검증은 AI가 기록한 값을 그대로 심판하고, 저장본만 기계가 읽을 수 있는 형태로 맞춥니다.
+        source.architecture = { ...source.architecture, sections: pagePlanSectionRefs(plan) };
+        // 이미지 프롬프트에는 내부 업종 키가 아니라 plan이 확정한 업종 라벨과 판매 상품군이 들어갑니다.
+        const imageBrief = { industry: plan.industryLabel, brief: input.prompt, brandName: source.brandName, productCategory: plan.productCategory, productExamples: plan.productExamples, palette: { surface: parsed.commerce.surface, accent: parsed.commerce.accent, thumbBackground: parsed.commerce.thumbBackground } };
         // 검증을 통과한 draft에만 Preview 사진을 만듭니다. 실패한 자리는 SVG 자리표시자를 유지합니다.
         source.previewProducts = await addGeneratedPreviewPhotos({
           products: previewProducts,
@@ -386,7 +402,7 @@ export async function generateProjectSource(input: DesignGenerationInput, option
           ? { checks: imageReport.checks, repaired: imageReport.repair?.actions ?? [], unverified: imageReport.repair?.unverified ?? imageReport.checks.filter((check) => check.verdict === "unverified").map((check) => check.url) }
           : null;
         await writeGenerationTrace(trace);
-        return { source, rationale: parsed.designRationale, traceId, validator, blueprint: blueprintAudit, imageReport: imageReport ? { repaired: imageReport.repair?.actions.length ?? 0, unverified: imageReport.repair?.unverified.length ?? 0 } : null };
+        return { source, rationale: parsed.designRationale, traceId, validator, pagePlan: plan, planAudit, imageReport: imageReport ? { repaired: imageReport.repair?.actions.length ?? 0, unverified: imageReport.repair?.unverified.length ?? 0 } : null };
       }
       previousIssues = validator.violations.map((item) => `${item.code}: ${item.message}${item.token ? ` (${item.token})` : ""}`).slice(0, 24);
     }
@@ -415,12 +431,18 @@ SELECTED-NODE EDIT MODE
 - Typography requests may safely use font-family, font-size, color, line-height, letter-spacing, font-weight, font-style, text-decoration, text-align, scale, and translate.
 - Prefer responsive-safe properties and avoid absolute positioning unless the selected node already uses it. Never reject these supported style requests merely because the user did not use CSS terminology.`;
 
-export async function editProjectNode(input: { prompt: string; nodeId: string; nodeType: string; nodeHtml: string; projectCss: string; rootValue: string; architecture: ProjectSource["architecture"]; renderMetrics?: { width: number; height: number; fontSize: number; lineHeight: number; letterSpacing: number; marginTop: number; marginBottom: number; paddingTop: number; paddingBottom: number } }, options?: { onUsage?: (event: OpenAIUsageEvent) => Promise<void> }) {
+export async function editProjectNode(input: { prompt: string; nodeId: string; nodeType: string; nodeHtml: string; projectCss: string; rootValue: string; architecture: ProjectSource["architecture"]; pagePlan?: PagePlan; renderMetrics?: { width: number; height: number; fontSize: number; lineHeight: number; letterSpacing: number; marginTop: number; marginBottom: number; paddingTop: number; paddingBottom: number } }, options?: { onUsage?: (event: OpenAIUsageEvent) => Promise<void> }) {
   const traceId = crypto.randomUUID();
   const createdAt = new Date().toISOString();
   const editIntent = classifyAiEditIntent(input.prompt);
-  const scopedSystemPrompt = `${editSystemPrompt.replaceAll("SELECTED_ID", input.nodeId)}\nEvery nodeCss selector must also begin with the exact project selector [data-moire-root="${input.rootValue}"].${editIntent === "style-only" ? "\nThis is a STYLE-ONLY request. Return the selected outerHTML unchanged and put the requested visual change only in nodeCss." : ""}`;
-  const userPrompt = `Project architecture (context only):\n${JSON.stringify(input.architecture)}\nSelected node type: ${input.nodeType}\nCurrent selected render metrics (CSS px, use for relative changes):\n${JSON.stringify(input.renderMetrics ?? null)}\nSelected node outerHTML:\n${input.nodeHtml}\nCurrent project CSS for visual context:\n${input.projectCss}\nUser request:\n${input.prompt}`;
+  /**
+   * page plan이 있는 프로젝트는 "이 몰이 무엇을 파는 어떤 구성인가"를 참고 컨텍스트로 함께 넘겨
+   * 부분 수정이 상품군과 페이지 톤에서 벗어나지 않게 합니다.
+   * plan이 없는 기존 프로젝트는 예전 프롬프트를 그대로 씁니다.
+   */
+  const planContext = input.pagePlan ? renderPagePlanEditContext(input.pagePlan) : "";
+  const scopedSystemPrompt = `${editSystemPrompt.replaceAll("SELECTED_ID", input.nodeId)}\nEvery nodeCss selector must also begin with the exact project selector [data-moire-root="${input.rootValue}"].${editIntent === "style-only" ? "\nThis is a STYLE-ONLY request. Return the selected outerHTML unchanged and put the requested visual change only in nodeCss." : ""}${planContext ? "\nThe user message carries this project's page composition. Treat it as context: keep the edit inside the composition's product category and tone, and never add, remove, or reorder sections outside the selected node." : ""}`;
+  const userPrompt = `${planContext ? `${planContext}\n` : ""}Project architecture (context only):\n${JSON.stringify(input.architecture)}\nSelected node type: ${input.nodeType}\nCurrent selected render metrics (CSS px, use for relative changes):\n${JSON.stringify(input.renderMetrics ?? null)}\nSelected node outerHTML:\n${input.nodeHtml}\nCurrent project CSS for visual context:\n${input.projectCss}\nUser request:\n${input.prompt}`;
   const trace: GenerationTrace = { traceId, kind: "edit", createdAt, request: { model: model(), systemPrompt: scopedSystemPrompt, userPrompt } };
   try {
     const response = await getOpenAI().responses.create({

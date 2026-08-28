@@ -519,7 +519,7 @@ export function EditorShell({ initialSource, projectId = null, initialVersions =
     } : undefined;
     const response = await fetch("/api/ai/edit", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt, nodeId: snapshot.id, nodeType: snapshot.type, nodeHtml: snapshot.outerHtml, projectCss: baseSource.css, rootValue: sourceRootValue(baseSource.html), architecture: baseSource.architecture, renderMetrics, ...(projectId && UUID_PATTERN.test(projectId) ? { projectId } : {}) }),
+      body: JSON.stringify({ prompt, nodeId: snapshot.id, nodeType: snapshot.type, nodeHtml: snapshot.outerHtml, projectCss: baseSource.css, rootValue: sourceRootValue(baseSource.html), architecture: baseSource.architecture, pagePlan: baseSource.pagePlan, renderMetrics, ...(projectId && UUID_PATTERN.test(projectId) ? { projectId } : {}) }),
     });
     const payload = await response.json() as { nodeHtml?: string; nodeCss?: string; summary?: string; error?: string; balance?: number };
     if (!response.ok || !payload.nodeHtml || payload.nodeCss === undefined) throw new Error(payload.error ?? "AI 영역 편집에 실패했습니다.");

@@ -1,10 +1,14 @@
 /**
- * MOLIVE 디자인 variant 라이브러리입니다.
+ * MOLIVE 디자인 축(axis) 라이브러리입니다.
  * reference-patterns.ts의 실제 Cafe24 레퍼런스 패턴을 AI가 그대로 시공할 수 있는
- * 구조 계약(spec)으로 옮긴 것으로, blueprint.ts가 업종·시드에 따라 조합합니다.
+ * 구조 계약(spec)으로 옮긴 것으로, 페이지 전역에 한 번씩만 정해지는 축을 담습니다.
+ * (Hero variant / Header 구조 / 상품 진열 / Footer 무드 / 밀도 / 타이포 / 이미지 처리)
  *
- * 안정성 경계: 여기의 variant는 전부 AI 소유 캔버스(Hero/Category/Story/CTA/Footer 무드)만
- * 다룹니다. HeaderV1, verified ProductSectionV1, Cafe24 module/변수 계약은 건드리지 않습니다.
+ * 본문 섹션의 종류·variant는 section-registry.ts가 소유하고, 이번 페이지에 어떤 섹션을
+ * 어떤 순서로 둘지는 page-plan.ts의 Page Plan(AI 결정)이 소유합니다.
+ *
+ * 안정성 경계: 여기의 variant는 전부 AI 소유 캔버스만 다룹니다.
+ * HeaderV1, verified ProductSectionV1, Cafe24 module/변수 계약은 건드리지 않습니다.
  */
 
 export type VariantKind = "hero" | "category" | "product-context" | "story" | "social" | "cta" | "trust";
@@ -72,150 +76,6 @@ export const HERO_VARIANTS: Record<HeroVariantId, DesignVariant & { id: HeroVari
     name: "상품 우선 컴팩트 배너",
     basedOn: ["hero/product-forward"],
     spec: "높이를 36~52svh로 억제한 컴팩트 배너(카피 좌측, 시선을 끄는 단정한 비주얼 우측 또는 배경). 배너 바로 아래 카테고리 퀵 진입(아이콘/텍스트 칩 6~10개)이 오고, 곧바로 상품 영역으로 이어져 '바로 산다'는 리테일 리듬을 만든다. 모바일에서는 배너가 더 낮아지고 퀵 진입은 가로 스크롤 칩.",
-  },
-};
-
-export const CATEGORY_VARIANTS: Record<string, DesignVariant> = {
-  "quick-menu": {
-    id: "quick-menu",
-    kind: "category",
-    name: "아이콘 퀵메뉴",
-    basedOn: ["category/quick-menu"],
-    spec: "'무엇을 찾으시나요?' 류의 짧은 안내 카피와 함께 원형/라운드 썸네일+라벨의 카테고리 그리드(PC 6~10개 1행, 모바일 2행 또는 가로 스크롤). 각 항목은 /product/list.html 링크.",
-  },
-  "collection-tiles": {
-    id: "collection-tiles",
-    kind: "category",
-    name: "컬렉션 타일 카드",
-    basedOn: ["category/collection-tiles"],
-    spec: "이미지 타일 2~3장(비율 4/5 또는 1/1)에 컬렉션명과 more 링크를 오버레이 또는 하단 캡션으로 얹는 카드 행. 타일 간 여백과 캡션 타이포로 브랜드 톤을 만든다.",
-  },
-  "editorial-index": {
-    id: "editorial-index",
-    kind: "category",
-    name: "에디토리얼 인덱스",
-    basedOn: ["category/editorial-index"],
-    spec: "괘선으로 구분된 카테고리명 텍스트 리스트(대형 세리프, 각 행에 01/02 번호 라벨). 헤딩 컬럼+리스트 컬럼의 2컬럼 또는 풀폭 리스트. hover에서 들여쓰기/색 변화만.",
-  },
-  "tab-free-rail": {
-    id: "tab-free-rail",
-    kind: "category",
-    name: "카테고리 밴드",
-    basedOn: ["category/tab-product-rail"],
-    spec: "카테고리 이름을 큰 텍스트 칩/밴드로 나열하고 각 칩이 리스트로 링크되는 정적 밴드(JS 탭 전환은 금지이므로 탭의 인상을 칩 나열로 대체). 상품 영역 바로 위에 붙여 진열의 도입부 역할.",
-  },
-};
-
-export const PRODUCT_CONTEXT_VARIANTS: Record<string, DesignVariant> = {
-  "heading-more": {
-    id: "heading-more",
-    kind: "product-context",
-    name: "타이틀+more 프레임",
-    basedOn: ["product-context/heading-more"],
-    spec: "상품 슬롯 위에 영문 라벨(txt01)+국문 타이틀(txt02) 페어, 아래 또는 우측에 more 링크. 레퍼런스에서 가장 보편적인 진열 프레임.",
-  },
-  "best-frame": {
-    id: "best-frame",
-    kind: "product-context",
-    name: "베스트 프레임",
-    basedOn: ["product-context/best-ranking"],
-    spec: "BEST/TOP SELLER 성격의 헤딩과 절제된 부카피로 상품 슬롯을 감싼다. 판매 수치·순위 숫자를 지어내지 않고 헤딩의 무게만 가져온다.",
-  },
-  "curation-band": {
-    id: "curation-band",
-    kind: "product-context",
-    name: "큐레이션 밴드",
-    basedOn: ["product-context/curation-band"],
-    spec: "MD 추천/시즌 에디트 성격의 2~3문장 큐레이션 카피 블록이 상품 슬롯을 이끈다. 배경 톤을 페이지와 살짝 달리해 밴드로 인지되게 한다.",
-  },
-};
-
-export const STORY_VARIANTS: Record<string, DesignVariant> = {
-  "split-media": {
-    id: "split-media",
-    kind: "story",
-    name: "스플릿 미디어 스토리",
-    basedOn: ["story/split-media"],
-    spec: "사진 50~54% + 카피 46~50%의 2컬럼 브랜드 서사(min-height 60~76svh). 카피는 eyebrow+대형 타이틀+본문 2~4문장+텍스트 링크. 소재·공정·철학을 말한다. 모바일은 이미지→카피 스택.",
-  },
-  "dark-statement": {
-    id: "dark-statement",
-    kind: "story",
-    name: "다크 선언 밴드",
-    basedOn: ["story/dark-statement"],
-    spec: "어두운 배경 전폭 밴드(min-height 42~60svh)에 큰 카피 1~2줄과 짧은 보조문. 페이지 리듬을 끊는 무게추 역할. 배경은 단색 또는 저채도 이미지+셰이드.",
-  },
-  "lookbook-row": {
-    id: "lookbook-row",
-    kind: "story",
-    name: "룩북 이미지 행",
-    basedOn: ["story/lookbook-row"],
-    spec: "캡션 없이(또는 아주 작은 캡션만) 이미지 3~4장을 서로 다른 높이 오프셋으로 나란히 흘리는 행. 설명하지 않는 것이 목적이므로 텍스트는 섹션 라벨 하나까지만.",
-  },
-};
-
-export const SOCIAL_VARIANTS: Record<string, DesignVariant> = {
-  "sns-gallery": {
-    id: "sns-gallery",
-    kind: "social",
-    name: "SNS 갤러리",
-    basedOn: ["social/sns-gallery"],
-    spec: "정방형 이미지 4~6장의 그리드와 @핸들 라벨. 팔로워 수·좋아요 수 등 수치는 만들지 않는다. 각 셀은 이미지만, hover에 옅은 오버레이.",
-  },
-  "ugc-strip": {
-    id: "ugc-strip",
-    kind: "social",
-    name: "UGC 스트립",
-    basedOn: ["social/review-band"],
-    spec: "리뷰 본문을 지어내는 대신 고객 씬 무드의 라이프스타일 컷 3~4장과 'REAL MOMENTS' 성격의 라벨로 사회적 신뢰의 인상만 만든다. 별점·후기 텍스트 금지.",
-  },
-};
-
-export const CTA_VARIANTS: Record<string, DesignVariant> = {
-  "full-campaign": {
-    id: "full-campaign",
-    kind: "cta",
-    name: "풀폭 캠페인",
-    basedOn: ["cta/full-campaign"],
-    spec: "전폭 이미지(min-height 56~78svh) 위 방향성 셰이드+카피+밑줄형 CTA 링크 1개. 시즌 캠페인/기획전으로 이어지는 문.",
-  },
-  "statement-text": {
-    id: "statement-text",
-    kind: "cta",
-    name: "텍스트 선언 CTA",
-    basedOn: ["cta/statement-text"],
-    spec: "이미지 없이 넉넉한 상하 패딩(120px 이상)과 중앙 또는 좌측 정렬 대형 타이포 2~3줄, 아래 텍스트 링크 1개. 배경은 페이지와 한 톤 다른 단색.",
-  },
-  "promo-duo": {
-    id: "promo-duo",
-    kind: "cta",
-    name: "프로모션 듀오 패널",
-    basedOn: ["cta/promo-duo"],
-    spec: "반폭 패널 2장(또는 1/3 패널 3장)의 grid. 각 패널은 이미지+라벨+짧은 카피+링크로 서로 다른 기획(선물세트/신상/이벤트)을 병렬 제안. 모바일 세로 스택.",
-  },
-  "marquee-strip": {
-    id: "marquee-strip",
-    kind: "cta",
-    name: "마퀴 스트립",
-    basedOn: ["cta/marquee-strip"],
-    spec: "시즌 키워드를 · 로 이어 반복한 한 줄 대형 텍스트 스트립(정적, keyframes 금지). 섹션 사이 전환부에 한 번만 사용.",
-  },
-};
-
-export const TRUST_VARIANTS: Record<string, DesignVariant> = {
-  "spec-band": {
-    id: "spec-band",
-    kind: "trust",
-    name: "스펙/약속 밴드",
-    basedOn: ["story/dark-statement", "product-context/heading-more"],
-    spec: "3~4개의 짧은 항목(소재/공정/배송·교환 안내 같은 일반적 사실)을 괘선 그리드로 나열하는 정보 밴드. 인증·수상·판매수치 등 검증 불가한 주장 금지.",
-  },
-  "info-columns": {
-    id: "info-columns",
-    kind: "trust",
-    name: "인포 컬럼",
-    basedOn: ["product-context/curation-band"],
-    spec: "제품 철학·사용 안내·관리법 같은 도움말 성격의 2~3 컬럼 텍스트 블록. 차분한 타이포와 아이콘 없이 텍스트 위주.",
   },
 };
 
@@ -320,18 +180,3 @@ export const IMAGE_TREATMENTS = {
   "dark-cinematic": "grayscale 0.2~0.5 + contrast 상향의 어두운 룩. 금속·기계·야간 씬과 어울린다.",
 } as const;
 export type ImageTreatmentId = keyof typeof IMAGE_TREATMENTS;
-
-export const SECTION_VARIANTS: Record<string, DesignVariant> = {
-  ...Object.fromEntries(Object.entries(CATEGORY_VARIANTS).map(([key, value]) => [`category/${key}`, value])),
-  ...Object.fromEntries(Object.entries(PRODUCT_CONTEXT_VARIANTS).map(([key, value]) => [`products/${key}`, value])),
-  ...Object.fromEntries(Object.entries(STORY_VARIANTS).map(([key, value]) => [`story/${key}`, value])),
-  ...Object.fromEntries(Object.entries(SOCIAL_VARIANTS).map(([key, value]) => [`social/${key}`, value])),
-  ...Object.fromEntries(Object.entries(CTA_VARIANTS).map(([key, value]) => [`cta/${key}`, value])),
-  ...Object.fromEntries(Object.entries(TRUST_VARIANTS).map(([key, value]) => [`trust/${key}`, value])),
-};
-
-export function sectionVariant(ref: string): DesignVariant {
-  const variant = SECTION_VARIANTS[ref];
-  if (!variant) throw new Error(`알 수 없는 section variant입니다: ${ref}`);
-  return variant;
-}
