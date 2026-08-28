@@ -3,6 +3,7 @@ import { errorResponse, requireApiUser } from "@/lib/api/auth";
 import { editProjectNode } from "@/lib/openai/site-generator";
 import { projectPagePlan } from "@/lib/project-source";
 import { createGenerationUsageRecorder } from "@/lib/openai/usage-store";
+import { openAIUsageActorType } from "@/lib/auth/roles";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { hasSupabaseServerConfig } from "@/lib/supabase/config";
 import { commitAiCredits, releaseAiCredits, reserveAiCredits } from "@/lib/credits/service";
@@ -44,7 +45,8 @@ export async function POST(request: Request) {
     let creditCommitted = false;
     try {
       if (hasSupabaseServerConfig()) creditReservation = await reserveAiCredits(user.id, "editor_ai", projectId);
-      const onUsage = hasSupabaseServerConfig() ? createGenerationUsageRecorder({ generationId: crypto.randomUUID(), userId: user.id, projectId, usageType: "editor_ai" }) : undefined;
+      const actorType = openAIUsageActorType("app_metadata" in user ? user.app_metadata as Record<string, unknown> : null);
+      const onUsage = hasSupabaseServerConfig() ? createGenerationUsageRecorder({ generationId: crypto.randomUUID(), userId: user.id, actorType, projectId, usageType: "editor_ai" }) : undefined;
       const result = await editProjectNode({ ...parsedInput.data, pagePlan: projectPagePlan(parsedInput.data) ?? undefined }, { onUsage });
       const balance = creditReservation ? await commitAiCredits(creditReservation.id, user.id, projectId) : null;
       creditCommitted = true;

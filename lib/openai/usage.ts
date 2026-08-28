@@ -1,4 +1,4 @@
-export const openAIPricingVersion = "openai-2026-08-21";
+export const openAIPricingVersion = "openai-2026-08-28";
 
 type TokenRates = {
   input: number;
@@ -17,6 +17,21 @@ const tokenRatesPerMillion: Array<{ matches: (model: string) => boolean; rates: 
   { matches: (model) => model.startsWith("gpt-5.4"), rates: { input: 2.5, cachedInput: 0.25, cacheWriteInput: 2.5, output: 15 } },
 ];
 
+type ImageTokenRates = {
+  textInput: number;
+  cachedTextInput: number;
+  imageInput: number;
+  cachedImageInput: number;
+  imageOutput: number;
+};
+
+const imageTokenRatesPerMillion: Array<{ matches: (model: string) => boolean; rates: ImageTokenRates }> = [
+  {
+    matches: (model) => model === "gpt-image-2" || model.startsWith("gpt-image-2-"),
+    rates: { textInput: 5, cachedTextInput: 1.25, imageInput: 8, cachedImageInput: 2, imageOutput: 30 },
+  },
+];
+
 type ResponseUsageLike = {
   input_tokens?: number;
   input_tokens_details?: { cached_tokens?: number; cache_write_tokens?: number } | null;
@@ -31,7 +46,12 @@ export type OpenAIUsageEvent = {
   outputTokens: number;
   requestCount: 1;
   imageCount: number;
-  imageCostUsd: number;
+  textInputTokens: number;
+  cachedTextInputTokens: number;
+  imageInputTokens: number;
+  cachedImageInputTokens: number;
+  imageOutputTokens: number;
+  estimatedImageCostUsd: number;
   estimatedCostUsd: number;
   pricingVersion: string;
 };
@@ -60,31 +80,83 @@ export function estimateTextCostUsd(input: {
   ) / 1_000_000;
 }
 
-type ImageUsageLike = { input_tokens?: number; output_tokens?: number } | null | undefined;
+type ImageUsageLike = {
+  input_tokens?: number;
+  output_tokens?: number;
+  input_tokens_details?: {
+    text_tokens?: number;
+    image_tokens?: number;
+    cached_tokens?: number;
+    cached_text_tokens?: number;
+    cached_image_tokens?: number;
+  } | null;
+  output_tokens_details?: { text_tokens?: number; image_tokens?: number } | null;
+} | null | undefined;
 
-/**
- * 이미지 모델 단가는 계정 계약에 따라 달라지므로 표에 가정값을 넣지 않고
- * OPENAI_IMAGE_PRICE_USD로 받은 장당 단가만 씁니다. 값이 없으면 토큰 비용처럼 0으로 둡니다.
- */
-function imagePricePerImageUsd() {
-  const configured = Number(process.env.OPENAI_IMAGE_PRICE_USD);
-  return Number.isFinite(configured) && configured > 0 ? configured : 0;
+export function estimateImageCostUsd(input: {
+  model: string;
+  textInputTokens: number;
+  cachedTextInputTokens: number;
+  imageInputTokens: number;
+  cachedImageInputTokens: number;
+  imageOutputTokens: number;
+}) {
+  const rates = imageTokenRatesPerMillion.find((entry) => entry.matches(input.model))?.rates;
+  if (!rates) return 0;
+  const cachedText = Math.min(input.textInputTokens, input.cachedTextInputTokens);
+  const cachedImage = Math.min(input.imageInputTokens, input.cachedImageInputTokens);
+  return (
+    (input.textInputTokens - cachedText) * rates.textInput
+    + cachedText * rates.cachedTextInput
+    + (input.imageInputTokens - cachedImage) * rates.imageInput
+    + cachedImage * rates.cachedImageInput
+    + input.imageOutputTokens * rates.imageOutput
+  ) / 1_000_000;
 }
 
 /** 이미지 생성 1회를 사용량 이벤트로 기록합니다. */
 export function usageEventFromImageResponse(input: { model: string; usage?: ImageUsageLike; imageCount: number }): OpenAIUsageEvent {
   const imageCount = Math.max(0, Math.trunc(input.imageCount));
-  const imageCostUsd = imageCount * imagePricePerImageUsd();
+  const inputTokens = tokenCount(input.usage?.input_tokens);
+  const outputTokens = tokenCount(input.usage?.output_tokens);
+  const details = input.usage?.input_tokens_details;
+  const detailedTextInput = tokenCount(details?.text_tokens);
+  const detailedImageInput = tokenCount(details?.image_tokens);
+  const hasInputBreakdown = detailedTextInput + detailedImageInput > 0;
+  const textInputTokens = hasInputBreakdown ? detailedTextInput : inputTokens;
+  const imageInputTokens = hasInputBreakdown ? detailedImageInput : 0;
+  const explicitCachedText = tokenCount(details?.cached_text_tokens);
+  const explicitCachedImage = tokenCount(details?.cached_image_tokens);
+  const cachedTotal = Math.min(inputTokens, tokenCount(details?.cached_tokens) || explicitCachedText + explicitCachedImage);
+  const remainingCached = Math.max(0, cachedTotal - explicitCachedText - explicitCachedImage);
+  // The Images API currently reports modality totals. If it supplies only an aggregate
+  // cached count, a text-only generation can still be classified exactly.
+  const cachedTextInputTokens = Math.min(textInputTokens, explicitCachedText + (imageInputTokens === 0 ? remainingCached : 0));
+  const cachedImageInputTokens = Math.min(imageInputTokens, explicitCachedImage + (textInputTokens === 0 ? remainingCached : 0));
+  const imageOutputTokens = tokenCount(input.usage?.output_tokens_details?.image_tokens) || outputTokens;
+  const estimatedImageCostUsd = estimateImageCostUsd({
+    model: input.model,
+    textInputTokens,
+    cachedTextInputTokens,
+    imageInputTokens,
+    cachedImageInputTokens,
+    imageOutputTokens,
+  });
   return {
     model: input.model,
-    inputTokens: tokenCount(input.usage?.input_tokens),
-    cachedInputTokens: 0,
+    inputTokens,
+    cachedInputTokens: cachedTextInputTokens + cachedImageInputTokens,
     cacheWriteInputTokens: 0,
-    outputTokens: tokenCount(input.usage?.output_tokens),
+    outputTokens,
     requestCount: 1,
     imageCount,
-    imageCostUsd,
-    estimatedCostUsd: imageCostUsd,
+    textInputTokens,
+    cachedTextInputTokens,
+    imageInputTokens,
+    cachedImageInputTokens,
+    imageOutputTokens,
+    estimatedImageCostUsd,
+    estimatedCostUsd: estimatedImageCostUsd,
     pricingVersion: openAIPricingVersion,
   };
 }
@@ -103,7 +175,12 @@ export function usageEventFromResponse(response: { model: string; usage?: Respon
     outputTokens,
     requestCount: 1,
     imageCount: 0,
-    imageCostUsd: 0,
+    textInputTokens: inputTokens,
+    cachedTextInputTokens: cachedInputTokens,
+    imageInputTokens: 0,
+    cachedImageInputTokens: 0,
+    imageOutputTokens: 0,
+    estimatedImageCostUsd: 0,
     estimatedCostUsd,
     pricingVersion: openAIPricingVersion,
   };

@@ -1,10 +1,13 @@
 import "server-only";
-import { OPENAI_USAGE_TYPES, type OpenAIUsageType } from "@/lib/openai/usage-store";
+import { OPENAI_USAGE_TYPES, type OpenAIUsageActorType, type OpenAIUsageType } from "@/lib/openai/usage-store";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export type OpenAIUsageSummary = {
   todayCostUsd: number;
   monthCostUsd: number;
+  totalCostUsd: number;
+  customerCostUsd: number;
+  adminCostUsd: number;
   totalGenerations: number;
   averageCostUsd: number;
   highestCostUsd: number;
@@ -13,6 +16,7 @@ export type OpenAIUsageSummary = {
 export type RecentOpenAIUsage = {
   generationId: string;
   usageType: OpenAIUsageType;
+  actorType: OpenAIUsageActorType;
   userId: string;
   projectId: string | null;
   model: string;
@@ -54,6 +58,9 @@ export async function getAdminOpenAIUsage(): Promise<{ summary: OpenAIUsageSumma
     summary: {
       todayCostUsd: numeric(row.today_cost_usd),
       monthCostUsd: numeric(row.month_cost_usd),
+      totalCostUsd: numeric(row.total_cost_usd),
+      customerCostUsd: numeric(row.customer_cost_usd),
+      adminCostUsd: numeric(row.admin_cost_usd),
       totalGenerations: numeric(row.total_generations),
       averageCostUsd: numeric(row.average_cost_usd),
       highestCostUsd: numeric(row.highest_cost_usd),
@@ -70,6 +77,7 @@ export async function getAdminOpenAIUsage(): Promise<{ summary: OpenAIUsageSumma
     recent: (recentResult.data ?? []).map((item: Record<string, unknown>) => ({
       generationId: String(item.generation_id),
       usageType: String(item.usage_type) as OpenAIUsageType,
+      actorType: String(item.actor_type) as OpenAIUsageActorType,
       userId: String(item.user_id),
       projectId: item.project_id ? String(item.project_id) : null,
       model: String(item.model),

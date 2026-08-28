@@ -14,6 +14,7 @@ import { isRepairableVerdict, verifyGeneralImages, type ImageProbe } from "@/lib
 import { repairBrokenImages } from "@/lib/assets/image-repair";
 import { writeGenerationTrace, type GenerationTrace } from "@/lib/openai/dev-trace";
 import { usageEventFromResponse, type OpenAIUsageEvent } from "@/lib/openai/usage";
+import { OpenAIUsageRecordingError, runRecordedOpenAICall } from "@/lib/openai/recorded-call";
 import { classifyAiEditIntent } from "@/lib/editor/ai-edit-intent";
 import type { ProjectSource } from "@/lib/project-source";
 
@@ -228,6 +229,7 @@ async function addGeneratedPreviewPhotos(input: {
     const photos = await generatePreviewProductPhotos({ targets, brief: input.brief, store: input.store, onUsage: input.onUsage });
     return applyGeneratedPreviewPhotos({ products: input.products, photos, attachmentUrls: input.attachmentUrls });
   } catch (error) {
+    if (error instanceof OpenAIUsageRecordingError) throw error;
     console.error("Preview 상품 사진 생성을 건너뜁니다", error instanceof Error ? error.message : "unknown error");
     return input.products;
   }
@@ -259,6 +261,7 @@ async function verifyAndRepairGeneralImages(input: {
     });
     return { checks, repair };
   } catch (error) {
+    if (error instanceof OpenAIUsageRecordingError) throw error;
     // 검증 자체가 실패해도 생성 결과를 버리지 않습니다. 검증 전 상태를 그대로 씁니다.
     console.error("일반 이미지 검증을 건너뜁니다", error instanceof Error ? error.message : "unknown error");
     return null;
@@ -267,16 +270,6 @@ async function verifyAndRepairGeneralImages(input: {
 
 function responseTrace(response: { id: string; model: string; output_text: string; usage?: unknown }) {
   return { id: response.id, model: response.model, outputText: response.output_text, usage: response.usage ?? null };
-}
-
-async function recordUsage(response: { model: string; usage?: Parameters<typeof usageEventFromResponse>[0]["usage"] }, onUsage?: (event: OpenAIUsageEvent) => Promise<void>) {
-  if (!onUsage) return;
-  try {
-    await onUsage(usageEventFromResponse(response));
-  } catch (error) {
-    // Metering must be visible in server logs without exposing prompts or breaking generation.
-    console.error("OpenAI usage persistence failed", error instanceof Error ? error.message : "unknown error");
-  }
 }
 
 export async function generateProjectSource(input: DesignGenerationInput, options?: { onUsage?: (event: OpenAIUsageEvent) => Promise<void>; onPreviewImageUsage?: (event: OpenAIUsageEvent) => Promise<void>; previewImageStore?: GeneratedImageStore; imageProbe?: ImageProbe; pagePlan?: PagePlan }) {
@@ -322,18 +315,23 @@ export async function generateProjectSource(input: DesignGenerationInput, option
   try {
     for (let attempt = 1; attempt <= 3; attempt += 1) {
       const correction = previousIssues.length ? `\nA prior draft failed validation. Rebuild it and correct all of these issues: ${previousIssues.join("; ")}` : "";
-      const response = await getOpenAI().responses.create({
-        model: model(), store: false, max_output_tokens: 30000,
-        input: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: [
-            { type: "input_text", text: userPrompt + correction },
-            ...(input.assetUrls ?? []).map((imageUrl) => ({ type: "input_image" as const, image_url: imageUrl, detail: "auto" as const })),
-          ] },
-        ],
-        text: { format: { type: "json_schema", name: "moire_project_source", strict: true, schema: designJsonSchema } },
+      const requestedModel = model();
+      const response = await runRecordedOpenAICall({
+        onUsage: options?.onUsage,
+        call: () => getOpenAI().responses.create({
+          model: requestedModel, store: false, max_output_tokens: 30000,
+          input: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: [
+              { type: "input_text", text: userPrompt + correction },
+              ...(input.assetUrls ?? []).map((imageUrl) => ({ type: "input_image" as const, image_url: imageUrl, detail: "auto" as const })),
+            ] },
+          ],
+          text: { format: { type: "json_schema", name: "moire_project_source", strict: true, schema: designJsonSchema } },
+        }),
+        usageFromResponse: usageEventFromResponse,
+        usageFromError: (usage) => usage ? usageEventFromResponse({ model: requestedModel, usage: usage as Parameters<typeof usageEventFromResponse>[0]["usage"] }) : null,
       });
-      await recordUsage(response, options?.onUsage);
       const parsed = designSchema.parse(JSON.parse(response.output_text));
       const projectId = crypto.randomUUID();
       // Preview mock의 이미지는 이번 세션 첨부이거나 이번 생성에서 그린 타일뿐입니다.
@@ -445,12 +443,17 @@ export async function editProjectNode(input: { prompt: string; nodeId: string; n
   const userPrompt = `${planContext ? `${planContext}\n` : ""}Project architecture (context only):\n${JSON.stringify(input.architecture)}\nSelected node type: ${input.nodeType}\nCurrent selected render metrics (CSS px, use for relative changes):\n${JSON.stringify(input.renderMetrics ?? null)}\nSelected node outerHTML:\n${input.nodeHtml}\nCurrent project CSS for visual context:\n${input.projectCss}\nUser request:\n${input.prompt}`;
   const trace: GenerationTrace = { traceId, kind: "edit", createdAt, request: { model: model(), systemPrompt: scopedSystemPrompt, userPrompt } };
   try {
-    const response = await getOpenAI().responses.create({
-      model: model(), store: false, max_output_tokens: 16000,
-      input: [{ role: "system", content: scopedSystemPrompt }, { role: "user", content: userPrompt }],
-      text: { format: { type: "json_schema", name: "moire_node_patch", strict: true, schema: nodeEditJsonSchema } },
+    const requestedModel = model();
+    const response = await runRecordedOpenAICall({
+      onUsage: options?.onUsage,
+      call: () => getOpenAI().responses.create({
+        model: requestedModel, store: false, max_output_tokens: 16000,
+        input: [{ role: "system", content: scopedSystemPrompt }, { role: "user", content: userPrompt }],
+        text: { format: { type: "json_schema", name: "moire_node_patch", strict: true, schema: nodeEditJsonSchema } },
+      }),
+      usageFromResponse: usageEventFromResponse,
+      usageFromError: (usage) => usage ? usageEventFromResponse({ model: requestedModel, usage: usage as Parameters<typeof usageEventFromResponse>[0]["usage"] }) : null,
     });
-    await recordUsage(response, options?.onUsage);
     const parsed = nodeEditSchema.parse(JSON.parse(response.output_text));
     if (editIntent === "style-only" && !parsed.nodeCss.trim()) {
       throw new Error("AI가 실제로 적용할 스타일 값을 만들지 못했습니다. 변경할 크기나 배율을 더 구체적으로 적어 주세요.");

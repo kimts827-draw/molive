@@ -2,6 +2,7 @@ import "server-only";
 import OpenAI from "openai";
 import { buildPreviewImagePrompt, buildSectionImagePrompt, type GeneratedPreviewPhoto, type PreviewImageBrief } from "@/lib/openai/preview-image-contract";
 import { usageEventFromImageResponse, type OpenAIUsageEvent } from "@/lib/openai/usage";
+import { OpenAIUsageRecordingError, runRecordedOpenAICall } from "@/lib/openai/recorded-call";
 
 /** 이번 생성에서 방금 만들어진 이미지 한 장의 원본입니다. */
 export type GeneratedImageBytes = { index: number; kind: "product" | "section"; data: Buffer; contentType: string };
@@ -33,23 +34,21 @@ async function generateImage(
   request: { index: number; kind: GeneratedImageBytes["kind"]; prompt: string; size: typeof PRODUCT_IMAGE_SIZE | typeof SECTION_IMAGE_SIZE },
   onUsage?: (event: OpenAIUsageEvent) => Promise<void>,
 ): Promise<GeneratedImageBytes | null> {
-  const response = await client.images.generate({
-    model: imageModel(),
-    prompt: request.prompt,
-    n: 1,
-    size: request.size,
-    output_format: IMAGE_OUTPUT_FORMAT,
-    output_compression: 70,
-    background: "opaque",
-  }, { signal: AbortSignal.timeout(timeoutMs()) });
-
-  if (onUsage) {
-    try {
-      await onUsage(usageEventFromImageResponse({ model: imageModel(), usage: response.usage, imageCount: 1 }));
-    } catch (error) {
-      console.error("OpenAI image usage persistence failed", error instanceof Error ? error.message : "unknown error");
-    }
-  }
+  const requestedModel = imageModel();
+  const response = await runRecordedOpenAICall({
+    onUsage,
+    call: () => client.images.generate({
+      model: requestedModel,
+      prompt: request.prompt,
+      n: 1,
+      size: request.size,
+      output_format: IMAGE_OUTPUT_FORMAT,
+      output_compression: 70,
+      background: "opaque",
+    }, { signal: AbortSignal.timeout(timeoutMs()) }),
+    usageFromResponse: (value) => usageEventFromImageResponse({ model: requestedModel, usage: value.usage, imageCount: 1 }),
+    usageFromError: (usage) => usage ? usageEventFromImageResponse({ model: requestedModel, usage: usage as Parameters<typeof usageEventFromImageResponse>[0]["usage"], imageCount: 1 }) : null,
+  });
 
   const encoded = response.data?.[0]?.b64_json;
   if (!encoded) return null;
@@ -103,6 +102,7 @@ export async function generatePreviewProductPhotos(input: {
       continue;
     }
     const reason = result.reason;
+    if (reason instanceof OpenAIUsageRecordingError) throw reason;
     console.error(
       `Preview 상품 사진 생성 실패 (${input.targets[position]?.name ?? "unknown"})`,
       reason instanceof Error ? reason.message : "unknown error",

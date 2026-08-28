@@ -4,6 +4,7 @@ import { composeFallbackPagePlan } from "@/lib/design-library/plan-composer";
 import { normalizePagePlan, pagePlanJsonSchema, pagePlanSchema, type PagePlan } from "@/lib/design-library/page-plan";
 import { buildPagePlanUserPrompt, PAGE_PLAN_SYSTEM_PROMPT, type PagePlanInput } from "@/lib/openai/page-plan-contract";
 import { usageEventFromResponse, type OpenAIUsageEvent } from "@/lib/openai/usage";
+import { OpenAIUsageRecordingError, runRecordedOpenAICall } from "@/lib/openai/recorded-call";
 
 export type { PagePlanInput };
 export type PagePlanResult = { plan: PagePlan; source: "ai" | "fallback"; error?: string };
@@ -23,26 +24,26 @@ export async function generatePagePlan(input: PagePlanInput, options?: { onUsage
   }
   try {
     const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-    const response = await client.responses.create({
-      model: planModel(),
-      store: false,
-      max_output_tokens: 6000,
-      input: [
-        { role: "system", content: PAGE_PLAN_SYSTEM_PROMPT },
-        { role: "user", content: buildPagePlanUserPrompt(input) },
-      ],
-      text: { format: { type: "json_schema", name: "moire_page_plan", strict: true, schema: pagePlanJsonSchema } },
+    const requestedModel = planModel();
+    const response = await runRecordedOpenAICall({
+      onUsage: options?.onUsage,
+      call: () => client.responses.create({
+        model: requestedModel,
+        store: false,
+        max_output_tokens: 6000,
+        input: [
+          { role: "system", content: PAGE_PLAN_SYSTEM_PROMPT },
+          { role: "user", content: buildPagePlanUserPrompt(input) },
+        ],
+        text: { format: { type: "json_schema", name: "moire_page_plan", strict: true, schema: pagePlanJsonSchema } },
+      }),
+      usageFromResponse: usageEventFromResponse,
+      usageFromError: (usage) => usage ? usageEventFromResponse({ model: requestedModel, usage: usage as Parameters<typeof usageEventFromResponse>[0]["usage"] }) : null,
     });
-    if (options?.onUsage) {
-      try {
-        await options.onUsage(usageEventFromResponse(response));
-      } catch (error) {
-        console.error("OpenAI usage persistence failed", error instanceof Error ? error.message : "unknown error");
-      }
-    }
     const parsed = pagePlanSchema.parse(JSON.parse(response.output_text));
     return { plan: normalizePagePlan(parsed), source: "ai" };
   } catch (error) {
+    if (error instanceof OpenAIUsageRecordingError) throw error;
     const message = error instanceof Error ? error.message : "unknown page plan error";
     console.error("Page plan 생성 실패, 결정적 조합기로 대체합니다", message);
     return { plan: composeFallbackPagePlan(input, input.seed), source: "fallback", error: message };

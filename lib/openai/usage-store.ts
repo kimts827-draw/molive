@@ -1,15 +1,18 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { OpenAIUsageEvent } from "@/lib/openai/usage";
+import type { OpenAIUsageActorType } from "@/lib/auth/roles";
 
 export const OPENAI_USAGE_TYPES = ["design_generation", "editor_ai", "preview_image"] as const;
 export type OpenAIUsageType = (typeof OPENAI_USAGE_TYPES)[number];
+export type { OpenAIUsageActorType } from "@/lib/auth/roles";
 
-export function createGenerationUsageRecorder(input: { generationId: string; userId: string; usageType: OpenAIUsageType; projectId?: string | null }) {
+export function createGenerationUsageRecorder(input: { generationId: string; userId: string; actorType: OpenAIUsageActorType; usageType: OpenAIUsageType; projectId?: string | null }) {
   return async (event: OpenAIUsageEvent) => {
     const { error } = await createAdminClient().from("openai_usage_events").insert({
       generation_id: input.generationId,
       user_id: input.userId,
+      actor_type: input.actorType,
       project_id: input.projectId ?? null,
       usage_type: input.usageType,
       model: event.model,
@@ -19,7 +22,13 @@ export function createGenerationUsageRecorder(input: { generationId: string; use
       output_tokens: event.outputTokens,
       request_count: event.requestCount,
       image_count: event.imageCount,
-      image_cost_usd: event.imageCostUsd,
+      text_input_tokens: event.textInputTokens,
+      cached_text_input_tokens: event.cachedTextInputTokens,
+      image_input_tokens: event.imageInputTokens,
+      cached_image_input_tokens: event.cachedImageInputTokens,
+      image_output_tokens: event.imageOutputTokens,
+      // Legacy DB column name; the value is a usage-token pricing estimate.
+      image_cost_usd: event.estimatedImageCostUsd,
       estimated_cost_usd: event.estimatedCostUsd,
       pricing_version: event.pricingVersion,
     });

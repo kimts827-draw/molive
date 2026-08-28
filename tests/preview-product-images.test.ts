@@ -91,8 +91,8 @@ test("사진 생성 사용량은 이미지 장수로 기록된다", () => {
   assert.equal(event.requestCount, 1);
   assert.equal(event.inputTokens, 120);
   assert.equal(event.outputTokens, 4096);
-  // 장당 단가는 환경 변수로만 들어오므로 기본값은 0입니다.
-  assert.equal(event.imageCostUsd, 0);
+  // Images API usage token과 중앙 단가표로 계산하므로 기본값도 0이 아닙니다.
+  assert.equal(event.estimatedImageCostUsd, 0.12348);
 });
 
 test("사진 생성은 검증을 통과한 draft에서만 실행되고 실패해도 생성을 깨지 않는다", async () => {

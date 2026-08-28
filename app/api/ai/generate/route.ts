@@ -5,6 +5,7 @@ import { createGeneratedImageStore } from "@/lib/assets/generated-asset-store";
 import { createImageProbe } from "@/lib/assets/image-probe";
 import { generateProjectSource } from "@/lib/openai/site-generator";
 import { attachGenerationUsageToProject, createGenerationUsageRecorder } from "@/lib/openai/usage-store";
+import { openAIUsageActorType } from "@/lib/auth/roles";
 import { createProjectWithVersion } from "@/lib/projects/service";
 import { hasSupabaseServerConfig, isSupabaseDemoMode, missingSupabaseServerEnv } from "@/lib/supabase/config";
 import { commitAiCredits, releaseAiCredits, reserveAiCredits } from "@/lib/credits/service";
@@ -31,8 +32,9 @@ export async function POST(request: Request) {
     try {
       if (hasSupabaseServerConfig()) creditReservation = await reserveAiCredits(user.id, "design_generation");
       const generationId = crypto.randomUUID();
-      const onUsage = hasSupabaseServerConfig() ? createGenerationUsageRecorder({ generationId, userId: user.id, usageType: "design_generation" }) : undefined;
-      const onPreviewImageUsage = hasSupabaseServerConfig() ? createGenerationUsageRecorder({ generationId, userId: user.id, usageType: "preview_image" }) : undefined;
+      const actorType = openAIUsageActorType("app_metadata" in user ? user.app_metadata as Record<string, unknown> : null);
+      const onUsage = hasSupabaseServerConfig() ? createGenerationUsageRecorder({ generationId, userId: user.id, actorType, usageType: "design_generation" }) : undefined;
+      const onPreviewImageUsage = hasSupabaseServerConfig() ? createGenerationUsageRecorder({ generationId, userId: user.id, actorType, usageType: "preview_image" }) : undefined;
       // Preview 상품 사진은 이번 이미지 세션 폴더에만 저장합니다. 첨부가 없으면 이번 생성 id가 세션이 됩니다.
       const previewImages = createGeneratedImageStore({ ownerId: user.id, sessionId: parsedInput.data.assetSessionId ?? generationId });
       const result = await generateProjectSource(parsedInput.data, { onUsage, onPreviewImageUsage, previewImageStore: previewImages.store, imageProbe: createImageProbe() });

@@ -23,6 +23,9 @@ export default async function AdminUsagePage() {
 
   const { summary, byFeature, recent } = await getAdminOpenAIUsage();
   const cards = [
+    ["전체 비용", money(summary.totalCostUsd)],
+    ["일반 사용자 비용", money(summary.customerCostUsd)],
+    ["관리자/테스트 비용", money(summary.adminCostUsd)],
     ["오늘 비용", money(summary.todayCostUsd)],
     ["이번 달 비용", money(summary.monthCostUsd)],
     ["총 생성 횟수", `${count(summary.totalGenerations)}회`],
@@ -42,7 +45,7 @@ export default async function AdminUsagePage() {
         </section>
         <section className="usage-recent">
           <div className="usage-section-title"><div><span>RECENT OPERATIONS</span><h2>최근 작업별 비용</h2></div><small>한국 시간 기준</small></div>
-          {recent.length === 0 ? <div className="projects-empty"><p>아직 기록된 OpenAI 사용량이 없습니다.</p></div> : <div className="usage-table-wrap"><table><thead><tr><th>작업 시각</th><th>기능</th><th>모델</th><th>요청</th><th>토큰</th><th>프로젝트</th><th>예상 비용</th></tr></thead><tbody>{recent.map((item) => <tr key={`${item.generationId}:${item.usageType}`}><td>{new Intl.DateTimeFormat("ko-KR", { dateStyle: "short", timeStyle: "short", timeZone: "Asia/Seoul" }).format(new Date(item.createdAt))}</td><td>{featureLabels[item.usageType]}</td><td>{item.model}</td><td>{count(item.requestCount)}회</td><td><span className="usage-token-detail">입력 {count(item.inputTokens)} · 캐시 {count(item.cachedInputTokens)} · 출력 {count(item.outputTokens)}{item.imageCount ? ` · 이미지 ${count(item.imageCount)}` : ""}</span></td><td>{item.projectId ? item.projectId.slice(0, 8) : "연결 전"}</td><td><strong>{money(item.estimatedCostUsd)}</strong></td></tr>)}</tbody></table></div>}
+          {recent.length === 0 ? <div className="projects-empty"><p>아직 기록된 OpenAI 사용량이 없습니다.</p></div> : <div className="usage-table-wrap"><table><thead><tr><th>작업 시각</th><th>구분</th><th>기능</th><th>모델</th><th>요청</th><th>토큰</th><th>프로젝트</th><th>예상 비용</th></tr></thead><tbody>{recent.map((item) => <tr key={`${item.generationId}:${item.usageType}:${item.actorType}`}><td>{new Intl.DateTimeFormat("ko-KR", { dateStyle: "short", timeStyle: "short", timeZone: "Asia/Seoul" }).format(new Date(item.createdAt))}</td><td>{item.actorType === "admin" ? "관리자/테스트" : "일반 사용자"}</td><td>{featureLabels[item.usageType]}</td><td>{item.model}</td><td>{count(item.requestCount)}회</td><td><span className="usage-token-detail">입력 {count(item.inputTokens)} · 캐시 {count(item.cachedInputTokens)} · 출력 {count(item.outputTokens)}{item.imageCount ? ` · 이미지 ${count(item.imageCount)}` : ""}</span></td><td>{item.projectId ? item.projectId.slice(0, 8) : "연결 전"}</td><td><strong>{money(item.estimatedCostUsd)}</strong></td></tr>)}</tbody></table></div>}
         </section>
       </section>
     </main>

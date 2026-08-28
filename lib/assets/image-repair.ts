@@ -52,6 +52,7 @@ export async function repairBrokenImages(input: {
       try {
         replacement = await input.regenerate({ url: check.url, label: check.label, index });
       } catch (error) {
+        if (error instanceof Error && error.name === "OpenAIUsageRecordingError") throw error;
         console.error("깨진 이미지 재생성 실패", error instanceof Error ? error.message : "unknown error");
         replacement = null;
       }
