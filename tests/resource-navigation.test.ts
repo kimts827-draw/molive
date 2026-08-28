@@ -8,9 +8,9 @@ const dropdown = await readFile(new URL("../components/resources/resource-dropdo
 const dropdownStyles = await readFile(new URL("../components/resources/resource-dropdown.module.css", import.meta.url), "utf8");
 const globalStyles = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
 
-test("Header는 가격·사용 방법을 유지하고 Desktop/Mobile 자료실 메뉴를 제공한다", () => {
+test("Header는 가격·사용 방법·문의를 유지하고 Desktop/Mobile 자료실 메뉴를 제공한다", () => {
   assert.match(landing, /<SiteHeader[^>]*priceHref="#price"/);
-  assert.match(siteHeader, /<Link href=\{priceHref\}>가격<\/Link><Link href="\/guide">사용 방법<\/Link><ResourceDropdown \/>/);
+  assert.match(siteHeader, /<Link href=\{priceHref\}>가격<\/Link><Link href="\/guide">사용 방법<\/Link><Link href="\/contact">문의<\/Link><ResourceDropdown \/>/);
   assert.match(siteHeader, /<ResourceDropdown mobile \/>/);
   for (const [title, description, href] of [
     ["공지사항", "MOLIVE 업데이트와 주요 안내", "/notice"],

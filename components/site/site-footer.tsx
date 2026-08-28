@@ -9,7 +9,7 @@ export function SiteFooter() {
   return <footer className={styles.footer}>
     <div className={styles.footerBrand}><Brand /><p>MOLIVE — AI Design Platform for Cafe24</p><strong>쇼핑몰을 만들고, 바꾸고, 계속 살아있게.</strong></div>
     <div className={styles.footerDetails}>
-      <nav className={styles.footerLinks} aria-label="Footer 메뉴"><Link href="/guide">사용 방법</Link><Link href="/pricing">가격</Link>{siteInfo.policies.map((policy) => <Link href={policy.href} key={policy.label}>{policy.label}</Link>)}</nav>
+      <nav className={styles.footerLinks} aria-label="Footer 메뉴"><Link href="/guide">사용 방법</Link><Link href="/pricing">가격</Link><Link href="/contact">문의하기</Link>{siteInfo.policies.map((policy) => <Link href={policy.href} key={policy.label}>{policy.label}</Link>)}</nav>
       <dl className={styles.businessInfo}>
         <div><dt>상호</dt><dd>{siteInfo.business.name}</dd></div>
         <div><dt>대표자</dt><dd>{siteInfo.business.representative}</dd></div>
