@@ -162,8 +162,8 @@ test("Header Inspector는 로고 두 방식·띠배너·크기 조절과 전체�
   for (const text of ["글자·아이콘 색상", "검정", "흰색", "텍스트 로고", "이미지 로고", "띠배너", "표시 높이", "글자 크기", "전체화면 보기", "Editor로 돌아가기"]) {
     assert.ok(editorSource.includes(text), text);
   }
-  assert.ok(editorSource.includes("headerContentColor={source.headerContentColor ?? \"dark\"}"));
-  assert.ok(editorSource.includes("commit({ ...current, headerContentColor"));
+  assert.ok(editorSource.includes("headerTextTone={source.headerTextTone ?? \"dark\"}"));
+  assert.ok(editorSource.includes("commit({ ...current, headerTextTone"));
   assert.ok(editorSource.includes('persistProjectAsset(optimized, "logo"'));
   assert.ok(editorCss.includes(".preview-fullscreen .editor-left-panel"));
   assert.ok(editorCss.includes(".canvas-viewport.viewport-desktop { width: 100%"));
@@ -181,13 +181,13 @@ test("Header Inspector는 조작 중 Preview만 갱신하고 종료 시 ProjectS
   assert.ok(editorSource.includes("thumbRatioOverride={source.commerce?.thumbRatioOverride}"));
 });
 
-test("텍스트 로고는 일반 텍스트 Inspector와 같은 typography 입력을 사용한다", () => {
+test("텍스트 로고는 typography 입력만 제공하고 색상은 Header tone을 상속한다", () => {
   for (const label of ["텍스트 로고 행간", "텍스트 로고 자간", "Extra Bold", "header-logo-letter-spacing", "header-logo-line-height"]) {
     assert.ok(editorSource.includes(label), label);
   }
   assert.ok(editorSource.includes('value={presentation.logo.fontFamily ?? "inherit"}'));
   assert.ok(editorSource.includes('value={String(presentation.logo.fontWeight ?? 800)}'));
-  assert.ok(editorSource.includes('nodeId="header-logo" property="color"'));
+  assert.equal(editorSource.includes('nodeId="header-logo" property="color"'), false);
   assert.equal(editorSource.includes("header-logo-translate"), false);
   assert.equal(editorSource.includes("header-logo-scale"), false);
 });

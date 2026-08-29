@@ -134,12 +134,27 @@ test("기존 ProjectSource serialization은 html/css/commerce/architecture를 �
 test("Header 로고·띠배너·글자 아이콘 색상 설정도 ProjectSource 저장·복구에서 손실되지 않는다", () => {
   const source: ProjectSource = {
     ...legacySource,
-    headerContentColor: "light",
+    headerTextTone: "light",
     headerPresentation: {
-      logo: { mode: "image", text: "Legacy Brand", imageUrl: "https://assets.example/logo.webp", imageHeight: 52, textSize: 30, fontFamily: "Georgia, serif", lineHeight: 1.2, letterSpacing: 3, fontWeight: 700, textColor: "#223344" },
+      logo: { mode: "image", text: "Legacy Brand", imageUrl: "https://assets.example/logo.webp", imageHeight: 52, textSize: 30, fontFamily: "Georgia, serif", lineHeight: 1.2, letterSpacing: 3, fontWeight: 700 },
       announcement: { visible: true, text: "무료 배송", href: "/event.html", backgroundColor: "#112233", textColor: "#ffffff", height: 40 },
     },
   };
+  assert.equal(isProjectSource(source), true);
+  assert.deepEqual(deserializeProjectDocument(serializeProjectDocument(source)), source);
+});
+
+test("과거 logoColor/textColor가 남은 ProjectSource도 오류 없이 저장·복구한다", () => {
+  const source = {
+    ...legacySource,
+    headerTextTone: "light",
+    logoColor: "#000000",
+    headerPresentation: {
+      logo: { mode: "text", text: "Legacy Brand", textColor: "#000000" },
+      announcement: { visible: false, text: "", backgroundColor: "#171713", textColor: "#ffffff", height: 36 },
+    },
+  } as unknown;
+
   assert.equal(isProjectSource(source), true);
   assert.deepEqual(deserializeProjectDocument(serializeProjectDocument(source)), source);
 });

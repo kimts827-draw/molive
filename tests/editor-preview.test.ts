@@ -2,13 +2,13 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { renderProject } from "../lib/component-library/index.ts";
-import { commerceCss, composeCommerce, isolateAiDesignCss, renderProjectHeaderV1, resolveLegacyComposition, verifiedProductLayoutCss } from "../lib/commerce/fixed-components.ts";
+import { commerceCss, composeCommerce, headerTextToneCss, isolateAiDesignCss, renderProjectHeaderV1, resolveLegacyComposition, verifiedProductLayoutCss } from "../lib/commerce/fixed-components.ts";
 import { FOOTER_SHELL_CSS, renderFooterShell } from "../lib/commerce/footer-shell.ts";
 import { buildBridgeCss, buildFooterThemeCss } from "../lib/cafe24/theme-bridge.ts";
 import { buildEditorPreviewDocument } from "../lib/editor/preview-document.ts";
 import { OVERFLOW_CLIP_CSS } from "../lib/editor/responsive-style.ts";
 import { projectSpecV1Schema, type ProjectSpecV1 } from "../lib/project-document.ts";
-import type { ProjectSource } from "../lib/project-source.ts";
+import { isProjectSource, type ProjectSource } from "../lib/project-source.ts";
 
 const fixtureUrl = (name: string) => new URL(`./fixtures/${name}`, import.meta.url);
 const spec = projectSpecV1Schema.parse(JSON.parse(await readFile(fixtureUrl("project-spec-v1-renderer.json"), "utf8")) as unknown);
@@ -117,7 +117,8 @@ test("Header 임시 설정도 srcDoc 재생성 없이 iframe Header에만 반영
   assert.ok(editorCanvasSource.includes("logoText.style.fontWeight"));
   assert.ok(editorCanvasSource.includes("logoText.style.lineHeight"));
   assert.ok(editorCanvasSource.includes("logoText.style.letterSpacing"));
-  assert.ok(editorCanvasSource.includes("logoText.style.color"));
+  assert.ok(editorCanvasSource.includes('logoText.style.removeProperty("color")'));
+  assert.equal(editorCanvasSource.includes("logoText.style.color"), false);
   assert.ok(editorCanvasSource.includes("[isComponentSpec, previewHeaderPresentation, viewport]"));
 });
 
@@ -167,7 +168,7 @@ test("Legacy ProjectSource Preview 출력은 기존 HTML/CSS 직접 렌더링을
   const verifiedProductCss = verifiedProductLayoutCss(composition.productLayout);
   const rootValue = "moire-legacy-preview";
   const shell = `<div id="wrap" data-moire-root="${rootValue}">${renderProjectHeaderV1("preview", legacySource)}<div id="container"><main id="contents" role="main" data-moire-full="true">${legacyCommerce.html}</main></div>${renderFooterShell("preview")}</div>`;
-  const css = `${buildBridgeCss(legacySource.css)}\n${isolateAiDesignCss(legacySource.css)}\n${commerceCss(legacySource.commerce, composition.headerVariant)}[module="Layout_stateLogon"]{display:none}\n${verifiedProductCss}\n${FOOTER_SHELL_CSS}\n${buildFooterThemeCss(legacySource.css)}`;
+  const css = `${buildBridgeCss(legacySource.css)}\n${isolateAiDesignCss(legacySource.css)}\n${commerceCss(legacySource.commerce, composition.headerVariant)}\n${headerTextToneCss("dark")}[module="Layout_stateLogon"]{display:none}\n${verifiedProductCss}\n${FOOTER_SHELL_CSS}\n${buildFooterThemeCss(legacySource.css)}`;
 
   assert.equal(preview.kind, "legacy");
   assert.equal(preview.bundle, undefined);
@@ -178,4 +179,25 @@ test("Legacy ProjectSource Preview 출력은 기존 HTML/CSS 직접 렌더링을
   assert.equal((preview.srcDoc.match(/<footer id="footer">/g) ?? []).length, 1);
   assert.equal(preview.srcDoc.includes("pocGrid"), false);
   assert.deepEqual(legacySource, sourceBefore, "Legacy Editor source를 변경하지 않는다");
+});
+
+test("Legacy Preview는 저장된 logoColor/textColor를 무시하고 Header text tone을 상속한다", () => {
+  const source = {
+    ...legacySource,
+    headerTextTone: "light" as const,
+    logoColor: "#000000",
+    headerPresentation: {
+      logo: { mode: "text" as const, text: "TONE QA", textColor: "#000000" },
+      announcement: { visible: false, text: "", backgroundColor: "#171713", textColor: "#ffffff", height: 36 },
+    },
+  } as unknown as ProjectSource;
+  const restored = JSON.parse(JSON.stringify(source)) as unknown;
+
+  if (!isProjectSource(restored)) assert.fail("레거시 로고색 필드가 남은 프로젝트를 열 수 있어야 한다");
+  const preview = buildEditorPreviewDocument(restored);
+  const logoRules = [...preview.srcDoc.matchAll(/\.pocHeader__logoText\{[^}]*\}/g)].map((match) => match[0]);
+
+  assert.match(preview.srcDoc, /#header\.pocHeader \.pocHeader__inner\{color:#ffffff\}/);
+  assert.ok(logoRules.length >= 2);
+  assert.ok(logoRules.every((rule) => !/color:/.test(rule)), logoRules.join("\n"));
 });

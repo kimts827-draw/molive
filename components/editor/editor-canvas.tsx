@@ -300,7 +300,7 @@ export function EditorCanvas({ source, selection, previewStylePatch = null, prev
       logoText.style.fontWeight = String(previewHeaderPresentation.logo.fontWeight ?? 800);
       logoText.style.lineHeight = String(previewHeaderPresentation.logo.lineHeight ?? 1);
       logoText.style.letterSpacing = `${previewHeaderPresentation.logo.letterSpacing ?? 2}px`;
-      logoText.style.color = previewHeaderPresentation.logo.textColor ?? "inherit";
+      logoText.style.removeProperty("color");
     }
     if (logoImage) logoImage.style.height = `${viewport === "mobile" ? Math.min(imageHeight, 32) : viewport === "tablet" ? Math.min(imageHeight, 51.2) : imageHeight}px`;
     if (announcement) {

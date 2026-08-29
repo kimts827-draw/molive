@@ -153,7 +153,6 @@ export function resolveHeaderPresentation(value?: Partial<ProjectHeaderPresentat
       lineHeight: Math.min(2, Math.max(0.7, value?.logo?.lineHeight ?? DEFAULT_HEADER_PRESENTATION.logo.lineHeight ?? 1)),
       letterSpacing: Math.min(30, Math.max(-10, value?.logo?.letterSpacing ?? DEFAULT_HEADER_PRESENTATION.logo.letterSpacing ?? 2)),
       fontWeight: [300, 400, 500, 600, 700, 800, 900].includes(value?.logo?.fontWeight ?? 800) ? value?.logo?.fontWeight ?? 800 : 800,
-      textColor: value?.logo?.textColor ? safeHeaderColor(value.logo.textColor, "#171713") : undefined,
     },
     announcement: {
       visible: value?.announcement?.visible ?? false,
@@ -197,19 +196,19 @@ export function renderProjectHeaderV1(mode: RenderMode, project: { brandName?: s
   return renderHeaderV1(mode, composition.headerVariant, project.brandName?.trim() || project.name, project.headerPresentation);
 }
 
-export function headerContentColorCss(value: "dark" | "light") {
-  return `/* Moiré Header content color (logo excluded) */
-#header.pocHeader .pocHeader__inner > :not(.pocHeader__logo){color:${value === "light" ? "#ffffff" : "#171713"}}
-#header.pocHeader .pocHeader__inner > :not(.pocHeader__logo) svg{color:inherit}
+export function headerTextToneCss(value: "dark" | "light") {
+  return `/* Moiré Header text / icon tone */
+#header.pocHeader .pocHeader__inner{color:${value === "light" ? "#ffffff" : "#171713"}}
+#header.pocHeader .pocHeader__inner svg{color:inherit}
 `;
 }
 
 export function headerPresentationCss(value?: Partial<ProjectHeaderPresentation>) {
   const presentation = resolveHeaderPresentation(value);
-  const { textSize, imageHeight, fontFamily, lineHeight, letterSpacing, fontWeight, textColor } = presentation.logo;
+  const { textSize, imageHeight, fontFamily, lineHeight, letterSpacing, fontWeight } = presentation.logo;
   const announcement = presentation.announcement;
   return `/* Moiré Header logo / Announcement presentation */
-.pocHeader__logoText{font-family:${fontFamily};font-size:${textSize}px;font-weight:${fontWeight};line-height:${lineHeight};letter-spacing:${letterSpacing}px;color:${textColor ?? "inherit"}}
+.pocHeader__logoText{font-family:${fontFamily};font-size:${textSize}px;font-weight:${fontWeight};line-height:${lineHeight};letter-spacing:${letterSpacing}px}
 .pocHeader__logo img.pocHeader__logoImage{display:block;width:auto;height:${imageHeight}px;max-width:min(360px,34vw);object-fit:contain}
 .moireAnnouncementBar{position:relative;z-index:31;box-sizing:border-box;display:flex;align-items:center;justify-content:center;min-height:${announcement.height}px;padding:4px 24px;background:${announcement.backgroundColor};color:${announcement.textColor};font:600 13px/1.35 system-ui,-apple-system,'Apple SD Gothic Neo','Malgun Gothic',sans-serif;text-align:center}
 .moireAnnouncementBar a,.moireAnnouncementBar span{color:inherit;text-decoration:none}

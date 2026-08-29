@@ -1,4 +1,4 @@
-import { commerceCss, composeCommerce, headerContentColorCss, headerPresentationCss, isolateAiDesignCss, renderProjectHeaderV1, resolveLegacyComposition, verifiedProductLayoutCss } from "../commerce/fixed-components.ts";
+import { commerceCss, composeCommerce, headerPresentationCss, headerTextToneCss, isolateAiDesignCss, renderProjectHeaderV1, resolveLegacyComposition, verifiedProductLayoutCss } from "../commerce/fixed-components.ts";
 import { FOOTER_SHELL_CSS, renderFooterShell } from "../commerce/footer-shell.ts";
 import { buildBridgeCss, buildFooterThemeCss } from "../cafe24/theme-bridge.ts";
 import { renderProject, type RenderBundle } from "../component-library/index.ts";
@@ -56,7 +56,7 @@ export function buildEditorPreviewDocument(document: ProjectDocument): EditorPre
       ?? `moire-${document.id.replace(/[^a-z0-9-]/gi, "").slice(0, 24)}`;
     const canvas = composeCommerce(document.html, "preview", document.commerce, composition, { includeHeader: false, previewProducts: document.previewProducts }).html;
     body = `<div id="wrap" data-moire-root="${rootValue}">${renderProjectHeaderV1("preview", document)}<div id="container"><main id="contents" role="main" data-moire-full="true">${canvas}</main></div>${renderFooterShell("preview")}</div>`;
-    commerce = `${commerceCss(document.commerce, composition.headerVariant)}${document.headerPresentation ? `\n${headerPresentationCss(document.headerPresentation)}` : ""}${document.headerContentColor ? `\n${headerContentColorCss(document.headerContentColor)}` : ""}`;
+    commerce = `${commerceCss(document.commerce, composition.headerVariant)}\n${headerTextToneCss(document.headerTextTone ?? "dark")}${document.headerPresentation ? `\n${headerPresentationCss(document.headerPresentation)}` : ""}`;
   } catch (error) {
     body = `<pre style="margin:0;padding:24px;font:13px/1.6 ui-monospace,monospace;color:#a0392e;white-space:pre-wrap">고정 커머스 컴포넌트를 넣지 못했습니다.\n${error instanceof Error ? error.message : String(error)}</pre>`;
   }

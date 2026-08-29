@@ -5,7 +5,7 @@ import { structuralFingerprint } from "../lib/component-library/fingerprint.ts";
 import { PRODUCT_SECTION_V1_CSS, renderProductSectionV1 } from "../lib/component-library/components/product-section-v1.ts";
 import { buildBridgeCss } from "../lib/cafe24/theme-bridge.ts";
 import { CAFE24_FOOTER_HTML, extractFooterShell, FOOTER_SHELL_CSS, renderFooterShell, replaceFooterShell } from "../lib/commerce/footer-shell.ts";
-import { commerceCss, headerContentColorCss, headerPresentationCss, renderHeaderV1, renderProjectHeaderV1 } from "../lib/commerce/fixed-components.ts";
+import { commerceCss, headerPresentationCss, headerTextToneCss, renderHeaderV1, renderProjectHeaderV1 } from "../lib/commerce/fixed-components.ts";
 
 test("Header Preview는 Cafe24 template의 variable 값만 mock하고 DOM/class를 공유한다", () => {
   const preview = renderHeaderV1("preview", "centered-brand", "MAISON DEUX");
@@ -64,32 +64,35 @@ test("편집한 이미지 로고와 띠배너는 Preview와 Cafe24 ZIP Header에
 
 test("텍스트 로고 typography는 Preview와 Cafe24 ZIP의 공통 CSS로 렌더된다", () => {
   const presentation = {
-    logo: { mode: "text" as const, text: "TYPE QA", textSize: 42, imageHeight: 38, fontFamily: "Georgia, serif", lineHeight: 1.25, letterSpacing: 4.5, fontWeight: 600, textColor: "#334455" },
+    logo: { mode: "text" as const, text: "TYPE QA", textSize: 42, imageHeight: 38, fontFamily: "Georgia, serif", lineHeight: 1.25, letterSpacing: 4.5, fontWeight: 600 },
     announcement: { visible: false, text: "", href: "", backgroundColor: "#171713", textColor: "#ffffff", height: 36 },
   };
   const project = { name: "TYPE QA", architecture: { header: "centered-brand", productPresentation: "grid-four" }, headerPresentation: presentation };
   assert.equal(structuralFingerprint(renderProjectHeaderV1("preview", project)), structuralFingerprint(renderProjectHeaderV1("cafe24", project)));
   assert.match(renderProjectHeaderV1("cafe24", project), /<span class="pocHeader__logoText">TYPE QA<\/span>/);
   const css = headerPresentationCss(presentation);
-  for (const declaration of ["font-family:Georgia, serif", "font-size:42px", "font-weight:600", "line-height:1.25", "letter-spacing:4.5px", "color:#334455"]) {
+  for (const declaration of ["font-family:Georgia, serif", "font-size:42px", "font-weight:600", "line-height:1.25", "letter-spacing:4.5px"]) {
     assert.ok(css.includes(declaration), declaration);
   }
+  assert.doesNotMatch(css.match(/\.pocHeader__logoText\{[^}]*\}/)?.[0] ?? "", /color:/);
 });
 
 test("Header 글자·아이콘 색상은 로고와 DOM·레이아웃을 바꾸지 않고 검정·흰색만 지원한다", () => {
   const dark = {
-    logo: { mode: "text" as const, text: "COLOR QA", textColor: "#334455" },
+    logo: { mode: "text" as const, text: "COLOR QA" },
     announcement: { visible: false, text: "", backgroundColor: "#171713", textColor: "#ffffff", height: 36 },
   };
 
   for (const variant of ["split-utility", "centered-brand", "overlay-minimal"] as const) {
     assert.equal(structuralFingerprint(renderHeaderV1("preview", variant, "COLOR QA", dark)), structuralFingerprint(renderHeaderV1("cafe24", variant, "COLOR QA", dark)));
   }
-  assert.match(headerContentColorCss("dark"), /> :not\(\.pocHeader__logo\)\{color:#171713\}/);
-  assert.match(headerContentColorCss("light"), /> :not\(\.pocHeader__logo\)\{color:#ffffff\}/);
-  assert.match(headerContentColorCss("light"), /> :not\(\.pocHeader__logo\) svg\{color:inherit\}/);
-  assert.doesNotMatch(headerContentColorCss("light"), /logoText|position|grid|flex|margin|padding|width|height/);
-  assert.match(headerPresentationCss(dark), /\.pocHeader__logoText\{[^}]*color:#334455\}/);
+  assert.match(headerTextToneCss("dark"), /\.pocHeader__inner\{color:#171713\}/);
+  assert.match(headerTextToneCss("light"), /\.pocHeader__inner\{color:#ffffff\}/);
+  assert.match(headerTextToneCss("light"), /\.pocHeader__inner svg\{color:inherit\}/);
+  assert.doesNotMatch(headerTextToneCss("light"), /logoText|position|grid|flex|margin|padding|width|height|filter|fill|stroke/);
+  assert.doesNotMatch(headerPresentationCss(dark).match(/\.pocHeader__logoText\{[^}]*\}/)?.[0] ?? "", /color:/);
+  const legacyLogoColor = { ...dark, logo: { ...dark.logo, textColor: "#000000" } };
+  assert.doesNotMatch(headerPresentationCss(legacyLogoColor).match(/\.pocHeader__logoText\{[^}]*\}/)?.[0] ?? "", /color:/);
 });
 
 test("Product Preview는 Cafe24 card template을 4개 mock 반복하고 Guide 이미지 selector를 쓴다", () => {
