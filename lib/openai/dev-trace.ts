@@ -12,6 +12,10 @@ export type GenerationTrace = {
   validator?: unknown;
   previewProductImages?: unknown;
   generalImageVerification?: unknown;
+  /** plan 축을 어떤 근거로 DOM에 이었는지. fallback 의존도를 관측합니다. */
+  planAttributeMapping?: unknown;
+  /** 브랜드 색이 실제로 어디에 얼마나 쓰였는지. 검증이 아니라 관측 지표입니다. */
+  brandColorUsage?: unknown;
   error?: string;
 };
 

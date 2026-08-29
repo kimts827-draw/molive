@@ -1,5 +1,8 @@
 import { commerceCss, composeCommerce, headerPresentationCss, headerTextToneCss, isolateAiDesignCss, renderProjectHeaderV1, resolveLegacyComposition, verifiedProductLayoutCss } from "../commerce/fixed-components.ts";
 import { FOOTER_SHELL_CSS, renderFooterShell } from "../commerce/footer-shell.ts";
+import { brandThemeCss, footerBrandBackground, resolveProjectPalette } from "../commerce/brand-theme.ts";
+import { planLayoutCss } from "../design-library/plan-layout-css.ts";
+import { projectPagePlan } from "../project-source.ts";
 import { buildBridgeCss, buildFooterThemeCss } from "../cafe24/theme-bridge.ts";
 import { renderProject, type RenderBundle } from "../component-library/index.ts";
 import type { ProjectDocument } from "../project-document.ts";
@@ -51,6 +54,11 @@ export function buildEditorPreviewDocument(document: ProjectDocument): EditorPre
   let body: string;
   let commerce = "";
   const composition = resolveLegacyComposition(document.architecture);
+  // 브랜드 색 변수는 AI CSS 뒤에 실어, AI가 색을 무시해도 코드가 선언한 값이 남게 합니다.
+  const palette = resolveProjectPalette(document);
+  const brandTheme = brandThemeCss(palette, { radius: document.commerce?.radius });
+  // plan이 정한 tone/축을 코드가 직접 소비합니다. AI가 무시해도 화면에 남습니다.
+  const planLayout = planLayoutCss(projectPagePlan(document));
   try {
     const rootValue = document.html.match(/data-moire-root="([^"]+)"/)?.[1]
       ?? `moire-${document.id.replace(/[^a-z0-9-]/gi, "").slice(0, 24)}`;
@@ -62,6 +70,6 @@ export function buildEditorPreviewDocument(document: ProjectDocument): EditorPre
   }
   return {
     kind: "legacy",
-    srcDoc: htmlDocument(body, `${buildBridgeCss(document.css)}\n${isolateAiDesignCss(document.css)}\n${commerce}[module="Layout_stateLogon"]{display:none}\n${verifiedProductLayoutCss(composition.productLayout, document.commerce?.thumbRatioOverride)}\n${FOOTER_SHELL_CSS}\n${buildFooterThemeCss(document.css)}`),
+    srcDoc: htmlDocument(body, `${buildBridgeCss(document.css)}\n${isolateAiDesignCss(document.css)}\n${commerce}[module="Layout_stateLogon"]{display:none}\n${verifiedProductLayoutCss(composition.productLayout, document.commerce?.thumbRatioOverride)}\n${FOOTER_SHELL_CSS}\n${buildFooterThemeCss(document.css, footerBrandBackground(palette))}\n${brandTheme}\n${planLayout}`),
   };
 }

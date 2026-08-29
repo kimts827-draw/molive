@@ -5,6 +5,7 @@ import { ensureEditingMetadata, validateNodePatch, validateProjectSource } from 
 import { buildDesignGenerationUserPrompt, validateGeneratedDesignContract, type DesignGenerationInput } from "@/lib/openai/design-generation-contract";
 import { generatePagePlan } from "@/lib/openai/page-plan-generator";
 import { pagePlanSectionRefs, pagePlanSignature, renderPagePlanEditContext, type PagePlan } from "@/lib/design-library/page-plan";
+import { applyPagePlanAttributes } from "@/lib/design-library/plan-attributes";
 import { HERO_VARIANT_IDS } from "@/lib/design-library/variants";
 import { auditAssetReferenceTokens, auditGeneratedAssets, collectAssetReferences, createAssetAllowlist, isFreshlyCreatedImage } from "@/lib/assets/asset-policy";
 import { resolvePreviewProducts, type PreviewProductMock } from "@/lib/component-library/preview-mock";
@@ -139,7 +140,10 @@ REFERENCE-DERIVED DESIGN GRAMMAR
 - Hero must follow the composition's hero variant. The library spans a committed full-bleed composition, a purposeful split-editorial composition, a banner-stack board, a typographic-marquee statement, a cinematic-still, and a product-forward compact banner; build the one the plan names to its structural spec. Vary crop, focal point, text anchoring, layering, and vertical rhythm instead of merely swapping colours.
 - The product surroundings may feel commerce-forward and dense or editorial and spacious, but ProductSectionV1 itself remains untouched.
 - Brand Story should use split-media or a strong editorial composition, not another generic card row.
-- Every body section carries its own alignment, media position, density and tone axis. Honour them: two sections of the same registry type in one page must not look alike, and adjacent sections must not share a background tone.
+- Every body section carries its own alignment, media position, density, tone, container, columns and surface axis. Honour them: two sections of the same registry type in one page must not look alike, and adjacent sections must not share a background tone.
+- The container axis decides how wide a section is: boxed stays inside a 1200px measure, wide opens to 1560px, full-bleed runs edge to edge with no side padding, asymmetric leaves a large left margin and pushes content right. A page whose every section is the same width is the failure this axis exists to prevent.
+- Code declares --molive-columns on each section from the columns axis. Write grid-template-columns: repeat(var(--molive-columns), 1fr) instead of hard-coding a count, so the grid follows the plan.
+- Code also declares the brand palette as --molive-brand, --molive-brand-strong, --molive-brand-tint, --molive-brand-soft and --molive-brand-on on the page root, and paints any section the plan marked as accent tone. Reach for those variables instead of literal hex values, and give the brand colour real area — a band background, a filled CTA, a card ground — not just a hairline or an icon.
 - Avoid a page whose hero is polished but everything below becomes repeated equal cards. Alternate composition, scale, image/text relationships, and background rhythm while keeping one coherent design language.
 - Before writing HTML, commit to headerVariant, heroComposition, productLayout, section order/selection, typography scale, image treatment, spacing/density, and content composition. Do not return vague labels such as modern, premium, or clean by themselves.
 - Encode the deterministic choices in the existing architecture object exactly: header = split-utility | centered-brand | overlay-minimal, hero = the composition's hero variant id (full-bleed | split-editorial | banner-stack | typographic-marquee | cinematic-still | product-forward), productPresentation = the composition's presentation id (grid-four | large-grid | editorial-two | featured-grid | compact-five). architecture.sections must record the composition's sections in order as "type/variant — 헤딩".
@@ -342,8 +346,19 @@ export async function generateProjectSource(input: DesignGenerationInput, option
       });
       const assetTokenViolations = auditAssetReferenceTokens({ html: parsed.html, css: parsed.css }, input.assetUrls?.length ?? 0);
       const rawHtml = resolveAssetReferences(parsed.html, input.assetUrls ?? []);
-      const html = ensureEditingMetadata(rawHtml, `moire-${projectId.slice(0, 8)}`);
+      /**
+       * plan이 정한 축을 코드가 section 요소에 새겨 넣습니다.
+       * AI에게 속성을 붙이라고 지시하고 검사하는 대신 후처리로 확정하므로 재시도가 늘지 않습니다.
+       */
+      const attributed = applyPagePlanAttributes(ensureEditingMetadata(rawHtml, `moire-${projectId.slice(0, 8)}`), plan);
+      const html = attributed.html;
       const css = resolveAssetReferences(parsed.css, input.assetUrls ?? []);
+      /**
+       * 브랜드 색은 AI 응답을 심판하지 않고 코드가 확정합니다.
+       * plan.palette가 진실이고, commerce.accent는 그 값을 그대로 따라갑니다.
+       * 불일치를 위반으로 잡아 재생성시키면 생성 1건당 비용과 시간이 그대로 늘어납니다.
+       */
+      const commerce = plan.palette ? { ...parsed.commerce, accent: plan.palette.brandColor } : parsed.commerce;
       const source: ProjectSource = {
         id: projectId,
         brandName: input.brandName?.trim() || parsed.brandName,
@@ -351,7 +366,7 @@ export async function generateProjectSource(input: DesignGenerationInput, option
         html,
         css,
         architecture: parsed.architecture,
-        commerce: parsed.commerce,
+        commerce,
         previewProducts,
         pagePlan: plan,
         updatedAt: new Date().toISOString(),
@@ -371,7 +386,7 @@ export async function generateProjectSource(input: DesignGenerationInput, option
         // 검증은 AI가 기록한 값을 그대로 심판하고, 저장본만 기계가 읽을 수 있는 형태로 맞춥니다.
         source.architecture = { ...source.architecture, sections: pagePlanSectionRefs(plan) };
         // 이미지 프롬프트에는 내부 업종 키가 아니라 plan이 확정한 업종 라벨과 판매 상품군이 들어갑니다.
-        const imageBrief = { industry: plan.industryLabel, brief: input.prompt, brandName: source.brandName, productCategory: plan.productCategory, productExamples: plan.productExamples, palette: { surface: parsed.commerce.surface, accent: parsed.commerce.accent, thumbBackground: parsed.commerce.thumbBackground } };
+        const imageBrief = { industry: plan.industryLabel, brief: input.prompt, brandName: source.brandName, productCategory: plan.productCategory, productExamples: plan.productExamples, palette: { surface: commerce.surface, accent: commerce.accent, thumbBackground: commerce.thumbBackground } };
         // 검증을 통과한 draft에만 Preview 사진을 만듭니다. 실패한 자리는 SVG 자리표시자를 유지합니다.
         source.previewProducts = await addGeneratedPreviewPhotos({
           products: previewProducts,
@@ -393,6 +408,13 @@ export async function generateProjectSource(input: DesignGenerationInput, option
           source.html = imageReport.repair.html;
           source.css = imageReport.repair.css;
         }
+        trace.planAttributeMapping = attributed.mapping;
+        trace.brandColorUsage = {
+          brandColor: plan.palette?.brandColor ?? null,
+          colorStrategy: plan.palette?.colorStrategy ?? null,
+          accentSections: plan.sections.filter((section) => section.tone === "accent").map((section) => section.id),
+          declaredInAiCss: plan.palette ? (css.toLowerCase().split(plan.palette.brandColor.toLowerCase()).length - 1) : 0,
+        };
         trace.generated = source;
         trace.validator = validator;
         trace.previewProductImages = source.previewProducts.map((product) => ({ name: product.name, kind: previewImageKind(product.image, input.assetUrls ?? []) }));
@@ -400,7 +422,7 @@ export async function generateProjectSource(input: DesignGenerationInput, option
           ? { checks: imageReport.checks, repaired: imageReport.repair?.actions ?? [], unverified: imageReport.repair?.unverified ?? imageReport.checks.filter((check) => check.verdict === "unverified").map((check) => check.url) }
           : null;
         await writeGenerationTrace(trace);
-        return { source, rationale: parsed.designRationale, traceId, validator, pagePlan: plan, planAudit, imageReport: imageReport ? { repaired: imageReport.repair?.actions.length ?? 0, unverified: imageReport.repair?.unverified.length ?? 0 } : null };
+        return { source, rationale: parsed.designRationale, traceId, validator, pagePlan: plan, planAudit: { ...planAudit, attributeMapping: attributed.mapping, brandColor: plan.palette?.brandColor ?? null, colorStrategy: plan.palette?.colorStrategy ?? null }, imageReport: imageReport ? { repaired: imageReport.repair?.actions.length ?? 0, unverified: imageReport.repair?.unverified.length ?? 0 } : null };
       }
       previousIssues = validator.violations.map((item) => `${item.code}: ${item.message}${item.token ? ` (${item.token})` : ""}`).slice(0, 24);
     }

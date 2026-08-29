@@ -41,7 +41,8 @@ export async function generatePagePlan(input: PagePlanInput, options?: { onUsage
       usageFromError: (usage) => usage ? usageEventFromResponse({ model: requestedModel, usage: usage as Parameters<typeof usageEventFromResponse>[0]["usage"] }) : null,
     });
     const parsed = pagePlanSchema.parse(JSON.parse(response.output_text));
-    return { plan: normalizePagePlan(parsed), source: "ai" };
+    // 사용자가 고른 hex는 AI 응답을 심판하지 않고 코드가 그대로 확정합니다(재시도 없음).
+    return { plan: normalizePagePlan(parsed, { brandColor: (input.colors ?? [])[0], brief: input.prompt }), source: "ai" };
   } catch (error) {
     if (error instanceof OpenAIUsageRecordingError) throw error;
     const message = error instanceof Error ? error.message : "unknown page plan error";

@@ -30,6 +30,7 @@ import {
   type SectionTypeId,
 } from "./section-registry.ts";
 import type { DensityId } from "./variants.ts";
+import { COLOR_STRATEGIES, parseHex, toHex, type BrandPalette, type ColorStrategy, type SurfaceFamily } from "../commerce/brand-theme.ts";
 
 /** 시드 고정 시 같은 plan이 나오는 결정적 RNG(mulberry32)입니다. */
 function mulberry32(seed: number) {
@@ -132,6 +133,21 @@ function alignmentFor(typeId: SectionTypeId, random: () => number): SectionAlign
 export type PlanCompositionInput = { prompt: string; brandName?: string; colors?: string[] };
 
 /**
+ * 대비 경로의 색 전략입니다. 사용자가 hex를 넣었을 때만 palette가 생기며,
+ * 전략은 시드로 고르되 monochrome은 제외해 색이 사라지지 않게 합니다.
+ * (사용자가 명시적으로 무채색을 요구한 경우는 normalizePagePlan이 따로 통과시킵니다.)
+ */
+const FALLBACK_STRATEGIES = COLOR_STRATEGIES.filter((strategy) => strategy !== "monochrome") as ColorStrategy[];
+
+function composePalette(colors: string[] | undefined, random: () => number): BrandPalette | undefined {
+  const rgb = (colors ?? []).map(parseHex).find((value) => value !== null);
+  if (!rgb) return undefined;
+  const colorStrategy = choose(FALLBACK_STRATEGIES, random);
+  const surfaceFamily = choose((colorStrategy === "dominant" ? ["tinted", "dark"] : ["white", "warm", "cool", "tinted"]) as SurfaceFamily[], random);
+  return { brandColor: toHex(rgb), colorStrategy, surfaceFamily };
+}
+
+/**
  * 업종 가중치와 시드로 Page Plan을 조합합니다.
  * 같은 시드는 같은 plan을, 다른 브리프는 다른 구조를 냅니다.
  */
@@ -175,6 +191,10 @@ export function composeFallbackPagePlan(input: PlanCompositionInput, seed?: numb
       mediaPosition: mediaPositionFor(typeId, order, random),
       density: definition.axes.density ? shiftDensity(baseDensity, Math.floor(random() * 3) - 1) : "regular",
       tone: definition.axes.tone ? toneCycle[order % toneCycle.length] : "light",
+      // geometry 축도 시드로 고릅니다. normalizeSection이 타입별 허용 조합으로 다시 눌러 줍니다.
+      container: definition.geometry?.containers?.length ? choose(definition.geometry.containers, random) : undefined,
+      columns: definition.geometry?.columns?.length ? choose(definition.geometry.columns, random) : undefined,
+      surfaceStyle: definition.geometry?.surfaces?.length ? choose(definition.geometry.surfaces, random) : undefined,
       intent: definition.purpose,
       headline: HEADLINE_DRAFTS[typeId],
     };
@@ -199,6 +219,7 @@ export function composeFallbackPagePlan(input: PlanCompositionInput, seed?: numb
       tone: toneCycle[0] === "dark" ? "dark" : choose(["light", "dark"] as SectionTone[], random),
       headline: "",
     },
+    palette: composePalette(input.colors, random),
     productPresentation,
     footerMood,
     typeScale,
@@ -207,5 +228,5 @@ export function composeFallbackPagePlan(input: PlanCompositionInput, seed?: numb
     rationale: `AI page planner 응답을 쓰지 못해 ${profile.label} 가중치와 브리프 시드(${resolvedSeed})로 구성했습니다.`,
   };
 
-  return normalizePagePlan(plan);
+  return normalizePagePlan(plan, { brandColor: (input.colors ?? [])[0], brief });
 }

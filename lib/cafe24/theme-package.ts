@@ -8,6 +8,8 @@ import { buildComponentSpecThemeEntries } from "@/lib/cafe24/component-spec-them
 import { assetFileName, rewriteAssetUrls, THEME_ASSET_DIR } from "@/lib/cafe24/theme-assets";
 import { buildBridgeCss, buildFooterThemeCss, resolveFooterInk } from "@/lib/cafe24/theme-bridge";
 import { commerceCss, composeCommerce, headerPresentationCss, headerTextToneCss, isolateAiDesignCss, renderProjectHeaderV1, resolveLegacyComposition, verifiedProductLayoutCss } from "@/lib/commerce/fixed-components";
+import { brandThemeCss, footerBrandBackground, resolveProjectPalette } from "@/lib/commerce/brand-theme";
+import { planLayoutCss } from "@/lib/design-library/plan-layout-css";
 import { replaceFooterShell } from "@/lib/commerce/footer-shell";
 import {
   BASE_INDEX_PATH,
@@ -92,7 +94,8 @@ function buildLegacyThemeEntries(base: Map<string, Buffer>, source: ProjectSourc
   const rawThemeCss = rewriteAssetUrls(source.css, mapping);
   const composition = resolveLegacyComposition(source.architecture);
   const themeCss = isolateAiDesignCss(rawThemeCss);
-  const protectedCss = `${commerceCss(source.commerce, composition.headerVariant)}\n${headerTextToneCss(source.headerTextTone ?? "dark")}${source.headerPresentation ? `\n${headerPresentationCss(source.headerPresentation)}` : ""}\n${verifiedProductLayoutCss(composition.productLayout, source.commerce?.thumbRatioOverride)}\n${buildFooterThemeCss(rawThemeCss)}`;
+  const palette = resolveProjectPalette(source);
+  const protectedCss = `${commerceCss(source.commerce, composition.headerVariant)}\n${headerTextToneCss(source.headerTextTone ?? "dark")}${source.headerPresentation ? `\n${headerPresentationCss(source.headerPresentation)}` : ""}\n${verifiedProductLayoutCss(composition.productLayout, source.commerce?.thumbRatioOverride)}\n${buildFooterThemeCss(rawThemeCss, footerBrandBackground(palette))}\n${brandThemeCss(palette, { radius: source.commerce?.radius })}\n${planLayoutCss(source.pagePlan)}`;
 
   // 고정 커머스 컴포넌트를 씁니다. 상품 슬롯이 없으면 Guide module로 물러나지 않고 실패합니다.
   const composed = composeCommerce(themeHtml, "cafe24", source.commerce, composition, { includeHeader: false });

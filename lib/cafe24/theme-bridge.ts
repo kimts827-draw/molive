@@ -106,9 +106,12 @@ export function resolveFooterInk(css: string) {
 }
 
 /** Footer shell이 AI selector 우선순위에 기대지 않도록 실제 배경과 대비색을 완성된 palette로 고정합니다. */
-export function resolveFooterPalette(css: string) {
+export function resolveFooterPalette(css: string, brandBackground?: string | null) {
   const resolved = resolveFooterBackground(css);
-  const background = resolved?.color ?? [246, 246, 246] as [number, number, number];
+  // colorStrategy가 dominant/band일 때만 brandBackground가 들어옵니다.
+  // 나머지 전략은 null이라 기존 footerMood 배경이 그대로 남고, 모든 몰의 푸터가 같아지지 않습니다.
+  const branded = brandBackground ? parseColor(brandBackground) : null;
+  const background = branded ?? resolved?.color ?? [246, 246, 246] as [number, number, number];
   const dark = relativeLuminance(background) < 0.45;
   const primary: [number, number, number] = dark ? [245, 243, 238] : [27, 26, 23];
   return {
@@ -117,13 +120,13 @@ export function resolveFooterPalette(css: string) {
     secondary: toHex(mix(background, primary, 0.72)),
     divider: toHex(mix(background, primary, 0.2)),
     iconFilter: dark ? "invert(1) brightness(1.8)" : "none",
-    from: resolved?.from ?? "default" as const,
+    from: branded ? "brand" as const : resolved?.from ?? "default" as const,
   };
 }
 
 /** AI CSS 뒤에 배치되어 Cafe24 Footer의 배경·텍스트·링크·divider 대비를 명시적으로 보장합니다. */
-export function buildFooterThemeCss(css: string) {
-  const palette = resolveFooterPalette(css);
+export function buildFooterThemeCss(css: string, brandBackground?: string | null) {
+  const palette = resolveFooterPalette(css, brandBackground);
   return `/* Moiré Footer palette contract */
 /* position:relative가 없으면 Guide layout.css의 #footer:before(bottom:100px)가 initial containing block 기준으로 떠서 PC 뷰포트 상단(Hero)을 가로지릅니다. Preview shell(FOOTER_SHELL_CSS)과 동일하게 footer를 containing block으로 만듭니다. */
 [data-moire-root] #footer{position:relative;background:${palette.background};color:${palette.primary}}

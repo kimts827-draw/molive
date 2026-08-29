@@ -11,10 +11,17 @@
  */
 
 import { z } from "zod";
+import { COLOR_STRATEGIES, SURFACE_FAMILIES, brandRamp, parseHex, rgbToHsl, surfaceTokens, toHex, type BrandPalette, type ColorStrategy, type SurfaceFamily } from "../commerce/brand-theme.ts";
 import { INDUSTRY_IDS, industryProfile, type IndustryId } from "./industry.ts";
 import {
   SECTION_ALIGNMENTS,
   SECTION_ALIGNMENT_SPECS,
+  SECTION_COLUMNS,
+  SECTION_COLUMN_SPECS,
+  SECTION_CONTAINERS,
+  SECTION_CONTAINER_SPECS,
+  SECTION_SURFACE_STYLES,
+  SECTION_SURFACE_STYLE_SPECS,
   SECTION_DENSITIES,
   SECTION_DENSITY_SPECS,
   SECTION_MEDIA_POSITIONS,
@@ -25,7 +32,10 @@ import {
   SECTION_TYPE_IDS,
   sectionType,
   type SectionAlignment,
+  type SectionColumns,
+  type SectionContainer,
   type SectionDensity,
+  type SectionSurfaceStyle,
   type SectionMediaPosition,
   type SectionTone,
   type SectionTypeId,
@@ -67,10 +77,23 @@ export const pagePlanSectionSchema = z.object({
   mediaPosition: z.enum(SECTION_MEDIA_POSITIONS),
   density: z.enum(SECTION_DENSITIES),
   tone: z.enum(SECTION_TONES),
+  /** 화면 폭 사용법. 서로 다른 섹션이 같은 모양으로 붕괴하는 것을 막는 축입니다. */
+  container: z.enum(SECTION_CONTAINERS).optional(),
+  /** 한 행의 단위 요소 수입니다. */
+  columns: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5), z.literal(6)]).optional(),
+  /** 카드·괘선 같은 표면 성격입니다. 배경색은 tone이 맡습니다. */
+  surfaceStyle: z.enum(SECTION_SURFACE_STYLES).optional(),
   /** 이 브랜드에 이 섹션이 왜 필요한지. 사람이 읽는 근거이자 2단계 생성의 카피 지침입니다. */
   intent: z.string().trim().min(1).max(400),
   /** 이 섹션의 한국어 헤딩 초안입니다. */
   headline: z.string().trim().max(120),
+});
+
+export const pagePlanPaletteSchema = z.object({
+  /** 이 몰의 브랜드 색입니다. 사용자가 입력한 hex가 있으면 코드가 그 값으로 확정합니다. */
+  brandColor: z.string().trim().min(4).max(9),
+  colorStrategy: z.enum(COLOR_STRATEGIES),
+  surfaceFamily: z.enum(SURFACE_FAMILIES),
 });
 
 export const pagePlanSchema = z.object({
@@ -99,6 +122,8 @@ export const pagePlanSchema = z.object({
   footerMood: z.enum(FOOTER_IDS as [FooterMoodId, ...FooterMoodId[]]),
   typeScale: z.enum(TYPE_SCALE_IDS as [TypeScaleId, ...TypeScaleId[]]),
   imageTreatment: z.enum(IMAGE_TREATMENT_IDS as [ImageTreatmentId, ...ImageTreatmentId[]]),
+  /** 색 계약입니다. palette가 없는 기존 plan도 그대로 열리도록 optional입니다. */
+  palette: pagePlanPaletteSchema.optional(),
   sections: z.array(pagePlanSectionSchema).min(1).max(24),
   /** 왜 이 구성인지에 대한 한 문단 설명입니다. */
   rationale: z.string().trim().max(800),
@@ -111,7 +136,7 @@ export type PagePlan = z.infer<typeof pagePlanSchema>;
 export const pagePlanJsonSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["version", "industry", "industryLabel", "productCategory", "productExamples", "audience", "brandPosition", "mood", "emphasis", "header", "hero", "productPresentation", "footerMood", "typeScale", "imageTreatment", "sections", "rationale"],
+  required: ["version", "industry", "industryLabel", "productCategory", "productExamples", "audience", "brandPosition", "mood", "emphasis", "palette", "header", "hero", "productPresentation", "footerMood", "typeScale", "imageTreatment", "sections", "rationale"],
   properties: {
     version: { type: "integer", enum: [PAGE_PLAN_VERSION] },
     industry: { type: "string", enum: [...INDUSTRY_IDS] },
@@ -122,6 +147,16 @@ export const pagePlanJsonSchema = {
     brandPosition: { type: "string" },
     mood: { type: "string" },
     emphasis: { type: "array", maxItems: 8, items: { type: "string" } },
+    palette: {
+      type: "object",
+      additionalProperties: false,
+      required: ["brandColor", "colorStrategy", "surfaceFamily"],
+      properties: {
+        brandColor: { type: "string" },
+        colorStrategy: { type: "string", enum: [...COLOR_STRATEGIES] },
+        surfaceFamily: { type: "string", enum: [...SURFACE_FAMILIES] },
+      },
+    },
     header: { type: "string", enum: [...HEADER_IDS] },
     hero: {
       type: "object",
@@ -147,7 +182,7 @@ export const pagePlanJsonSchema = {
       items: {
         type: "object",
         additionalProperties: false,
-        required: ["id", "type", "variant", "alignment", "mediaPosition", "density", "tone", "intent", "headline"],
+        required: ["id", "type", "variant", "alignment", "mediaPosition", "density", "tone", "container", "columns", "surfaceStyle", "intent", "headline"],
         properties: {
           id: { type: "string" },
           type: { type: "string", enum: [...SECTION_TYPE_IDS] },
@@ -156,6 +191,9 @@ export const pagePlanJsonSchema = {
           mediaPosition: { type: "string", enum: [...SECTION_MEDIA_POSITIONS] },
           density: { type: "string", enum: [...SECTION_DENSITIES] },
           tone: { type: "string", enum: [...SECTION_TONES] },
+          container: { type: "string", enum: [...SECTION_CONTAINERS] },
+          columns: { type: "integer", enum: [...SECTION_COLUMNS] },
+          surfaceStyle: { type: "string", enum: [...SECTION_SURFACE_STYLES] },
           intent: { type: "string" },
           headline: { type: "string" },
         },
@@ -189,6 +227,25 @@ function normalizeSection(section: PagePlanSection, order: number): PagePlanSect
   if (definition.media === "required" && mediaPosition === "none") mediaPosition = pick(["left", "right", "grid", "background"] as SectionMediaPosition[], order);
   const density: SectionDensity = definition.axes.density ? section.density : "regular";
   const tone: SectionTone = definition.axes.tone ? section.tone : "light";
+
+  /**
+   * geometry 축은 타입마다 의미 있는 값이 다릅니다.
+   * 레지스트리가 허용하지 않은 값이 오면 그 타입의 후보 안에서 순서 기반으로 되돌립니다.
+   * (허용 목록이 비어 있으면 그 축은 쓰지 않습니다 — 예: featuredProducts의 columns는 productPresentation이 소유.)
+   */
+  const geometry = definition.geometry ?? {};
+  const container = geometry.containers?.length
+    ? (geometry.containers.includes(section.container as SectionContainer) ? section.container as SectionContainer : pick(geometry.containers, order))
+    : undefined;
+  const columns = geometry.columns?.length
+    ? (geometry.columns.includes(section.columns as SectionColumns) ? section.columns as SectionColumns : pick(geometry.columns, order))
+    : undefined;
+  // 사진이 없는 섹션에 photoField를 붙이면 빈 바탕이 됩니다.
+  const surfaceCandidates = (geometry.surfaces ?? []).filter((style) => style !== "photoField" || mediaPosition !== "none");
+  const surfaceStyle = surfaceCandidates.length
+    ? (surfaceCandidates.includes(section.surfaceStyle as SectionSurfaceStyle) ? section.surfaceStyle as SectionSurfaceStyle : pick(surfaceCandidates, order))
+    : undefined;
+
   return {
     ...section,
     id: slugify(section.id, `${section.type}-${order + 1}`),
@@ -197,9 +254,124 @@ function normalizeSection(section: PagePlanSection, order: number): PagePlanSect
     mediaPosition,
     density,
     tone,
+    container,
+    columns,
+    surfaceStyle,
     intent: section.intent.trim() || definition.purpose,
     headline: section.headline.trim(),
   };
+}
+
+
+/**
+ * 브리프가 무채색/모노크롬을 명시적으로 요구했는지 봅니다.
+ * inferIndustry와 같은 결정적 키워드 검사이며, 사용자가 직접 요구한 경우에만 monochrome을 허용합니다.
+ */
+/**
+ * 브리프가 어두운 지면을 명시적으로 요구했는지 봅니다.
+ * 실제 생성 검증에서 "차콜과 뉴트럴 톤"을 적은 브리프에 AI가 surfaceFamily "warm"을 돌려주어
+ * 지면이 아이보리로 나오는 모순이 확인됐습니다. 그 모순만 결정적으로 막습니다.
+ */
+const DARK_SURFACE_KEYWORDS = ["차콜", "charcoal", "다크", "dark", "블랙", "black", "검정", "검은", "먹색", "무채색 어두운"];
+
+/** 반대로 따뜻한 지면을 명시한 브리프는 warm을 그대로 지킵니다. */
+const WARM_SURFACE_KEYWORDS = ["아이보리", "ivory", "크림", "cream", "따뜻", "warm", "베이지", "beige", "우드", "웜톤"];
+
+export function briefAsksDarkSurface(brief: string | undefined | null) {
+  if (!brief) return false;
+  const haystack = brief.toLowerCase();
+  return DARK_SURFACE_KEYWORDS.some((keyword) => haystack.includes(keyword.toLowerCase()));
+}
+
+export function briefAsksWarmSurface(brief: string | undefined | null) {
+  if (!brief) return false;
+  const haystack = brief.toLowerCase();
+  return WARM_SURFACE_KEYWORDS.some((keyword) => haystack.includes(keyword.toLowerCase()));
+}
+
+/** 이보다 어두운 브랜드 색이면 밝은 지면과 짝지었을 때 브리프와 어긋납니다. */
+const VERY_DARK_LIGHTNESS = 0.28;
+
+const MONOCHROME_KEYWORDS = ["모노크롬", "무채색", "흑백", "블랙앤화이트", "블랙 앤 화이트", "그레이스케일", "monochrome", "black and white", "greyscale", "grayscale"];
+
+export function briefAsksMonochrome(brief: string | undefined | null) {
+  if (!brief) return false;
+  const haystack = brief.toLowerCase();
+  return MONOCHROME_KEYWORDS.some((keyword) => haystack.includes(keyword.toLowerCase()));
+}
+
+/** accent 밴드로 승격할 후보 순서입니다. 전환·탐색 역할 섹션만 쓰고 상품 진열은 건드리지 않습니다. */
+const ACCENT_PROMOTION_ORDER: SectionTypeId[] = ["cta", "editorialBanner", "promotion", "categoryGrid", "gift", "collection", "benefits"];
+
+export type PagePlanNormalizeOptions = {
+  /** 사용자가 생성 화면에서 고른 brand main color입니다. 있으면 이 값이 진실입니다. */
+  brandColor?: string;
+  /** monochrome 예외 판정을 위한 원본 브리프입니다. */
+  brief?: string;
+};
+
+/**
+ * 색 계약을 확정합니다. AI 응답을 심판해 재생성시키지 않고, 코드가 값을 눌러 씁니다.
+ * - 사용자가 hex를 넣었으면 brandColor는 무조건 그 값입니다.
+ * - 그 hex를 넣고도 AI가 monochrome을 고르면 색이 도로 사라지므로 accent-only로 강등합니다.
+ *   브리프가 명시적으로 무채색을 요구한 경우만 예외로 통과시킵니다.
+ * - dominant인데 surfaceFamily가 white면 색을 무력화하는 조합이라 tinted로 눌러 줍니다.
+ */
+function normalizePalette(plan: PagePlan, options: PagePlanNormalizeOptions): BrandPalette | undefined {
+  const supplied = parseHex(options.brandColor);
+  const planned = plan.palette;
+  const plannedRgb = parseHex(planned?.brandColor);
+  const brandColor = supplied ? toHex(supplied) : plannedRgb ? toHex(plannedRgb) : null;
+  if (!brandColor) return undefined;
+
+  let colorStrategy: ColorStrategy = planned?.colorStrategy ?? "accent-only";
+  if (supplied && colorStrategy === "monochrome" && !briefAsksMonochrome(options.brief)) colorStrategy = "accent-only";
+
+  let surfaceFamily: SurfaceFamily = planned?.surfaceFamily ?? "white";
+  if (colorStrategy === "dominant" && surfaceFamily === "white") surfaceFamily = "tinted";
+
+  /**
+   * 브리프가 어두운 지면을 명시했고 브랜드 색도 매우 어두운데 AI가 밝고 따뜻한 지면을 골랐다면,
+   * 그건 브리프와 어긋난 조합입니다. 재생성 없이 지면만 결정적으로 되돌립니다.
+   * 브리프가 따뜻한 지면을 함께 명시했다면(예: "차콜과 아이보리") 사용자의 말을 우선해 그대로 둡니다.
+   */
+  const brandHsl = rgbToHsl(parseHex(brandColor) as NonNullable<ReturnType<typeof parseHex>>);
+  const veryDarkBrand = brandHsl.l < VERY_DARK_LIGHTNESS;
+  const lightSurface = surfaceFamily === "warm" || surfaceFamily === "white";
+  if (lightSurface && veryDarkBrand && briefAsksDarkSurface(options.brief) && !briefAsksWarmSurface(options.brief)) {
+    // 채도가 남아 있으면 cool 쪽이 브랜드와 덜 부딪히고, 무채색이면 dark가 브리프에 그대로 맞습니다.
+    surfaceFamily = brandHsl.s >= 0.2 ? "cool" : "dark";
+  }
+
+  return { brandColor, colorStrategy, surfaceFamily };
+}
+
+/**
+ * 본문에 브랜드 색 면적을 최소 한 곳 남깁니다.
+ * accent tone 섹션이 하나도 없으면 전환·탐색 섹션 하나를 승격합니다(monochrome은 제외).
+ * planLayoutCss의 accent 규칙이 전체 명시도라, 승격된 섹션은 AI가 무엇을 쓰든 브랜드 색을 갖습니다.
+ */
+function ensureAccentBands(sections: PagePlanSection[], palette: BrandPalette | undefined) {
+  if (!palette || palette.colorStrategy === "monochrome") return sections;
+  const limit = palette.colorStrategy === "dominant" ? 2 : 1;
+  const next = [...sections];
+  const accentCount = () => next.filter((section) => section.tone === "accent").length;
+  if (accentCount() >= limit) return next;
+
+  // 승격 후보: 전환·탐색 역할 섹션이 먼저, 그다음은 뒤에서부터의 톤 가능 섹션.
+  const preferred = ACCENT_PROMOTION_ORDER.flatMap((typeId) => next.flatMap((section, index) => (section.type === typeId ? [index] : [])));
+  const remainder = next.map((_, index) => index).reverse();
+  const candidates = [...new Set([...preferred, ...remainder])]
+    .filter((index) => next[index].type !== "featuredProducts" && SECTION_TYPES[next[index].type].axes.tone);
+
+  for (const index of candidates) {
+    if (accentCount() >= limit) break;
+    if (next[index].tone === "accent") continue;
+    // 붙어 있는 두 섹션이 모두 accent면 한 덩어리로 보여 밴드 효과가 사라집니다.
+    if (next[index - 1]?.tone === "accent" || next[index + 1]?.tone === "accent") continue;
+    next[index] = { ...next[index], tone: "accent" };
+  }
+  return next;
 }
 
 /**
@@ -209,7 +381,7 @@ function normalizeSection(section: PagePlanSection, order: number): PagePlanSect
  * - 반복 불가 타입의 중복과 붙어 있는 같은 톤을 정리해 페이지 리듬을 보장합니다.
  * plan 자체를 버리고 고정 템플릿으로 되돌리는 경로는 없습니다.
  */
-export function normalizePagePlan(plan: PagePlan): PagePlan {
+export function normalizePagePlan(plan: PagePlan, options: PagePlanNormalizeOptions = {}): PagePlan {
   const seen = new Set<SectionTypeId>();
   const ids = new Set<string>();
   const sections: PagePlanSection[] = [];
@@ -240,6 +412,7 @@ export function normalizePagePlan(plan: PagePlan): PagePlan {
       mediaPosition: "none",
       density: "regular",
       tone: "light",
+      container: "boxed",
       intent: "실제 Cafe24 상품이 들어가는 단 하나의 진열 자리입니다.",
       headline: "",
     });
@@ -266,11 +439,13 @@ export function normalizePagePlan(plan: PagePlan): PagePlan {
     else if (current.mediaPosition === "right") sections[index] = { ...current, mediaPosition: "left" };
   }
 
-  return { ...plan, sections: sections.slice(0, PAGE_PLAN_MAX_SECTIONS) };
+  const palette = normalizePalette(plan, options);
+  const bodySections = ensureAccentBands(sections.slice(0, PAGE_PLAN_MAX_SECTIONS), palette);
+  return { ...plan, palette, sections: bodySections };
 }
 
-export function parsePagePlan(value: unknown): PagePlan {
-  return normalizePagePlan(pagePlanSchema.parse(value));
+export function parsePagePlan(value: unknown, options: PagePlanNormalizeOptions = {}): PagePlan {
+  return normalizePagePlan(pagePlanSchema.parse(value), options);
 }
 
 export function isPagePlan(value: unknown): value is PagePlan {
@@ -313,9 +488,46 @@ export function renderPagePlanEditContext(plan: PagePlan): string {
   return `PROJECT PAGE COMPOSITION (context only)
 업종: ${plan.industryLabel} · 판매 상품군: ${plan.productCategory}${plan.productExamples.length ? ` (예: ${plan.productExamples.join(", ")})` : ""}
 분위기: ${plan.mood || "명시 없음"} · 강조점: ${plan.emphasis.join(", ") || "명시 없음"}
-타이포 스케일: ${plan.typeScale} · 이미지 처리: ${plan.imageTreatment} · 상품 진열: ${plan.productPresentation}
+타이포 스케일: ${plan.typeScale} · 이미지 처리: ${plan.imageTreatment} · 상품 진열: ${plan.productPresentation}${plan.palette ? `
+브랜드 색: ${plan.palette.brandColor} (전략 ${plan.palette.colorStrategy}) · 색은 var(--molive-brand) 계열 변수를 쓴다` : ""}
 본문 순서: ${sections.join(" → ")}
 이 구성은 참고용이다. 선택 영역 밖의 섹션을 추가·삭제·재배치하지 말고, 위 상품군과 톤을 벗어나는 카피나 이미지를 만들지 않는다.`;
+}
+
+
+/** colorStrategy가 페이지에서 색을 얼마나 쓰는지에 대한 계약입니다. */
+export const COLOR_STRATEGY_SPECS: Record<ColorStrategy, string> = {
+  dominant: "브랜드 색이 페이지의 주인공이다. 큰 색면 밴드와 푸터를 브랜드 색으로 덮고, 사진보다 색이 먼저 보이게 한다.",
+  band: "브랜드 색을 밴드로 쓴다. 한두 개 섹션과 푸터를 브랜드 톤으로 깔고 나머지는 밝은 지면으로 둔다.",
+  "accent-only": "브랜드 색을 CTA·라벨·괘선 같은 작은 면적에만 쓰고 지면은 중립으로 둔다. 단 본문 한 곳에는 색면이 남는다.",
+  duotone: "브랜드 색과 코드가 파생한 2차 색을 교대로 쓴다. 두 색이 서로 다른 섹션을 맡아 리듬을 만든다.",
+  monochrome: "브랜드 색을 거의 쓰지 않고 명도 대비만으로 구성한다. 브리프가 무채색을 요구했을 때만 쓴다.",
+};
+
+/** surfaceFamily가 지면의 바탕 성격을 정합니다. */
+export const SURFACE_FAMILY_SPECS: Record<SurfaceFamily, string> = {
+  white: "순백에 가까운 지면. 상품과 사진이 주인공이 된다.",
+  warm: "따뜻한 아이보리·크림 지면. 식품·수공예의 온기를 만든다.",
+  cool: "차가운 회백 지면. 기술·정밀함의 인상을 만든다.",
+  tinted: "브랜드 색을 아주 옅게 섞은 지면. 페이지 전체가 브랜드 색을 머금는다.",
+  dark: "어두운 지면에 밝은 텍스트. 색과 사진이 강하게 튀어나온다.",
+};
+
+/** 2단계 생성 프롬프트에 실을 색 계약 텍스트입니다. */
+export function renderPaletteContract(palette: BrandPalette | undefined) {
+  if (!palette) return "";
+  const ramp = brandRamp(palette.brandColor);
+  if (!ramp) return "";
+  const surface = surfaceTokens(palette.surfaceFamily, palette.brandColor);
+  return `PALETTE (구속력 있음)
+- 브랜드 색: ${ramp.brand} — 이 몰의 주 색이다. 다른 색으로 바꾸거나 채도를 낮춰 중립색으로 만들지 않는다.
+- 색 전략(${palette.colorStrategy}): ${COLOR_STRATEGY_SPECS[palette.colorStrategy]}
+- 지면 성격(${palette.surfaceFamily}): ${SURFACE_FAMILY_SPECS[palette.surfaceFamily]}
+  기본 지면색은 var(--molive-surface)=${surface.surface}, 그 위 글자는 var(--molive-surface-ink)=${surface.surfaceInk}. 페이지 바탕은 이 값에서 출발한다.
+- 코드가 아래 CSS 변수를 페이지 루트에 이미 선언한다. 리터럴 hex 대신 이 변수를 써야 나중에 색을 바꿔도 페이지가 따라온다.
+  var(--molive-brand)=${ramp.brand} · var(--molive-brand-strong)=${ramp.strong} · var(--molive-brand-tint)=${ramp.tint} · var(--molive-brand-soft)=${ramp.soft} · var(--molive-brand-on)=${ramp.on}${palette.colorStrategy === "duotone" ? ` · var(--molive-brand-secondary)=${ramp.secondary}` : ""}
+- 브랜드 색은 선이나 아이콘 같은 얇은 요소가 아니라 배경 색면, CTA 채움, 카드 바탕처럼 눈에 보이는 면적으로 써야 한다.
+- 레퍼런스 몰은 브랜드 색을 풀폭 밴드, 푸터, 카테고리 타일, 프로모션 패널의 배경으로 쓴다. 같은 방식으로 쓴다.`;
 }
 
 function axisLine(section: PagePlanSection) {
@@ -325,6 +537,9 @@ function axisLine(section: PagePlanSection) {
     `밀도=${section.density}(${SECTION_DENSITY_SPECS[section.density]})`,
     `톤=${section.tone}(${SECTION_TONE_SPECS[section.tone]})`,
   ];
+  if (section.container) parts.push(`지면=${section.container}(${SECTION_CONTAINER_SPECS[section.container]})`);
+  if (section.columns) parts.push(`컬럼=${section.columns}(${SECTION_COLUMN_SPECS[section.columns]}) — CSS는 repeat(var(--molive-columns),1fr)로 쓴다`);
+  if (section.surfaceStyle) parts.push(`표면=${section.surfaceStyle}(${SECTION_SURFACE_STYLE_SPECS[section.surfaceStyle]})`);
   return parts.join(" · ");
 }
 
@@ -349,6 +564,7 @@ export function renderPagePlanContract(plan: PagePlan): string {
 타깃: ${plan.audience || "명시 없음"} · 브랜드 포지션: ${plan.brandPosition || "명시 없음"}
 분위기: ${plan.mood || "명시 없음"} · 강조점: ${plan.emphasis.join(", ") || "명시 없음"}
 구성 근거: ${plan.rationale || "-"}
+${renderPaletteContract(plan.palette)}
 
 이 구성은 이번 브랜드를 위해 새로 설계된 것이다. 아래 섹션을 순서대로, 빠짐없이, 더하지 말고 시공하되
 카피·색·이미지·비례·디테일로 브랜드를 표현한다. 다른 프로젝트에서 본 순서를 재사용하지 않는다.
