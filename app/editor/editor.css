@@ -237,6 +237,8 @@
 .new-section-position button { height: 28px; padding: 0 11px; border: 1px solid #d7d5ce; border-radius: 999px; background: #fff; font-size: 10px; color: #4a4843; }
 .new-section-position button.active { border-color: #6751d9; background: #6751d9; color: #fff; font-weight: 700; }
 .new-section-position button:disabled { opacity: .35; }
+.section-actions .section-redesign { color: #4a3bbd; background: #f1eeff; }
+.section-actions .section-redesign:disabled { color: #9a98a6; background: #f2f1ef; }
 
 @media (max-width: 1050px) {
   .editor-workspace { grid-template-columns: 200px minmax(0, 1fr); }

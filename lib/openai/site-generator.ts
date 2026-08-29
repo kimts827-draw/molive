@@ -1,7 +1,7 @@
 import "server-only";
 import OpenAI from "openai";
 import { z } from "zod";
-import { ensureEditingMetadata, validateNodePatch, validateNodePatchStructure, validateProjectSource } from "@/lib/cafe24/protection";
+import { dedupeNodePatchIds, demoteForbiddenChrome, ensureEditingMetadata, validateNodePatch, validateNodePatchStructure, validateProjectSource, type NodePatchOperation } from "@/lib/cafe24/protection";
 import { buildDesignGenerationUserPrompt, validateGeneratedDesignContract, type DesignGenerationInput } from "@/lib/openai/design-generation-contract";
 import { generatePagePlan } from "@/lib/openai/page-plan-generator";
 import { pagePlanSectionRefs, pagePlanSignature, renderPagePlanEditContext, type PagePlan } from "@/lib/design-library/page-plan";
@@ -464,42 +464,76 @@ NEW SECTION MODE
 - Keep the root element a <section> and keep its data-moire-id exactly. Keep every data-moire-plan, data-moire-tone, data-moire-container, data-moire-columns and data-moire-surface attribute on the root opening tag byte-for-byte. Those attributes are the page-level layout contract owned by code; dropping them breaks this section's width, colour band and grid.
 - Drop the placeholder's inline style attributes and the placeholder sentence. Express all styling through nodeCss instead.
 - Give every element a unique data-moire-id and a useful data-moire-type such as text, image, or button.
-- This page already has its single product area somewhere else. Never output data-cafe24-slot, product cards, prices, product names, stock, a header element, or any Cafe24 module, variable or directive here.
+- This page already has its single product area somewhere else. Never output data-cafe24-slot, product cards, prices, product names, stock, or any Cafe24 module, variable or directive here. Do not use a <header> element at all, not even to wrap this section's own title block: this page's header is a fixed component and the export contract rejects the tag. Use a div.
 - Write Korean customer-facing copy for this shop's own product category. Never fabricate reviews, ratings, awards, certifications, sales figures, delivery or refund terms, prices, or discount rates.
 - Build exactly the section type, variant and axes given in the request. Density, tone, alignment, container and media position are already decided; spend your craft on composition, copy, proportion and detail inside them.
 - Never invent an image address. Copy an ALLOWED IMAGES entry verbatim, or use CSS gradients, colour fields and inline data:image/svg+xml art instead. A remembered or guessed stock photo id does not exist and renders broken.
 - The section must read as a finished part of this page, not a demo block: purposeful heading, real supporting copy, and a deliberate vertical rhythm.`;
 
-export async function editProjectNode(input: { prompt: string; nodeId: string; nodeType: string; nodeHtml: string; projectCss: string; rootValue: string; architecture: ProjectSource["architecture"]; pagePlan?: PagePlan; renderMetrics?: { width: number; height: number; fontSize: number; lineHeight: number; letterSpacing: number; marginTop: number; marginBottom: number; paddingTop: number; paddingBottom: number }; operation?: "node-edit" | "new-section"; sectionPreset?: string; sectionBrief?: string; projectAssetUrls?: string[] }, options?: { onUsage?: (event: OpenAIUsageEvent) => Promise<void>; imageProbe?: ImageProbe }) {
+/**
+ * 기존 섹션 재디자인 계약입니다.
+ *
+ * 대상은 상품 슬롯이 없는 본문 섹션뿐입니다. 목적과 이미 쓰여 있는 사실은 지키고
+ * DOM 구조와 시각 구성만 새로 만듭니다. 상품 진열과 Header는 라우트 단계에서 걸러집니다.
+ */
+const redesignSystemPrompt = `
+REDESIGN SECTION MODE
+- The selected node is an existing body section of this page. Rebuild it: keep what the section is for, and give it a genuinely different HTML structure and visual composition.
+- Keep the root element a <section> and keep its data-moire-id exactly. Keep every data-moire-plan, data-moire-tone, data-moire-container, data-moire-columns and data-moire-surface attribute on the root opening tag byte-for-byte; they are the page-level layout contract owned by code.
+- Keep the section's purpose and every concrete fact it already states: headings' intent, numbers, product or brand names, link destinations, and promises. You may rewrite the wording and reorganise the blocks, but never drop information the merchant already published and never invent new facts, prices, reviews, ratings, awards, certifications, or delivery and refund terms.
+- Keep the photos that are already in this section by copying their src verbatim. Drop one only when the new composition genuinely has no place for it, and never invent an image address. ALLOWED IMAGES lists the other photos of this project you may pull in; a remembered or guessed stock photo id does not exist and renders broken.
+- This is a structural redesign, not a restyle. The DOM must actually change: different element grouping, different reading order or different composition. Returning the same markup with new CSS is a failed answer.
+- Give every descendant a unique data-moire-id and a useful data-moire-type. Prefix new ids with the section root id so they cannot collide with the rest of the page.
+- Never output data-cafe24-slot, product cards, prices, stock, or any Cafe24 module, variable or directive. This page's single product area lives in another section. Do not use a <header> element at all, not even to wrap this section's own title block: this page's header is a fixed component and the export contract rejects the tag. Use a div.
+- Write Korean customer-facing copy that fits this shop's product category.`;
+
+
+const PLAN_AXIS_ATTRIBUTES = { plan: "data-moire-plan", tone: "data-moire-tone", container: "data-moire-container", columns: "data-moire-columns", surface: "data-moire-surface" } as const;
+
+/** 재디자인 대상 섹션에 이미 새겨져 있는 plan 축입니다. 모델에게 그대로 지키라고 넘깁니다. */
+function sectionAxes(nodeHtml: string) {
+  const openTag = nodeHtml.trim().match(/^<[^>]*>/)?.[0] ?? "";
+  return Object.fromEntries(Object.entries(PLAN_AXIS_ATTRIBUTES).flatMap(([key, attribute]) => {
+    const value = openTag.match(new RegExp(`\\b${attribute}\\s*=\\s*["']([^"']*)["']`, "i"))?.[1];
+    return value ? [[key, value]] : [];
+  }));
+}
+
+export async function editProjectNode(input: { prompt: string; nodeId: string; nodeType: string; nodeHtml: string; projectCss: string; rootValue: string; architecture: ProjectSource["architecture"]; pagePlan?: PagePlan; renderMetrics?: { width: number; height: number; fontSize: number; lineHeight: number; letterSpacing: number; marginTop: number; marginBottom: number; paddingTop: number; paddingBottom: number }; operation?: NodePatchOperation; sectionPreset?: string; sectionBrief?: string; projectAssetUrls?: string[]; reservedNodeIds?: string[] }, options?: { onUsage?: (event: OpenAIUsageEvent) => Promise<void>; imageProbe?: ImageProbe }) {
   const traceId = crypto.randomUUID();
   const createdAt = new Date().toISOString();
-  const operation = input.operation ?? "node-edit";
+  const operation: NodePatchOperation = input.operation ?? "node-edit";
   const preset: NewSectionPreset | null = operation === "new-section" ? newSectionPreset(input.sectionPreset ?? "") : null;
   if (operation === "new-section" && !preset) throw new Error("알 수 없는 섹션 유형입니다.");
+  /** 섹션 단위 작업입니다. 구조를 새로 만들고, 이미지 검증과 ID 충돌 정리를 함께 받습니다. */
+  const sectionOperation = operation !== "node-edit";
   /**
    * 새 섹션은 언제나 구조를 새로 만드는 요청입니다.
    * 브리프에 "색"이나 "크기" 같은 단어가 있어도 style-only로 내려가면 빈 자리표시자만 남습니다.
    */
-  const editIntent = operation === "new-section" ? "general" : classifyAiEditIntent(input.prompt);
+  const editIntent = sectionOperation ? "general" : classifyAiEditIntent(input.prompt);
   /**
    * page plan이 있는 프로젝트는 "이 몰이 무엇을 파는 어떤 구성인가"를 참고 컨텍스트로 함께 넘겨
    * 부분 수정이 상품군과 페이지 톤에서 벗어나지 않게 합니다.
    * plan이 없는 기존 프로젝트는 예전 프롬프트를 그대로 씁니다.
    */
   const planContext = input.pagePlan ? renderPagePlanEditContext(input.pagePlan) : "";
-  const scopedSystemPrompt = `${editSystemPrompt.replaceAll("SELECTED_ID", input.nodeId)}\nEvery nodeCss selector must also begin with the exact project selector [data-moire-root="${input.rootValue}"].${editIntent === "style-only" ? "\nThis is a STYLE-ONLY request. Return the selected outerHTML unchanged and put the requested visual change only in nodeCss." : ""}${planContext ? "\nThe user message carries this project's page composition. Treat it as context: keep the edit inside the composition's product category and tone, and never add, remove, or reorder sections outside the selected node." : ""}${preset ? newSectionSystemPrompt : ""}`;
+  const scopedSystemPrompt = `${editSystemPrompt.replaceAll("SELECTED_ID", input.nodeId)}\nEvery nodeCss selector must also begin with the exact project selector [data-moire-root="${input.rootValue}"].${editIntent === "style-only" ? "\nThis is a STYLE-ONLY request. Return the selected outerHTML unchanged and put the requested visual change only in nodeCss." : ""}${planContext ? "\nThe user message carries this project's page composition. Treat it as context: keep the edit inside the composition's product category and tone, and never add, remove, or reorder sections outside the selected node." : ""}${preset ? newSectionSystemPrompt : ""}${operation === "redesign-section" ? redesignSystemPrompt : ""}`;
   /** 이 섹션이 쓸 수 있는 사진은 이미 이 프로젝트 안에 있는 것뿐입니다. 없으면 이번 요청용 스톡만 새로 씁니다. */
-  const allowedImages = preset?.mediaPolicy === "project-or-fresh" ? [...new Set(input.projectAssetUrls ?? [])].slice(0, 12) : [];
+  const allowedImages = preset?.mediaPolicy === "none" || !sectionOperation ? [] : [...new Set(input.projectAssetUrls ?? [])].slice(0, 12);
   const userPrompt = preset
     ? `${planContext ? `${planContext}\n` : ""}NEW SECTION REQUEST\n${renderNewSectionContract(preset)}\nALLOWED IMAGES (${allowedImages.length}):\n${allowedImages.join(`\n`) || "(없음)"}\n사용자 요구사항:\n${input.sectionBrief?.trim() || preset.intent}\nPlaceholder outerHTML (루트 속성은 그대로 두고 내용만 새로 설계):\n${input.nodeHtml}\nCurrent project CSS for visual context:\n${input.projectCss}`
-    : `${planContext ? `${planContext}\n` : ""}Project architecture (context only):\n${JSON.stringify(input.architecture)}\nSelected node type: ${input.nodeType}\nCurrent selected render metrics (CSS px, use for relative changes):\n${JSON.stringify(input.renderMetrics ?? null)}\nSelected node outerHTML:\n${input.nodeHtml}\nCurrent project CSS for visual context:\n${input.projectCss}\nUser request:\n${input.prompt}`;
+    : operation === "redesign-section"
+      ? `${planContext ? `${planContext}\n` : ""}REDESIGN SECTION REQUEST\nSection axes owned by code: ${JSON.stringify(sectionAxes(input.nodeHtml))}\nALLOWED IMAGES (${allowedImages.length}):\n${allowedImages.join(`\n`) || "(없음)"}\n사용자 요구사항:\n${input.sectionBrief?.trim() || input.prompt}\n현재 섹션 outerHTML (목적과 사실은 지키고 구조는 새로 설계):\n${input.nodeHtml}\nCurrent project CSS for visual context:\n${input.projectCss}`
+      : `${planContext ? `${planContext}\n` : ""}Project architecture (context only):\n${JSON.stringify(input.architecture)}\nSelected node type: ${input.nodeType}\nCurrent selected render metrics (CSS px, use for relative changes):\n${JSON.stringify(input.renderMetrics ?? null)}\nSelected node outerHTML:\n${input.nodeHtml}\nCurrent project CSS for visual context:\n${input.projectCss}\nUser request:\n${input.prompt}`;
   const trace: GenerationTrace = { traceId, kind: "edit", createdAt, request: { model: model(), systemPrompt: scopedSystemPrompt, userPrompt } };
   try {
     const requestedModel = model();
     const response = await runRecordedOpenAICall({
       onUsage: options?.onUsage,
       call: () => getOpenAI().responses.create({
-        model: requestedModel, store: false, max_output_tokens: 16000,
+        // 섹션 단위 작업은 HTML과 CSS를 통째로 돌려주므로 잘림 여유를 더 둡니다. 재시도가 없는 경로입니다.
+        model: requestedModel, store: false, max_output_tokens: sectionOperation ? 24000 : 16000,
         input: [{ role: "system", content: scopedSystemPrompt }, { role: "user", content: userPrompt }],
         text: { format: { type: "json_schema", name: "moire_node_patch", strict: true, schema: nodeEditJsonSchema } },
       }),
@@ -523,7 +557,27 @@ export async function editProjectNode(input: { prompt: string; nodeId: string; n
      * 그대로 Preview와 Export까지 깨진 채로 나갔습니다. 깨진 자리만 팔레트 색면으로 마감하고
      * 정상 이미지와 나머지 디자인은 건드리지 않습니다.
      */
-    const imageChecks: ImageCheck[] = preset && options?.imageProbe
+    /** 섹션 제목 묶음을 header로 감싼 마크업은 태그만 div로 낮춥니다. 내용은 그대로 남습니다. */
+    const chrome = demoteForbiddenChrome(patch.nodeHtml);
+    patch.nodeHtml = chrome.html;
+    /** 다른 섹션이 쓰는 편집 ID를 우연히 가져왔으면 재시도 없이 코드가 이름을 바꿉니다. */
+    const deduped = sectionOperation && input.reservedNodeIds?.length
+      ? dedupeNodePatchIds({ rootId: input.nodeId, reservedIds: input.reservedNodeIds, nodeHtml: patch.nodeHtml, nodeCss: patch.nodeCss })
+      : null;
+    if (deduped) {
+      patch.nodeHtml = deduped.nodeHtml;
+      patch.nodeCss = deduped.nodeCss;
+    }
+    /**
+     * 재디자인은 구조를 바꾸는 작업입니다.
+     *
+     * HTML이 그대로 돌아오면 nodeCss만 갈아 끼우게 되는데, 이때 이전 재디자인이 남긴 CSS 블록이
+     * 통째로 지워져 "성공했는데 디자인만 사라지는" 결과가 됩니다. 여기서 끊으면 Credit도 소모되지 않습니다.
+     */
+    if (operation === "redesign-section" && patch.nodeHtml.replace(/\s+/g, " ").trim() === input.nodeHtml.replace(/\s+/g, " ").trim()) {
+      throw new Error("AI가 섹션 구조를 실제로 바꾸지 않았습니다. 바꾸고 싶은 배치나 강조점을 조금 더 구체적으로 적어 주세요.");
+    }
+    const imageChecks: ImageCheck[] = sectionOperation && options?.imageProbe
       ? await verifyGeneralImages({ html: patch.nodeHtml, css: patch.nodeCss, allowlist: createAssetAllowlist({ projectAssets: input.projectAssetUrls ?? [] }), probe: options.imageProbe })
       : [];
     if (imageChecks.some((check) => isRepairableVerdict(check.verdict))) {
@@ -545,12 +599,14 @@ export async function editProjectNode(input: { prompt: string; nodeId: string; n
     const assetViolations = auditGeneratedAssets({ html: patch.nodeHtml, css: patch.nodeCss }, editAllowlist)
       .filter((violation) => !violation.token || !introduced.has(violation.token));
     const nodeValidator = validateNodePatch({ nodeId: input.nodeId, rootValue: input.rootValue, ...patch });
-    const structuralViolations = validateNodePatchStructure({ operation, before: input.nodeHtml, after: patch.nodeHtml }).violations;
+    const structuralViolations = validateNodePatchStructure({ operation, before: input.nodeHtml, after: patch.nodeHtml, reservedIds: input.reservedNodeIds }).violations;
     const violations = [...nodeValidator.violations, ...assetViolations, ...structuralViolations];
     const validator = { safe: violations.length === 0, violations };
     trace.response = responseTrace(response);
     trace.generated = patch;
     trace.validator = validator;
+    if (chrome.changed) trace.chromeDemoted = true;
+    if (deduped?.renamed.length || deduped?.duplicated.length) trace.nodeIdDedupe = { renamed: deduped.renamed, duplicated: deduped.duplicated };
     if (imageChecks.length) trace.generalImageVerification = { checks: imageChecks, repaired: [], unverified: imageChecks.filter((check) => check.verdict === "unverified").map((check) => check.url) };
     if (!validator.safe) throw new Error(`AI node patch 보호 검사 실패: ${validator.violations.map((item) => item.code).join(", ")}`);
     await writeGenerationTrace(trace);

@@ -151,8 +151,10 @@ function listRegions(html: string): RegionSummary[] {
   }));
 }
 
-/** 새 섹션 요청에만 붙는 payload입니다. 프롬프트 문장 대신 이 값으로 서버가 계약을 고릅니다. */
-type NewSectionRequest = { operation: "new-section"; sectionPreset: NewSectionPresetId; sectionBrief: string; projectAssetUrls: string[] };
+/** 섹션 단위 AI 작업에 붙는 payload입니다. 프롬프트 문장 대신 이 값으로 서버가 계약을 고릅니다. */
+type AiSectionRequest =
+  | { operation: "new-section"; sectionPreset: NewSectionPresetId; sectionBrief: string; projectAssetUrls: string[] }
+  | { operation: "redesign-section"; sectionBrief: string; projectAssetUrls: string[]; reservedNodeIds: string[] };
 
 /**
  * 새 섹션이 재사용할 수 있는, 이미 이 프로젝트 안에 있는 사진들입니다.
@@ -162,6 +164,36 @@ function projectImageUrls(source: ProjectSource) {
   return [...new Set(collectAssetReferences(source.html, source.css)
     .filter((reference) => !reference.inProductArea && /^https:\/\//i.test(reference.url))
     .map((reference) => reference.url))].slice(0, 24);
+}
+
+/**
+ * 선택한 섹션 밖에서 이미 쓰이고 있는 편집 ID입니다.
+ * 재디자인 patch가 이 ID를 가져오면 문서 전체가 중복 ID로 Export에서 거절되므로 서버에 함께 넘깁니다.
+ */
+function reservedNodeIds(source: ProjectSource, sectionId: string) {
+  const document = parseSource(source.html);
+  if (!document) return [];
+  const section = findByMoireId(document, sectionId);
+  const inside = new Set([
+    ...(section ? [section.dataset.moireId ?? ""] : []),
+    ...(section ? [...section.querySelectorAll<HTMLElement>("[data-moire-id]")].map((node) => node.dataset.moireId ?? "") : []),
+  ]);
+  return [...new Set([...document.querySelectorAll<HTMLElement>("[data-moire-id]")]
+    .map((node) => node.dataset.moireId ?? "")
+    .filter((id) => id && !inside.has(id)))];
+}
+
+/**
+ * 이 섹션이 상품 진열을 품고 있는지 봅니다.
+ *
+ * 상품 섹션 안이라도 슬롯 밖의 제목·문단은 그 자체로는 상품 노드가 아니어서,
+ * 선택 노드만 보면 재설계 대상처럼 보입니다. 승격될 섹션 루트를 기준으로 판단해야 합니다.
+ */
+function sectionOwnsProductSlot(source: ProjectSource, sectionId: string | null) {
+  if (!sectionId) return false;
+  const document = parseSource(source.html);
+  const section = document ? findByMoireId(document, sectionId) : null;
+  return Boolean(section && (section.querySelector("[data-cafe24-slot]") || section.dataset.moireType === "products"));
 }
 
 function replaceNode(source: ProjectSource, nodeId: string, nodeHtml: string, nodeCss: string) {
@@ -197,6 +229,7 @@ export function EditorShell({ initialSource, projectId = null, initialVersions =
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
   const [showVersions, setShowVersions] = useState(false);
   const [showAddSection, setShowAddSection] = useState(false);
+  const [showRedesign, setShowRedesign] = useState(false);
   const [showPublish, setShowPublish] = useState(false);
   const [chatInput, setChatInput] = useState("");
   const [chatBusy, setChatBusy] = useState(false);
@@ -514,6 +547,12 @@ export function EditorShell({ initialSource, projectId = null, initialVersions =
 
   function sectionNodeId() { return selectedNode?.sectionId ?? (selectedNode?.tagName === "section" ? selectedNode.id : null); }
 
+  /** 재설계 대상 섹션이 상품 진열을 품고 있으면 요청을 만들지 않습니다. */
+  const activeSectionOwnsProducts = useMemo(
+    () => sectionOwnsProductSlot(source, selectedNode?.sectionId ?? (selectedNode?.tagName === "section" ? selectedNode.id : null)),
+    [source, selectedNode?.sectionId, selectedNode?.tagName, selectedNode?.id],
+  );
+
   function toggleHidden(id = sectionNodeId()) {
     if (!id) return;
     mutateNode(id, (node) => {
@@ -580,7 +619,7 @@ export function EditorShell({ initialSource, projectId = null, initialVersions =
     }
   }, [projectId]);
 
-  async function requestAiPatch(prompt: string, target: EditorNodeSelection, baseSource = sourceRef.current, sectionRequest: NewSectionRequest | null = null) {
+  async function requestAiPatch(prompt: string, target: EditorNodeSelection, baseSource = sourceRef.current, sectionRequest: AiSectionRequest | null = null) {
     const snapshot = readNode(baseSource, target, viewport);
     if (!snapshot) throw new Error("AI가 수정할 선택 영역을 찾지 못했습니다.");
     const renderMetrics = selectionMetrics?.nodeId === snapshot.id ? {
@@ -780,6 +819,38 @@ export function EditorShell({ initialSource, projectId = null, initialVersions =
     } finally { setChatBusy(false); }
   }
 
+  /**
+   * 기존 섹션 재디자인입니다.
+   *
+   * 텍스트를 고른 상태여도 섹션 루트로 승격해서 보냅니다. 상품 진열과 Header는 코드가 소유하므로 대상이 아니고,
+   * 실패하거나 화면 결과가 달라지지 않으면 requestAiPatch가 원본 섹션을 그대로 되돌리고 Credit도 예약만 풉니다.
+   */
+  async function redesignSection(brief: string) {
+    const node = selectedNode;
+    const id = sectionNodeId();
+    if (chatBusy) return;
+    if (node?.isHeader) { setToast("헤더는 Inspector에서 형식만 바꿀 수 있습니다"); return; }
+    if (!id || !node) { setToast("다시 디자인할 섹션을 먼저 선택해 주세요"); return; }
+    if (node.isProductSection || node.insideProductSlot || activeSectionOwnsProducts) { setToast("상품 진열 영역은 Cafe24 상품 바인딩이 소유합니다"); return; }
+
+    const baseSource = sourceRef.current;
+    const target = { id, type: "section", tagName: "section" };
+    setSelection(target); setShowRedesign(false); setLeftPanel("ai"); setChatBusy(true);
+    setMessages((items) => [...items, { id: crypto.randomUUID(), role: "user", text: `섹션 다시 디자인 · ${brief}` }]);
+    try {
+      const summary = await requestAiPatch(`이 섹션을 다시 디자인해줘. 요구사항: ${brief}`, target, baseSource, {
+        operation: "redesign-section",
+        sectionBrief: brief,
+        projectAssetUrls: projectImageUrls(baseSource),
+        reservedNodeIds: reservedNodeIds(baseSource, id),
+      });
+      setMessages((items) => [...items, { id: crypto.randomUUID(), role: "assistant", text: summary }]);
+      setToast("섹션을 다시 디자인했습니다");
+    } catch (error) {
+      setMessages((items) => [...items, { id: crypto.randomUUID(), role: "assistant", text: `${error instanceof Error ? error.message : "섹션 재디자인에 실패했습니다."} 원래 섹션은 그대로 두었습니다.` }]);
+    } finally { setChatBusy(false); }
+  }
+
   async function saveVersion() {
     const label = `저장 버전 ${versions.length + 1}`;
     const createdAt = new Date().toISOString();
@@ -841,10 +912,11 @@ export function EditorShell({ initialSource, projectId = null, initialVersions =
 
         <section className="editor-stage"><div className="stage-toolbar"><span>{viewport === "desktop" ? "1920 × 1080" : viewport === "tablet" ? "1024 × 768" : "390 × 844"}</span><b>HTML/CSS 직접 렌더링</b></div><div className={`canvas-viewport viewport-${viewport}`}><EditorCanvas source={source} selection={selection} previewStylePatch={previewStylePatch} previewHeaderPresentation={previewHeaderPresentation} viewport={viewport} onSelectionMetrics={handleSelectionMetrics} onSelect={(next) => { setPreviewStylePatch(null); setPreviewHeaderPresentation(null); selectionMetricsRef.current = null; setSelectionMetrics(null); setSelection(next); setRightOpen(true); }} /></div></section>
 
-        {rightOpen && <aside className="editor-inspector"><div className="inspector-title"><div><span>선택 노드</span><b>{selectedNode ? `${selectedNode.tagName} · ${selectedNode.type}` : "선택 없음"}</b></div><button onClick={() => setRightOpen(false)} aria-label="Inspector 닫기"><X size={16} /></button></div>{selectedNode ? <NodeInspector node={selectedNode} renderMetrics={selectionMetrics?.nodeId === selectedNode.id ? selectionMetrics : null} projectId={projectId} productPresentation={source.architecture.productPresentation} thumbRatioOverride={source.commerce?.thumbRatioOverride} headerVariant={(source.architecture.header as EditorHeaderVariant) ?? "split-utility"} headerTextTone={source.headerTextTone ?? "dark"} headerPresentation={resolveHeaderPresentation(source.headerPresentation)} onPreviewHeaderPresentation={setPreviewHeaderPresentation} onHeaderTextTone={applyHeaderTextTone} onHeaderPresentation={applyHeaderPresentation} onHeaderVariant={(variant) => { if (!applyHeaderVariant(variant)) setToast("헤더가 이미 그 형식입니다"); }} onText={updateText} onAttribute={updateAttribute} onStyle={updateStyle} onStyles={updateStyles} onPreviewStyle={previewStyle} onImageSource={updateImageSource} /> : <p className="empty-inspector">미리보기에서 텍스트, 이미지, 버튼 또는 섹션을 클릭하세요.</p>}{sectionNodeId() && <div className="section-actions"><button onClick={duplicateSection}><Copy size={14} /> 복제</button><button onClick={() => toggleHidden()}><EyeOff size={14} /> 숨김</button><button className="danger" onClick={deleteSection}><Trash2 size={14} /> 삭제</button></div>}<button className="inspector-ai-button" onClick={() => setLeftPanel("ai")}><Sparkles size={15} /> AI로 선택 영역 다시 설계</button></aside>}
+        {rightOpen && <aside className="editor-inspector"><div className="inspector-title"><div><span>선택 노드</span><b>{selectedNode ? `${selectedNode.tagName} · ${selectedNode.type}` : "선택 없음"}</b></div><button onClick={() => setRightOpen(false)} aria-label="Inspector 닫기"><X size={16} /></button></div>{selectedNode ? <NodeInspector node={selectedNode} renderMetrics={selectionMetrics?.nodeId === selectedNode.id ? selectionMetrics : null} projectId={projectId} productPresentation={source.architecture.productPresentation} thumbRatioOverride={source.commerce?.thumbRatioOverride} headerVariant={(source.architecture.header as EditorHeaderVariant) ?? "split-utility"} headerTextTone={source.headerTextTone ?? "dark"} headerPresentation={resolveHeaderPresentation(source.headerPresentation)} onPreviewHeaderPresentation={setPreviewHeaderPresentation} onHeaderTextTone={applyHeaderTextTone} onHeaderPresentation={applyHeaderPresentation} onHeaderVariant={(variant) => { if (!applyHeaderVariant(variant)) setToast("헤더가 이미 그 형식입니다"); }} onText={updateText} onAttribute={updateAttribute} onStyle={updateStyle} onStyles={updateStyles} onPreviewStyle={previewStyle} onImageSource={updateImageSource} /> : <p className="empty-inspector">미리보기에서 텍스트, 이미지, 버튼 또는 섹션을 클릭하세요.</p>}{sectionNodeId() && <div className="section-actions"><button className="section-redesign" disabled={activeSectionOwnsProducts} title={activeSectionOwnsProducts ? "상품 진열 영역은 Cafe24가 소유합니다" : "이 섹션을 AI가 다시 디자인합니다"} onClick={() => setShowRedesign(true)}><Sparkles size={14} /> AI 재설계</button><button onClick={duplicateSection}><Copy size={14} /> 복제</button><button onClick={() => toggleHidden()}><EyeOff size={14} /> 숨김</button><button className="danger" onClick={deleteSection}><Trash2 size={14} /> 삭제</button></div>}<button className="inspector-ai-button" onClick={() => setLeftPanel("ai")}><Sparkles size={15} /> AI로 선택 영역 다시 설계</button></aside>}
       </div>
 
       {toast && <div className="editor-toast"><Save size={14} /> {toast}</div>}
+      {showRedesign && <RedesignSectionModal label={regions.find((region) => region.id === sectionNodeId())?.label ?? "선택한 섹션"} busy={chatBusy} onClose={() => setShowRedesign(false)} onSubmit={redesignSection} />}
       {showAddSection && <AddSectionModal anchorLabel={regions.find((region) => region.id === (selectedNode?.sectionId ?? selection?.id))?.label ?? null} busy={chatBusy} onClose={() => setShowAddSection(false)} onAdd={addAiSection} />}
       {showVersions && <VersionModal versions={versions} current={source} activeVersionId={activeVersionId} busy={persistBusy} onClose={() => setShowVersions(false)} onSave={saveVersion} onRestore={restoreVersion} />}
       {showPublish && <PublishModal projectId={projectId} saveStateLabel={autosaveLabel(autosaveState, lastSavedAt)} onFlushDraft={flushDraft} onClose={() => setShowPublish(false)} />}
@@ -1125,6 +1197,18 @@ function AddSectionModal({ anchorLabel, busy, onClose, onAdd }: { anchorLabel: s
       </div>
       <textarea rows={5} value={brief} onChange={(event) => setBrief(event.target.value)} placeholder={preset.briefPlaceholder} />
       <button disabled={busy || brief.trim().length < 5} onClick={() => void onAdd({ presetId, brief: brief.trim(), position })}><Sparkles size={15} /> {busy ? "생성 중" : "새 섹션 생성 · 1C"}</button>
+    </div>
+  </div></div>;
+}
+
+function RedesignSectionModal({ label, busy, onClose, onSubmit }: { label: string; busy: boolean; onClose: () => void; onSubmit: (brief: string) => Promise<void> }) {
+  const [brief, setBrief] = useState("");
+  return <div className="modal-backdrop"><div className="editor-modal add-ai-section-modal">
+    <div className="modal-title"><div><Sparkles size={18} /><b>섹션 다시 디자인</b></div><button onClick={onClose} aria-label="재설계 창 닫기"><X size={17} /></button></div>
+    <div className="add-section-form">
+      <p><b>{label}</b> 섹션의 목적과 지금 적혀 있는 정보는 그대로 두고, 구조와 디자인만 새로 만듭니다. 상품 진열과 헤더는 바뀌지 않습니다.</p>
+      <textarea rows={5} value={brief} onChange={(event) => setBrief(event.target.value)} placeholder="예: 지금은 카드 3개가 나열돼 있는데, 큰 사진 하나와 짧은 문장으로 여백 있게 바꿔줘." />
+      <button disabled={busy || brief.trim().length < 5} onClick={() => void onSubmit(brief.trim())}><Sparkles size={15} /> {busy ? "재설계 중" : "이 섹션 다시 디자인 · 1C"}</button>
     </div>
   </div></div>;
 }

@@ -193,7 +193,7 @@ test("새 섹션의 사진은 프로젝트 자산만 쓰고, 깨진 주소는 �
   assert.ok(generator.includes("Never invent an image address"));
 
   // 그래도 지어낸 주소가 오면 저장 전에 확인하고 깨진 자리만 대체합니다.
-  assert.match(generator, /preset && options\?\.imageProbe[\s\S]*verifyGeneralImages\(\{ html: patch\.nodeHtml/);
+  assert.match(generator, /sectionOperation && options\?\.imageProbe[\s\S]*verifyGeneralImages\(\{ html: patch\.nodeHtml/);
   assert.match(generator, /imageChecks\.some\(\(check\) => isRepairableVerdict\(check\.verdict\)\)/);
   assert.match(generator, /repairBrokenImages\(\{\s*source: \{ html: patch\.nodeHtml, css: patch\.nodeCss \}/);
   assert.match(route, /imageProbe: createImageProbe\(\)/);
@@ -226,13 +226,14 @@ test("새 섹션 요청은 프롬프트 추측이 아니라 operation으로 서�
   ]);
 
   // 서버: operation으로 계약을 고르고, style-only 오분류로 빈 자리표시자가 남지 않게 합니다.
-  assert.match(route, /operation: z\.enum\(\["node-edit", "new-section"\]\)\.optional\(\)/);
+  assert.match(route, /operation: z\.enum\(\["node-edit", "new-section", "redesign-section"\]\)\.optional\(\)/);
   assert.match(route, /sectionPreset: z\.enum\(NEW_SECTION_PRESET_IDS\)\.optional\(\)/);
   assert.match(route, /value\.operation !== "new-section" \|\| Boolean\(value\.sectionPreset\)/);
-  assert.match(generator, /const editIntent = operation === "new-section" \? "general" : classifyAiEditIntent\(input\.prompt\)/);
+  assert.match(generator, /const editIntent = sectionOperation \? "general" : classifyAiEditIntent\(input\.prompt\)/);
+  assert.match(generator, /const sectionOperation = operation !== "node-edit"/);
   assert.match(generator, /if \(operation === "new-section" && !preset\) throw new Error/);
   assert.match(generator, /\$\{preset \? newSectionSystemPrompt : ""\}/);
-  assert.match(generator, /validateNodePatchStructure\(\{ operation, before: input\.nodeHtml, after: patch\.nodeHtml \}\)/);
+  assert.match(generator, /validateNodePatchStructure\(\{ operation, before: input\.nodeHtml, after: patch\.nodeHtml, reservedIds: input\.reservedNodeIds \}\)/);
   for (const rule of [
     "Never output data-cafe24-slot",
     "Keep every data-moire-plan",

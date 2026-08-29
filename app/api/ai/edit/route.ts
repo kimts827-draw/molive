@@ -9,6 +9,7 @@ import { hasSupabaseServerConfig } from "@/lib/supabase/config";
 import { releaseAiCredits, reserveAiCredits } from "@/lib/credits/service";
 import { NEW_SECTION_PRESET_IDS } from "@/lib/editor/new-section";
 import { createImageProbe } from "@/lib/assets/image-probe";
+import { HEADER_NODE_ID } from "@/lib/commerce/fixed-components";
 
 const requestSchema = z.object({
   prompt: z.string().min(2).max(3000),
@@ -27,11 +28,13 @@ const requestSchema = z.object({
    * 어떤 AI 기능으로 들어온 요청인지 코드가 명시적으로 받습니다.
    * 프롬프트 문장을 정규식으로 추측하지 않아야 메뉴별로 계약과 검증을 다르게 걸 수 있습니다.
    */
-  operation: z.enum(["node-edit", "new-section"]).optional(),
+  operation: z.enum(["node-edit", "new-section", "redesign-section"]).optional(),
   sectionPreset: z.enum(NEW_SECTION_PRESET_IDS).optional(),
   sectionBrief: z.string().max(2000).optional(),
-  /** 새 섹션이 재사용할 수 있는, 이미 이 프로젝트 안에 있는 이미지 주소입니다. */
+  /** 섹션 작업이 재사용할 수 있는, 이미 이 프로젝트 안에 있는 이미지 주소입니다. */
   projectAssetUrls: z.array(z.string().max(2000)).max(60).optional(),
+  /** 선택 영역 밖에서 이미 쓰이고 있는 편집 ID입니다. patch가 이 값을 가져오지 못하게 막습니다. */
+  reservedNodeIds: z.array(z.string().max(500)).max(1000).optional(),
 }).refine((value) => value.operation !== "new-section" || Boolean(value.sectionPreset), {
   message: "새 섹션 유형을 선택해 주세요.",
   path: ["sectionPreset"],
@@ -48,6 +51,16 @@ export async function POST(request: Request) {
       const firstIssue = parsedInput.error.issues[0];
       const field = firstIssue?.path.join(".") || "요청";
       return Response.json({ error: `AI 수정 요청의 ${field} 값을 확인해 주세요.`, issues: parsedInput.error.issues }, { status: 400 });
+    }
+    /**
+     * 재디자인 대상은 상품 슬롯이 없는 본문 section뿐입니다.
+     * 검증된 ProductSectionV1과 고정 HeaderV1은 코드가 소유하므로 Credit을 예약하기 전에 거절합니다.
+     */
+    if (parsedInput.data.operation === "redesign-section") {
+      const { nodeId, nodeHtml } = parsedInput.data;
+      if (nodeId === HEADER_NODE_ID) return Response.json({ error: "헤더는 고정 컴포넌트가 소유해서 다시 디자인할 수 없습니다. 형식은 Inspector에서 바꿀 수 있습니다." }, { status: 400 });
+      if (/data-cafe24-slot/i.test(nodeHtml)) return Response.json({ error: "상품 진열 영역은 Cafe24 상품 바인딩이 소유해서 다시 디자인할 수 없습니다. 상품 영역을 감싸는 제목과 배경은 수정할 수 있습니다." }, { status: 400 });
+      if (!/^\s*<section[\s>]/i.test(nodeHtml)) return Response.json({ error: "다시 디자인할 섹션을 찾지 못했습니다. 캔버스에서 섹션을 선택해 주세요." }, { status: 400 });
     }
     const projectId = parsedInput.data.projectId ?? null;
     if (projectId && hasSupabaseServerConfig()) {

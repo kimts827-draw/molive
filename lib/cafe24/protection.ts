@@ -196,6 +196,74 @@ function planAttributeMap(openTag: string) {
   return found;
 }
 
+export type NodePatchOperation = "node-edit" | "new-section" | "redesign-section";
+
+const NODE_ID_PATTERN = /\bdata-moire-id\s*=\s*(["'])([^"']*)\1/gi;
+
+function nodeIds(html: string) {
+  return [...html.matchAll(NODE_ID_PATTERN)].map((match) => match[2]);
+}
+
+function collidingNodeIds(html: string, reservedIds: readonly string[]) {
+  const reserved = new Set(reservedIds);
+  return [...new Set(nodeIds(html).filter((id) => reserved.has(id)))];
+}
+
+/**
+ * 섹션 안에 쓰인 header 요소를 div로 낮춥니다.
+ *
+ * Project Source에는 header 요소가 존재할 수 없습니다(페이지 헤더는 고정 HeaderV1 소유이고,
+ * composeCommerce가 AI 캔버스의 header를 전부 걷어냅니다). 그런데 모델은 섹션 제목 묶음을
+ * <header>로 감싸는 평범한 마크업 습관이 있어, 그대로 두면 내용이 통째로 사라지거나 Export가 거절됩니다.
+ * 의미가 없는 태그 하나 때문에 요청을 통째로 실패시키는 대신 코드가 결정적으로 낮춰 줍니다.
+ */
+export function demoteForbiddenChrome(html: string) {
+  const demoted = html.replace(/<header(?=[\s>])/gi, "<div").replace(/<\/header\s*>/gi, "</div>");
+  return { html: demoted, changed: demoted !== html };
+}
+
+/**
+ * patch가 들고 온 편집 ID를 문서에서 유일하게 만듭니다.
+ *
+ * 모델은 선택 영역만 보고 답하므로 페이지의 다른 섹션이 이미 쓰는 ID를 우연히 만들 수 있습니다.
+ * 그대로 두면 Editor에서는 통과하고 ZIP/게시의 DUPLICATE_EDIT_ID에서 터지므로,
+ * 재시도로 비용을 들이는 대신 코드가 결정적으로 이름을 바꿔 줍니다.
+ * 선택 루트 ID는 patch 계약의 기준이므로 어떤 경우에도 바꾸지 않습니다.
+ */
+export function dedupeNodePatchIds(input: { rootId: string; reservedIds: readonly string[]; nodeHtml: string; nodeCss: string }) {
+  const reserved = new Set(input.reservedIds.filter((id) => id !== input.rootId));
+  const used = new Set<string>([...reserved, input.rootId]);
+  const renamed = new Map<string, string>();
+  const duplicated: string[] = [];
+  const seen = new Set<string>([input.rootId]);
+
+  const nodeHtml = input.nodeHtml.replace(NODE_ID_PATTERN, (match, quote: string, id: string) => {
+    if (id === input.rootId) return match;
+    const collides = reserved.has(id);
+    const repeated = seen.has(id);
+    if (!collides && !repeated) {
+      seen.add(id);
+      used.add(id);
+      return match;
+    }
+    let next = `${id}-${input.rootId.replace(/[^a-z0-9]/gi, "").slice(-6) || "x"}`;
+    let suffix = 2;
+    while (used.has(next)) next = `${id}-${suffix++}`;
+    used.add(next);
+    seen.add(next);
+    // 한 번만 나온 ID의 충돌만 CSS까지 따라갑니다. patch 안에서 중복된 ID는 이미 선택자가 모호합니다.
+    if (collides && !repeated) renamed.set(id, next);
+    else duplicated.push(id);
+    return `data-moire-id=${quote}${next}${quote}`;
+  });
+
+  let nodeCss = input.nodeCss;
+  for (const [from, to] of renamed) {
+    nodeCss = nodeCss.replaceAll(`[data-moire-id="${from}"]`, `[data-moire-id="${to}"]`).replaceAll(`[data-moire-id='${from}']`, `[data-moire-id='${to}']`);
+  }
+  return { nodeHtml, nodeCss, renamed: [...renamed.entries()].map(([from, to]) => ({ from, to })), duplicated };
+}
+
 /**
  * 노드 단위 검사만으로는 잡히지 않지만 문서 전체 계약을 깨는 변화를 막습니다.
  *
@@ -205,7 +273,7 @@ function planAttributeMap(openTag: string) {
  *
  * new-section에서는 코드가 소유한 plan 축 속성과 section 루트 태그도 함께 지킵니다.
  */
-export function validateNodePatchStructure(input: { operation: "node-edit" | "new-section"; before: string; after: string }) {
+export function validateNodePatchStructure(input: { operation: NodePatchOperation; before: string; after: string; reservedIds?: readonly string[] }) {
   const violations: SafetyViolation[] = [];
   const beforeSlot = PRODUCT_SLOT_PATTERN.test(input.before);
   const afterSlot = PRODUCT_SLOT_PATTERN.test(input.after);
@@ -213,14 +281,18 @@ export function validateNodePatchStructure(input: { operation: "node-edit" | "ne
   if (beforeSlot && !afterSlot) violations.push({ code: "PRODUCT_SLOT_REMOVED", message: "선택 영역 안의 상품 슬롯을 없앨 수 없습니다. Cafe24 상품 진열이 사라집니다." });
   if (/<header[\s>]/i.test(input.after)) violations.push({ code: "HEADER_ELEMENT_CREATED", message: "헤더는 고정 컴포넌트 HeaderV1이 소유합니다. 편집으로 header 요소를 만들 수 없습니다." });
 
-  if (input.operation === "new-section") {
+  if (input.operation !== "node-edit") {
     const afterRoot = rootOpenTag(input.after);
-    if (!/^<section[\s>]/i.test(afterRoot)) violations.push({ code: "SECTION_ROOT_TAG_CHANGED", message: "새 섹션의 루트는 section 요소여야 합니다." });
+    if (!/^<section[\s>]/i.test(afterRoot)) violations.push({ code: "SECTION_ROOT_TAG_CHANGED", message: "섹션 편집의 루트는 section 요소여야 합니다." });
     const before = planAttributeMap(rootOpenTag(input.before));
     const after = planAttributeMap(afterRoot);
     for (const [name, value] of before) {
-      if (after.get(name) !== value) violations.push({ code: "PLAN_ATTRIBUTES_LOST", message: "새 섹션의 plan 축 속성은 코드가 소유합니다. 값을 그대로 유지해야 합니다.", token: name });
+      if (after.get(name) !== value) violations.push({ code: "PLAN_ATTRIBUTES_LOST", message: "섹션의 plan 축 속성은 코드가 소유합니다. 값을 그대로 유지해야 합니다.", token: name });
     }
+  }
+  // 다른 섹션이 이미 쓰고 있는 편집 ID가 들어오면 문서 전체가 중복 ID로 Export에서 거절됩니다.
+  for (const id of collidingNodeIds(input.after, input.reservedIds ?? [])) {
+    violations.push({ code: "NODE_ID_COLLISION", message: "다른 섹션이 쓰고 있는 편집 ID를 가져올 수 없습니다.", token: id });
   }
   return { safe: violations.length === 0, violations };
 }
