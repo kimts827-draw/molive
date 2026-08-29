@@ -24,9 +24,10 @@
 
 import type { PagePlan } from "./page-plan.ts";
 import { PLAN_ATTRIBUTE_NAMES } from "./plan-attributes.ts";
+import { SECTION_TYPES } from "./section-registry.ts";
 
 const ROOT = "[data-moire-root]";
-const { tone, container, surface } = PLAN_ATTRIBUTE_NAMES;
+const { tone, container, surface, media } = PLAN_ATTRIBUTE_NAMES;
 
 /**
  * plan이 코드 소유로 확정한 hard property에만 붙입니다.
@@ -92,27 +93,37 @@ function toneCss(plan: PagePlan) {
 }
 
 /**
+ * 어떤 지면에서도 콘텐츠가 화면 끝에 닿지 않게 하는 공통 안전 여백입니다.
+ * 1280px에서 약 41px, 1440px에서 46px, 1600px에서 51px, 390px에서 20px이 됩니다.
+ */
+const GUTTER = "var(--molive-gutter)";
+const GUTTER_TOKEN = `${ROOT}{--molive-gutter:clamp(20px,3.2vw,56px)}`;
+
+/**
  * container별 inline measure입니다.
  *
  * 강제되는 최소 geometry 차이는 "가로 폭"뿐입니다. display·grid·수직 리듬은 건드리지 않아
- * AI가 짠 레이아웃이 깨질 경로를 만들지 않습니다. AI가 안쪽에 자기 컨테이너를 두었더라도
- * 폭이 좁아질 뿐이라 안전합니다. full-bleed만 직계 자식의 max-width를 풀어야 실제로 전폭이 됩니다.
+ * AI가 짠 레이아웃이 깨질 경로를 만들지 않습니다.
+ *
+ * full-bleed는 "배경만 전폭"이라는 뜻이다. 배경은 padding box까지 칠해지므로 섹션에 안전 여백을
+ * 주어도 색면·사진은 화면 끝까지 이어지고 글·버튼·그리드만 안쪽 가이드 안에 머문다.
+ * 이전 구현은 직계 자식의 max-width와 margin-inline까지 !important로 지워서
+ * AI가 걸어 둔 내부 컨테이너(예: max-width:1100px; margin-inline:auto)가 무력화됐고,
+ * 그 결과 PC에서 본문이 좌우 0px까지 퍼지고 가운데 정렬이 풀렸다. 그 두 선언은 더 이상 건드리지 않는다.
  */
 const CONTAINER_RULES: Record<string, (root: string) => string[]> = {
-  boxed: (root) => [`${root} [${container}="boxed"]{${hard("padding-inline:max(24px,calc((100% - 1200px) / 2))")}}`],
-  wide: (root) => [`${root} [${container}="wide"]{${hard("padding-inline:max(24px,calc((100% - 1560px) / 2))")}}`],
-  asymmetric: (root) => [`${root} [${container}="asymmetric"]{${hard("padding-inline:clamp(24px,9vw,200px) clamp(24px,3vw,56px)")}}`],
-  "full-bleed": (root) => [
-    `${root} [${container}="full-bleed"]{${hard("padding-inline:0")}}`,
-    `${root} [${container}="full-bleed"],${root} [${container}="full-bleed"] > *{${hard("max-width:none;margin-inline:0")}}`,
-  ],
+  boxed: (root) => [`${root} [${container}="boxed"]{${hard(`padding-inline:max(${GUTTER},calc((100% - 1200px) / 2))`)}}`],
+  wide: (root) => [`${root} [${container}="wide"]{${hard(`padding-inline:max(${GUTTER},calc((100% - 1560px) / 2))`)}}`],
+  asymmetric: (root) => [`${root} [${container}="asymmetric"]{${hard(`padding-inline:clamp(32px,9vw,200px) ${GUTTER}`)}}`],
+  // 섹션 자체의 max-width만 풀어 밴드가 전폭이 되게 하고, 내부 콘텐츠는 안전 여백 안에 둔다.
+  "full-bleed": (root) => [`${root} [${container}="full-bleed"]{${hard(`max-width:none;padding-inline:${GUTTER}`)}}`],
 };
 
 /**
- * 좁은 화면에서는 어떤 지면이든 같은 안전 여백으로 되돌립니다.
+ * 좁은 화면에서는 비대칭 지면도 같은 안전 여백으로 되돌립니다.
  * 데스크톱 규칙이 !important라 이쪽도 같은 무게여야 모바일에서 뒤집힙니다.
  */
-const CONTAINER_MOBILE = `@media all and (max-width:767px){${ROOT} [${container}]:not([${container}="full-bleed"]){${hard("padding-inline:20px")}}}`;
+const CONTAINER_MOBILE = `@media all and (max-width:767px){${ROOT} [${container}="asymmetric"]{${hard(`padding-inline:${GUTTER}`)}}}`;
 
 /**
  * 표면 표현입니다. tone이 배경색을 맡으므로 여기서는 카드와 괘선만 다룹니다.
@@ -120,11 +131,34 @@ const CONTAINER_MOBILE = `@media all and (max-width:767px){${ROOT} [${container}
  */
 const SURFACE_RULES: Record<string, (root: string) => string[]> = {
   outlined: (root) => [`${root} [${surface}="outlined"]{${hard("border-block:1px solid var(--molive-line)")}}`],
-  card: (root) => [`${root} [${surface}="card"] > *{${hard("background-color:var(--molive-raised);border-radius:var(--molive-radius)")}}`],
+  // card는 배경·모서리뿐 아니라 내부 여백까지 코드가 소유합니다.
+  // 여백 없이 배경만 깔리면 글이 카드 모서리에 붙어 카드로 읽히지 않습니다.
+  card: (root) => [`${root} [${surface}="card"] > *{${hard("background-color:var(--molive-raised);border-radius:var(--molive-radius);padding:clamp(18px,1.6vw,28px)")}}`],
 };
 
+/**
+ * media-first full-bleed 섹션의 미디어 묶음만 안전 여백 밖으로 흘려보냅니다.
+ *
+ * 대상은 plan-attributes가 구조로 판정해 직접 표시한 직계 자식뿐입니다(data-moire-media="edge").
+ * 임의 깊이의 img를 싸잡지 않고, 같은 섹션의 헤딩·카피·CTA는 그대로 여백 안에 남습니다.
+ * 음수 margin만 쓰므로 섹션의 padding은 그대로여서 나머지 콘텐츠 가이드가 유지됩니다.
+ */
+function edgeMediaCss() {
+  const scope = `${ROOT} [${container}="full-bleed"] > [${media}="edge"]`;
+  return [
+    `${scope}{${hard(`margin-inline:calc(${GUTTER} * -1);width:auto;max-width:none`)}}`,
+    // 이미지는 화면 끝까지 가더라도 그 위 캡션 글자는 끝에 붙으면 안 됩니다.
+    // 표시된 edge 묶음 안으로만 범위가 한정된 규칙입니다.
+    `${scope} figcaption{${hard("padding-inline:clamp(14px,1.4vw,24px)")}}`,
+  ];
+}
+
 function geometryCss(plan: PagePlan) {
-  const rules: string[] = [];
+  const rules: string[] = [GUTTER_TOKEN];
+  // 이번 plan에 media-first full-bleed 섹션이 있을 때만 예외 규칙을 만듭니다.
+  if (plan.sections.some((section) => section.container === "full-bleed" && SECTION_TYPES[section.type]?.mediaFirst)) {
+    rules.push(...edgeMediaCss());
+  }
   const containers = new Set(plan.sections.flatMap((section) => (section.container ? [section.container] : [])));
   for (const value of containers) rules.push(...(CONTAINER_RULES[value]?.(ROOT) ?? []));
   if (containers.size) rules.push(CONTAINER_MOBILE);

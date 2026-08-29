@@ -234,8 +234,13 @@ function normalizeSection(section: PagePlanSection, order: number): PagePlanSect
    * (허용 목록이 비어 있으면 그 축은 쓰지 않습니다 — 예: featuredProducts의 columns는 productPresentation이 소유.)
    */
   const geometry = definition.geometry ?? {};
-  const container = geometry.containers?.length
-    ? (geometry.containers.includes(section.container as SectionContainer) ? section.container as SectionContainer : pick(geometry.containers, order))
+  /**
+   * 가운데 정렬 섹션에 비대칭 지면을 주면 좌우 여백이 달라 카피가 실제로는 중앙에 오지 않습니다.
+   * 두 축이 서로를 무너뜨리는 조합이므로 여기서 대칭 지면만 남깁니다.
+   */
+  const allowedContainers = (geometry.containers ?? []).filter((value) => alignment !== "center" || value !== "asymmetric");
+  const container = allowedContainers.length
+    ? (allowedContainers.includes(section.container as SectionContainer) ? section.container as SectionContainer : pick(allowedContainers, order))
     : undefined;
   const columns = geometry.columns?.length
     ? (geometry.columns.includes(section.columns as SectionColumns) ? section.columns as SectionColumns : pick(geometry.columns, order))

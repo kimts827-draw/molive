@@ -130,6 +130,11 @@ export type SectionTypeDefinition = {
   axes: { alignment: boolean; mediaPosition: boolean; density: boolean; tone: boolean };
   /** 이 타입이 쓸 수 있는 컨테이너/컬럼/표면입니다. 비어 있으면 해당 축을 쓰지 않습니다. */
   geometry?: { containers?: SectionContainer[]; columns?: SectionColumns[]; surfaces?: SectionSurfaceStyle[] };
+  /**
+   * 이미지가 곁들임이 아니라 그 자체로 주 콘텐츠인 섹션입니다.
+   * full-bleed일 때 미디어 묶음만 안전 여백 밖으로 흘려보내는 예외에 씁니다(글·CTA는 그대로 여백 안).
+   */
+  mediaFirst?: boolean;
   variants: Record<string, DesignVariant>;
 };
 
@@ -240,6 +245,7 @@ export const SECTION_TYPES: Record<SectionTypeId, SectionTypeDefinition> = {
     repeatable: true,
     axes: { alignment: true, mediaPosition: true, density: false, tone: true },
     geometry: { containers: ["full-bleed", "wide", "boxed"], surfaces: ["flat", "photoField"] },
+    mediaFirst: true,
     variants: {
       "full-campaign": variant("full-campaign", "cta", "풀폭 캠페인", ["cta/full-campaign"], "전폭 이미지(min-height 56~78svh) 위 방향성 셰이드와 카피, 밑줄형 CTA 링크 1개."),
       "half-split": variant("half-split", "cta", "반폭 스플릿 배너", ["cta/promo-duo"], "이미지 반폭과 색면 반폭의 배너. 색면 쪽에 라벨, 카피, 링크를 두어 시선을 한쪽으로 몬다."),
@@ -255,6 +261,7 @@ export const SECTION_TYPES: Record<SectionTypeId, SectionTypeDefinition> = {
     repeatable: false,
     axes: { alignment: false, mediaPosition: true, density: true, tone: true },
     geometry: { containers: ["full-bleed", "wide", "asymmetric"], columns: [2, 3, 4, 6], surfaces: ["flat", "photoField"] },
+    mediaFirst: true,
     variants: {
       "offset-row": variant("offset-row", "story", "오프셋 이미지 행", ["story/lookbook-row"], "이미지 3~4장을 서로 다른 높이 오프셋으로 나란히 흘리는 행. 텍스트는 섹션 라벨 하나까지만."),
       "editorial-grid": variant("editorial-grid", "story", "에디토리얼 그리드", ["story/lookbook-row", "category/collection-tiles"], "크기가 다른 이미지 4~6장을 비대칭 그리드로 짜 맞춘다. 큰 컷 1장이 시선의 기준점이 되게 한다."),
@@ -375,6 +382,7 @@ export const SECTION_TYPES: Record<SectionTypeId, SectionTypeDefinition> = {
     repeatable: false,
     axes: { alignment: true, mediaPosition: true, density: true, tone: true },
     geometry: { containers: ["full-bleed", "wide", "boxed"], columns: [3, 4, 5, 6], surfaces: ["flat", "photoField"] },
+    mediaFirst: true,
     variants: {
       "sns-grid": variant("sns-grid", "social", "SNS 갤러리", ["social/sns-gallery"], "정방형 이미지 4~6장의 그리드와 핸들 라벨. 팔로워 수와 좋아요 수 등 수치는 만들지 않는다."),
       "ugc-strip": variant("ugc-strip", "social", "UGC 스트립", ["social/review-band"], "고객 씬 무드의 라이프스타일 컷 3~4장과 REAL MOMENTS 성격의 라벨. 별점과 후기 텍스트 금지."),
