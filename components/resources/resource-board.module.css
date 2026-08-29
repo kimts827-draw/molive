@@ -1,0 +1,55 @@
+.page { min-height: 100vh; padding-bottom: 110px; color: #171713; background: #f4f2ec; font-family: Inter, Pretendard, "Noto Sans KR", Arial, sans-serif; }
+.nav { width: min(1180px, calc(100% - 64px)); height: 80px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(20,20,20,.13); }
+.navLinks { display: flex; align-items: center; gap: 18px; }
+.navLinks a { display: inline-flex; align-items: center; gap: 7px; color: #66635c; font-size: 12px; font-weight: 700; }
+.navLinks a.current { color: #171713; }
+
+.hero { width: min(1180px, calc(100% - 64px)); margin: 0 auto; padding: 96px 0 54px; display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 24px; align-items: end; }
+.hero > div:first-child > span { color: #655bdd; font-size: 11px; font-weight: 800; letter-spacing: .14em; }
+.hero h1 { margin: 20px 0 22px; font-size: clamp(52px, 7vw, 82px); font-weight: 600; line-height: .98; letter-spacing: -.065em; }
+.hero p { margin: 0; color: #69665e; font-size: 16px; line-height: 1.75; white-space: pre-line; }
+.count { display: flex; align-items: baseline; gap: 8px; }
+.count strong { color: #655bdd; font-size: 42px; letter-spacing: -.04em; }
+.count span { color: #77736a; font-size: 13px; font-weight: 700; }
+
+.adminBar { width: min(1180px, calc(100% - 64px)); margin: 0 auto 26px; padding: 14px 18px; display: flex; align-items: center; justify-content: space-between; gap: 14px; background: white; border: 1px solid #d7d3ca; border-radius: 14px; }
+.adminBar span { color: #77736a; font-size: 12px; font-weight: 700; }
+.writeButton { min-height: 38px; padding: 0 16px; display: inline-flex; align-items: center; gap: 7px; color: white; background: #171713; border-radius: 10px; font-size: 12px; font-weight: 800; }
+.writeButton:hover { background: #655bdd; }
+
+.list { width: min(1180px, calc(100% - 64px)); margin: 0 auto; display: grid; gap: 14px; }
+.item { padding: 26px 28px; display: grid; gap: 10px; background: white; border: 1px solid #d7d3ca; border-radius: 18px; box-shadow: 0 12px 38px rgba(35,31,22,.06); }
+.item > a { display: grid; gap: 10px; }
+.itemMeta { display: flex; align-items: center; gap: 10px; color: #918c83; font-size: 11px; font-weight: 700; }
+.item h2 { margin: 0; font-size: 23px; font-weight: 650; line-height: 1.25; letter-spacing: -.04em; }
+.item p { margin: 0; color: #69665e; font-size: 14px; line-height: 1.7; }
+.itemActions { display: flex; gap: 10px; }
+.itemActions a { color: #655bdd; font-size: 12px; font-weight: 800; }
+
+.empty { width: min(1180px, calc(100% - 64px)); min-height: 230px; margin: 0 auto; padding: 36px; display: grid; place-items: center; align-content: center; gap: 18px; background: white; border: 1px solid rgba(20,20,20,.13); border-radius: 20px; text-align: center; }
+.empty svg { color: #655bdd; }
+.empty p { margin: 0; color: #69665e; font-size: 15px; line-height: 1.7; }
+
+.article { width: min(820px, calc(100% - 64px)); margin: 0 auto; padding: 84px 0 0; }
+.article > span { color: #655bdd; font-size: 11px; font-weight: 800; letter-spacing: .14em; }
+.article h1 { margin: 18px 0 16px; font-size: clamp(36px, 5vw, 54px); font-weight: 600; line-height: 1.08; letter-spacing: -.055em; }
+.articleMeta { display: flex; align-items: center; gap: 10px; padding-bottom: 26px; color: #918c83; font-size: 12px; font-weight: 700; border-bottom: 1px solid rgba(20,20,20,.13); }
+.articleImage { width: 100%; margin: 30px 0 0; border-radius: 18px; border: 1px solid #d7d3ca; }
+.articleBody { margin: 30px 0 0; color: #3f3c36; font-size: 16px; line-height: 1.9; white-space: pre-wrap; word-break: break-word; }
+.articleFoot { margin-top: 44px; padding-top: 22px; display: flex; gap: 14px; border-top: 1px solid rgba(20,20,20,.13); }
+.articleFoot a { color: #66635c; font-size: 12px; font-weight: 800; }
+
+@media (max-width: 800px) {
+  .nav, .hero, .list, .empty, .adminBar, .article { width: calc(100% - 32px); }
+  .nav { height: 66px; }
+  .hero { padding: 74px 0 38px; grid-template-columns: 1fr; align-items: start; }
+  .article { padding-top: 56px; }
+}
+
+@media (max-width: 520px) {
+  .page { padding-bottom: 72px; }
+  .hero h1 { font-size: 50px; }
+  .hero p { font-size: 14px; }
+  .item { padding: 22px; border-radius: 14px; }
+  .item h2 { font-size: 20px; }
+}

@@ -6,6 +6,10 @@ import { readFileSync } from "node:fs";
 const landing = await readFile(new URL("../components/landing/landing-page.tsx", import.meta.url), "utf8");
 const composer = await readFile(new URL("../components/landing/prompt-composer.tsx", import.meta.url), "utf8");
 const resultGallery = await readFile(new URL("../components/landing/result-gallery.tsx", import.meta.url), "utf8");
+const templateCatalog = await readFile(new URL("../lib/templates/catalog.ts", import.meta.url), "utf8");
+const templateBoard = await readFile(new URL("../components/resources/template-board.tsx", import.meta.url), "utf8");
+const templateLightbox = await readFile(new URL("../components/templates/template-lightbox.tsx", import.meta.url), "utf8");
+const templateLightboxStyles = await readFile(new URL("../components/templates/template-lightbox.module.css", import.meta.url), "utf8");
 const styles = await readFile(new URL("../components/landing/landing-sales.module.css", import.meta.url), "utf8");
 const planCards = await readFile(new URL("../components/pricing/plan-cards.tsx", import.meta.url), "utf8");
 const planCardStyles = await readFile(new URL("../components/pricing/plan-cards.module.css", import.meta.url), "utf8");
@@ -56,20 +60,36 @@ test("프롬프트 생성 기능은 유지하고 기본 버튼 문구는 생성�
 });
 
 test("업종별 실제 결과 이미지를 crop preview와 전체 보기로 제공한다", () => {
-  for (const [category, filename] of [["패션", "fashion.png"], ["자동차용품", "auto-care.png"], ["인테리어", "interior-v2.png"], ["뷰티", "beauty.png"]]) {
-    assert.match(resultGallery, new RegExp(category));
-    assert.match(resultGallery, new RegExp(`/samples/landing/${filename}`));
+  for (const [category, filename] of [["유아동 / 베이비", "baby.png"], ["유아동 / 키즈", "kids.png"], ["패션 / 스트리트", "streetfashion.png"], ["패션잡화 / 주얼리", "jewelry.png"]]) {
+    assert.match(templateCatalog, new RegExp(category));
+    assert.match(templateCatalog, new RegExp(`/templates/${filename}`));
   }
   assert.match(landing, /<ResultGallery \/>/);
+  assert.match(landing, /href="\/templates">템플릿 더보기/);
+  assert.match(resultGallery, /templateCatalog\.map/);
   assert.match(resultGallery, /sizes="\(max-width: 980px\)/);
-  assert.match(resultGallery, /Escape/);
-  assert.match(resultGallery, /event\.target === event\.currentTarget/);
-  assert.match(resultGallery, /aria-label="전체 보기 닫기"/);
+  assert.match(resultGallery, /<TemplateLightbox/);
+  assert.match(templateLightbox, /Escape/);
+  assert.match(templateLightbox, /event\.target === event\.currentTarget/);
+  assert.match(templateLightbox, /aria-label="전체 보기 닫기"/);
   assert.equal((resultGallery.match(/unoptimized/g) ?? []).length, 2);
   assert.match(styles, /@media \(max-width: 680px\)/);
   assert.match(styles, /\.resultPreview[^}]*aspect-ratio: 5 \/ 4/);
   assert.match(styles, /\.resultPreviewImage \{ object-fit: cover/);
-  assert.match(styles, /\.lightboxPanel[^}]*overflow-y: auto/);
+  assert.match(templateLightboxStyles, /\.panel[^}]*overflow-y: auto/);
+});
+
+test("자료실 템플릿 게시판은 이미지·카테고리·브랜드 컬러·프롬프트 복사를 제공한다", () => {
+  assert.match(templateBoard, /templates\.map/);
+  assert.match(templateBoard, /template\.imageUrl/);
+  assert.match(templateBoard, /template\.category/);
+  assert.match(templateBoard, /template\.brandColor/);
+  assert.match(templateBoard, /template\.prompt/);
+  assert.match(templateBoard, /navigator\.clipboard\.writeText/);
+  assert.match(templateBoard, /프롬프트 복사/);
+  assert.match(templateBoard, /<TemplateLightbox/);
+  assert.match(templateBoard, /전체보기/);
+  assert.match(templateLightboxStyles, /\.image[^}]*width: 100%[^}]*height: auto/);
 });
 
 test("Cafe24 적용 비교와 Editor 수정 영역은 실제 로컬 이미지를 사용한다", () => {

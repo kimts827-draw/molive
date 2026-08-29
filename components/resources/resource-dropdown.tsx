@@ -3,13 +3,8 @@
 import Link from "next/link";
 import { ChevronDown } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { RESOURCE_BOARDS } from "@/lib/resources/board";
 import styles from "./resource-dropdown.module.css";
-
-const RESOURCE_LINKS = [
-  { href: "/notice", title: "공지사항", description: "MOLIVE 업데이트와 주요 안내" },
-  { href: "/blog", title: "블로그", description: "Cafe24와 소규모 쇼핑몰 운영에 도움되는 글" },
-  { href: "/resources", title: "자료모음", description: "운영에 바로 쓰는 체크리스트와 자료" },
-] as const;
 
 export function ResourceDropdown({ mobile = false }: { mobile?: boolean }) {
   const [open, setOpen] = useState(false);
@@ -63,8 +58,8 @@ export function ResourceDropdown({ mobile = false }: { mobile?: boolean }) {
         자료실 <ChevronDown size={13} aria-hidden="true" />
       </button>
       {open ? <div className={styles.panel} id={panelId}>
-        {RESOURCE_LINKS.map((item) => <Link href={item.href} key={item.href} onClick={() => setOpen(false)}>
-          <strong>{item.title}</strong>
+        {RESOURCE_BOARDS.map((item) => <Link href={item.href} key={item.key} onClick={() => setOpen(false)}>
+          <strong>{item.label}</strong>
           <span>{item.description}</span>
         </Link>)}
       </div> : null}

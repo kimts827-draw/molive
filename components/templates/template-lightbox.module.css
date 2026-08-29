@@ -1,0 +1,13 @@
+.lightbox { position: fixed; inset: 0; z-index: 200; padding: 4vh 24px; display: flex; align-items: flex-start; justify-content: center; background: rgba(13,12,18,.86); backdrop-filter: blur(8px); }
+.panel { overflow-y: auto; width: min(1180px, 100%); max-height: 92vh; background: #f7f6f2; border-radius: 18px; box-shadow: 0 28px 90px rgba(0,0,0,.45); overscroll-behavior: contain; }
+.toolbar { position: sticky; top: 0; z-index: 2; min-height: 64px; padding: 0 14px 0 22px; display: flex; align-items: center; gap: 10px; color: #171713; background: rgba(247,246,242,.96); border-bottom: 1px solid #ddd9cf; backdrop-filter: blur(10px); }
+.toolbar strong { font-size: 15px; }
+.toolbar span { color: #77736a; font-size: 12px; }
+.toolbar button { width: 42px; height: 42px; margin-left: auto; display: grid; place-items: center; color: #171713; background: white; border: 1px solid #d8d4cb; border-radius: 50%; cursor: pointer; }
+.toolbar button:focus-visible { outline: 3px solid #765ee6; outline-offset: 2px; }
+.image { display: block; width: 100%; height: auto; object-fit: contain; }
+
+@media (max-width: 680px) {
+  .lightbox { padding: 10px; }
+  .panel { width: 100%; max-height: calc(100dvh - 20px); border-radius: 12px; }
+}

@@ -72,6 +72,9 @@ export function LandingPage({ userEmail, creditBalance, persistenceEnabled, demo
       <section className={`${styles.section} ${styles.results}`} id="results">
         <SectionTitle title={<>AI라서 <span className={styles.headlineAccent}>다 비슷할 것</span> 같나요?</>} description="아래는 MOLIVE에서 실제로 만든 쇼핑몰 디자인입니다." />
         <ResultGallery />
+        <div className={styles.resultMore}>
+          <Link href="/templates">템플릿 더보기 <ArrowRight size={16} /></Link>
+        </div>
       </section>
 
       <section className={`${styles.section} ${styles.apply}`} id="apply">

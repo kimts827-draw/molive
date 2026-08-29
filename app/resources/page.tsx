@@ -1,8 +1,14 @@
 import type { Metadata } from "next";
-import { ResourceEmptyPage } from "@/components/resources/resource-empty-page";
+import { ResourceBoardPage } from "@/components/resources/resource-board-page";
+import { isResourceAdmin } from "@/lib/admin/auth";
+import { listResourcePosts } from "@/lib/resources/service";
 
 export const metadata: Metadata = { title: "자료모음 — MOLIVE" };
 
-export default function ResourcesPage() {
-  return <ResourceEmptyPage eyebrow="RESOURCES" title="자료모음" message="쇼핑몰 운영에 바로 사용할 수 있는 자료를 준비하고 있습니다." />;
+export default async function Page() {
+  const [posts, canManage] = await Promise.all([listResourcePosts("resource"), isResourceAdmin()]);
+  return <ResourceBoardPage board="resource" posts={posts} canManage={canManage} />;
 }
+
+// 로그인 사용자에 따라 관리자 UI가 달라지므로 정적 캐시를 사용하지 않는다.
+export const dynamic = "force-dynamic";

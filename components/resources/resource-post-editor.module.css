@@ -1,0 +1,24 @@
+.shell { width: min(820px, calc(100% - 64px)); margin: 0 auto; padding: 84px 0 0; }
+.shell > span { color: #655bdd; font-size: 11px; font-weight: 800; letter-spacing: .14em; }
+.shell h1 { margin: 18px 0 30px; font-size: clamp(36px, 5vw, 54px); font-weight: 600; line-height: 1.08; letter-spacing: -.055em; }
+.form { display: grid; gap: 18px; padding: 30px; background: white; border: 1px solid #d7d3ca; border-radius: 20px; }
+.form label { display: grid; gap: 8px; font-size: 12px; font-weight: 800; }
+.form input, .form textarea { width: 100%; min-height: 44px; padding: 11px 13px; color: #171713; background: #f8f7f3; border: 1px solid #d7d3ca; border-radius: 10px; font: inherit; font-size: 14px; font-weight: 400; }
+.form textarea { min-height: 150px; line-height: 1.7; resize: vertical; }
+.form input:focus-visible, .form textarea:focus-visible { outline: 3px solid #765ee6; outline-offset: 1px; }
+.form small { color: #918c83; font-size: 11px; font-weight: 600; }
+.colorRow { display: grid; grid-template-columns: minmax(0,1fr) 54px; gap: 12px; align-items: end; }
+.colorRow input[type="color"] { min-height: 44px; padding: 4px; }
+.actions { display: flex; align-items: center; gap: 12px; }
+.actions button { min-height: 44px; padding: 0 20px; color: white; background: #171713; border: 0; border-radius: 10px; font-size: 13px; font-weight: 800; cursor: pointer; }
+.actions button:hover:not(:disabled) { background: #655bdd; }
+.actions button:disabled { opacity: .5; cursor: not-allowed; }
+.actions a { color: #66635c; font-size: 12px; font-weight: 800; }
+.actions .danger { margin-left: auto; color: #b23c3c; background: transparent; border: 1px solid #e0c4c4; }
+.actions .danger:hover:not(:disabled) { color: white; background: #b23c3c; }
+.error { margin: 0; color: #b23c3c; font-size: 13px; font-weight: 700; }
+
+@media (max-width: 800px) {
+  .shell { width: calc(100% - 32px); padding-top: 56px; }
+  .form { padding: 22px; }
+}

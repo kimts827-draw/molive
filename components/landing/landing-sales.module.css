@@ -31,14 +31,10 @@
 .resultCard footer { min-height: 74px; padding: 0 24px; display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,.08); }
 .resultCard footer strong { font-size: 14px; }
 .resultCard footer span { color: rgba(255,255,255,.65); font-size: 11px; }
-.lightbox { position: fixed; inset: 0; z-index: 200; padding: 4vh 24px; display: flex; align-items: flex-start; justify-content: center; background: rgba(13,12,18,.86); backdrop-filter: blur(8px); }
-.lightboxPanel { overflow-y: auto; width: min(1180px, 100%); max-height: 92vh; background: #f7f6f2; border-radius: 18px; box-shadow: 0 28px 90px rgba(0,0,0,.45); overscroll-behavior: contain; }
-.lightboxToolbar { position: sticky; top: 0; z-index: 2; min-height: 64px; padding: 0 14px 0 22px; display: flex; align-items: center; gap: 10px; color: #171713; background: rgba(247,246,242,.96); border-bottom: 1px solid #ddd9cf; backdrop-filter: blur(10px); }
-.lightboxToolbar strong { font-size: 15px; }
-.lightboxToolbar span { color: #77736a; font-size: 12px; }
-.lightboxToolbar button { width: 42px; height: 42px; margin-left: auto; display: grid; place-items: center; color: #171713; background: white; border: 1px solid #d8d4cb; border-radius: 50%; cursor: pointer; }
-.lightboxToolbar button:focus-visible { outline: 3px solid #765ee6; outline-offset: 2px; }
-.lightboxImage { display: block; width: 100%; height: auto; }
+.resultMore { margin-top: 38px; display: flex; justify-content: center; }
+.resultMore a { min-height: 52px; padding: 0 24px; display: inline-flex; align-items: center; gap: 9px; color: white; background: #171713; border-radius: 999px; font-size: 14px; font-weight: 800; transition: transform .2s ease, background-color .2s ease; }
+.resultMore a:hover { background: #655bdd; transform: translateY(-2px); }
+.resultMore a:focus-visible { outline: 3px solid #765ee6; outline-offset: 3px; }
 
 .apply { width: min(1280px, calc(100% - 64px)); padding-top: 150px; }
 .apply .sectionTitle { margin-left: auto; margin-right: auto; text-align: center; }
@@ -213,8 +209,7 @@
   .resultView { right: 12px; bottom: 12px; min-height: 34px; padding: 0 12px; }
   .resultCard footer { padding: 0 16px; }
   .resultCard footer span { font-size: 9px; }
-  .lightbox { padding: 10px; }
-  .lightboxPanel { width: 100%; max-height: calc(100dvh - 20px); border-radius: 12px; }
+  .resultMore { margin-top: 28px; }
   .applySteps { margin-bottom: 38px; }
   .applySteps > div { min-height: 72px; padding: 12px 7px; }
   .applySteps span { font-size: 8px; }
