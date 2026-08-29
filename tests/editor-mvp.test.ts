@@ -128,19 +128,33 @@ test("상품 presentation별 썸네일 권장 비율과 크기를 안내한다",
   assert.equal(productThumbnailGuidance("large-grid", "1/1").size, "1000 × 1000px");
 });
 
-test("Editor UI 글씨를 확대하고 1920 preview 아래 고정 흰 박스를 제거한다", () => {
-  assert.ok(editorCss.includes(".chat-message { max-width: 92%; padding: 11px 12px; font-size: 14px"));
-  assert.ok(editorCss.includes(".ai-input-wrap textarea { width: 100%; min-height: 62px"));
+test("Editor UI는 AI 생성 도구 카드를 제공하고 1920 preview 아래 고정 흰 박스를 제거한다", () => {
+  assert.ok(editorCss.includes(".ai-tool-card { padding: 13px; display: grid"));
+  assert.ok(editorCss.includes(".ai-tool-list { min-height: 0; overflow-y: auto"));
   assert.ok(editorCss.includes(".canvas-viewport { min-height: 0;"));
   assert.ok(editorCss.includes("grid-template-columns: 330px minmax(0, 1fr) 390px"));
   assert.equal(editorCss.includes(".canvas-viewport { min-height: 900px"), false);
 });
 
-test("AI 채팅은 메시지 영역만 스크롤되고 입력창은 패널 하단에 유지된다", () => {
+test("AI 메뉴는 자유 채팅 없이 두 생성 도구와 Credit 비용만 노출한다", () => {
   assert.ok(editorCss.includes(".editor-left-panel { height: 100%; overflow: hidden"));
-  assert.ok(editorCss.includes("grid-template-rows: auto minmax(0, 1fr) auto auto"));
-  assert.ok(editorCss.includes(".chat-messages { min-height: 0; overflow-y: auto"));
-  assert.ok(editorCss.includes(".ai-input-wrap { position: relative; z-index: 1"));
+  for (const label of ["새 섹션 만들기", "이 섹션 다시 디자인", "1 Credit 사용", "AI 생성 도구"]) assert.ok(editorSource.includes(label), label);
+  for (const removed of ["chatInput", "submitAiEdit", "suggestion-chips", "ai-input-wrap", "AI Node Designer"]) assert.equal(editorSource.includes(removed), false, removed);
+  assert.ok(editorSource.includes("일반 편집은 Inspector에서"));
+  assert.ok(editorSource.includes("색상, 여백, 글자 크기, 정렬, 상품 배열"));
+  assert.ok(editorSource.includes("mobile-ai-tools-button"));
+  assert.ok(editorCss.includes(".topbar-actions .mobile-ai-tools-button { display: flex !important"));
+});
+
+test("AI 도구는 실행 전 작업·취소·차단 이유를 명확히 보여준다", () => {
+  for (const preset of ["브랜드 스토리", "혜택·신뢰", "배너 CTA", "이미지 갤러리"]) assert.ok(editorSource.includes(preset), preset);
+  assert.ok(editorSource.includes("새 섹션 만들기 · 1 Credit 사용"));
+  assert.ok(editorSource.includes("이 섹션 다시 디자인 · 1 Credit 사용"));
+  assert.ok(editorSource.includes(">취소</button>"));
+  assert.ok(editorSource.includes("상품 섹션은 Cafe24 상품 바인딩을 보호하기 위해 AI 재디자인을 사용할 수 없습니다."));
+  assert.ok(editorSource.includes("Header는 고정 컴포넌트이므로 AI로 다시 디자인할 수 없습니다."));
+  assert.ok(editorSource.includes("원래 섹션은 그대로 두었습니다."));
+  assert.ok(editorSource.includes("추가하던 섹션 자리는 되돌렸습니다."));
 });
 
 test("게시 UI는 ZIP과 Installer 다운로드 및 적용 순서만 안내한다", () => {

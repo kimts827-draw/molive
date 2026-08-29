@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Copy, ExternalLink, Eye, EyeOff, GripVertical, History, ImagePlus, LoaderCircle, Maximize2, Minimize2, Monitor, Plus, Redo2, Save, Send, Smartphone, Sparkles, Tablet, Trash2, Undo2, X } from "lucide-react";
+import { ArrowLeft, Copy, ExternalLink, Eye, EyeOff, GripVertical, History, ImagePlus, LoaderCircle, Maximize2, Minimize2, Monitor, Plus, Redo2, Save, Smartphone, Sparkles, Tablet, Trash2, Undo2, X } from "lucide-react";
 import { Brand } from "@/components/brand";
 import { EditorCanvas, type PreviewStylePatch, type SelectionRenderMetrics } from "@/components/editor/editor-canvas";
 import { PublishModal } from "@/components/editor/publish-modal";
@@ -11,14 +11,13 @@ import { autosaveLabel, type AutosaveState } from "@/lib/editor/autosave-state";
 import { classifyAiEditIntent } from "@/lib/editor/ai-edit-intent";
 import { productThumbnailGuidance } from "@/lib/editor/product-thumbnail-guidance";
 import { isResponsiveProperty, readEditorDeclarations, removeEditorBlocks, setEditorDeclarations, type EditorViewport } from "@/lib/editor/responsive-style";
-import { resolveEditorIntent, type EditorHeaderVariant } from "@/lib/editor/style-intent";
+import { type EditorHeaderVariant } from "@/lib/editor/style-intent";
 import { HEADER_NODE_ID, resolveHeaderPresentation } from "@/lib/commerce/fixed-components";
 import { cloneProjectSource, projectPagePlan, type EditorNodeSelection, type ProjectHeaderPresentation, type ProjectSource } from "@/lib/project-source";
 import { collectAssetReferences } from "@/lib/assets/asset-policy";
 import { NEW_SECTION_PRESETS, insertArchitectureSection, insertPlanSection, newSectionNodeId, newSectionPlanSection, newSectionPreset, renderNewSectionPlaceholder, type NewSectionPosition, type NewSectionPresetId } from "@/lib/editor/new-section";
 
 type Viewport = "desktop" | "tablet" | "mobile";
-type ChatMessage = { id: string; role: "assistant" | "user"; text: string };
 type SavedVersion = { id: string; label: string; createdAt: string; source: ProjectSource };
 type NodeSnapshot = EditorNodeSelection & {
   text: string;
@@ -230,15 +229,14 @@ export function EditorShell({ initialSource, projectId = null, initialVersions =
   const [showVersions, setShowVersions] = useState(false);
   const [showAddSection, setShowAddSection] = useState(false);
   const [showRedesign, setShowRedesign] = useState(false);
+  const [showAiTools, setShowAiTools] = useState(false);
   const [showPublish, setShowPublish] = useState(false);
-  const [chatInput, setChatInput] = useState("");
   const [chatBusy, setChatBusy] = useState(false);
   const [creditBalance, setCreditBalance] = useState<number | null>(initialCreditBalance);
   const [toast, setToast] = useState<string | null>(null);
   const [previewStylePatch, setPreviewStylePatch] = useState<PreviewStylePatch | null>(null);
   const [previewHeaderPresentation, setPreviewHeaderPresentation] = useState<ProjectHeaderPresentation | null>(null);
   const [selectionMetrics, setSelectionMetrics] = useState<SelectionRenderMetrics | null>(null);
-  const [messages, setMessages] = useState<ChatMessage[]>([{ id: "hello", role: "assistant", text: "캔버스나 섹션 목록에서 영역을 선택한 뒤 원하는 변화를 말해 주세요. 선택한 HTML/CSS 범위만 수정합니다." }]);
   const sourceRef = useRef(source);
   const pastRef = useRef(past);
   const futureRef = useRef(future);
@@ -382,8 +380,6 @@ export function EditorShell({ initialSource, projectId = null, initialVersions =
         pastRef.current = [sourceRef.current];
         sourceRef.current = generated;
         setPast(pastRef.current); setSource(generated);
-        const rationale = sessionStorage.getItem("moire:generated-rationale");
-        if (rationale) setMessages((items) => [...items, { id: crypto.randomUUID(), role: "assistant", text: rationale }]);
         setToast("새 Project Source를 그대로 불러왔습니다");
       } catch { setToast("생성 결과를 불러오지 못했습니다"); }
       sessionStorage.removeItem("moire:generated-source");
@@ -553,6 +549,16 @@ export function EditorShell({ initialSource, projectId = null, initialVersions =
     [source, selectedNode?.sectionId, selectedNode?.tagName, selectedNode?.id],
   );
 
+  const redesignBlockedReason = !selectedNode
+    ? "캔버스에서 비상품 섹션을 먼저 선택해 주세요."
+    : selectedNode.isHeader || selectedNode.tagName === "header" || selectedNode.type === "header"
+      ? "Header는 고정 컴포넌트이므로 AI로 다시 디자인할 수 없습니다. Inspector에서 형식을 편집해 주세요."
+      : !sectionNodeId()
+        ? "선택한 요소가 속한 섹션을 찾을 수 없습니다. 비상품 섹션을 선택해 주세요."
+        : selectedNode.isProductSection || selectedNode.insideProductSlot || activeSectionOwnsProducts
+          ? "상품 섹션은 Cafe24 상품 바인딩을 보호하기 위해 AI 재디자인을 사용할 수 없습니다."
+          : null;
+
   function toggleHidden(id = sectionNodeId()) {
     if (!id) return;
     mutateNode(id, (node) => {
@@ -700,65 +706,6 @@ export function EditorShell({ initialSource, projectId = null, initialVersions =
     commit({ ...current, headerTextTone, updatedAt: new Date().toISOString() });
   }
 
-  async function submitAiEdit() {
-    const prompt = chatInput.trim();
-    if (!prompt || !selection || chatBusy) return;
-    const node = selectedNode;
-    setMessages((items) => [...items, { id: crypto.randomUUID(), role: "user", text: prompt }]);
-    setChatInput("");
-
-    // 결과가 하나로 정해지는 요청은 모델 왕복 없이 바로 처리합니다.
-    const intent = node
-      ? resolveEditorIntent({
-        prompt,
-        node: { tagName: node.tagName, type: node.type, insideProductSlot: node.insideProductSlot, isHeader: node.isHeader, thumbRatio: source.commerce?.thumbRatioOverride, translate: node.style.translate, scale: node.style.scale },
-        metrics: selectionMetrics?.nodeId === node.id
-          ? { width: selectionMetrics.width, height: selectionMetrics.height, fontSize: selectionMetrics.fontSize }
-          : undefined,
-      })
-      : { kind: "model" as const };
-
-    if (intent.kind === "unsupported") {
-      setMessages((items) => [...items, { id: crypto.randomUUID(), role: "assistant", text: intent.message }]);
-      return;
-    }
-    if (intent.kind === "product-thumbnail") {
-      const changed = applyThumbRatio(intent.thumbRatio);
-      setMessages((items) => [...items, { id: crypto.randomUUID(), role: "assistant", text: changed ? intent.summary : "상품 썸네일이 이미 요청하신 비율입니다. 바꾼 내용이 없습니다." }]);
-      return;
-    }
-    if (intent.kind === "header-variant") {
-      const changed = applyHeaderVariant(intent.variant);
-      setMessages((items) => [...items, { id: crypto.randomUUID(), role: "assistant", text: changed ? intent.summary : "헤더가 이미 요청하신 형식입니다. 바꾼 내용이 없습니다." }]);
-      return;
-    }
-    if (intent.kind === "style" && node) {
-      setPreviewStylePatch(null);
-      const before = sourceRef.current;
-      const previousFuture = futureRef.current;
-      const beforeRender = selectionMetricsRef.current;
-      applyStyleDeclarations(node.id, intent.declarations);
-      const changed = sourceRef.current.html !== before.html || sourceRef.current.css !== before.css;
-      const visiblyChanged = changed && await verifyVisibleSelectionChange(node.id, beforeRender);
-      if (changed && !visiblyChanged) discardUnappliedChange(before, previousFuture);
-      const text = !changed
-        ? "이미 요청하신 값이라 바뀐 내용이 없습니다."
-        : visiblyChanged
-          ? intent.summary
-          : "스타일 값은 만들었지만 실제 화면의 계산 결과가 달라지지 않아 적용을 취소했습니다. 상위 레이아웃의 고정 크기나 기존 CSS 제약을 확인해 주세요.";
-      setMessages((items) => [...items, { id: crypto.randomUUID(), role: "assistant", text }]);
-      return;
-    }
-
-    setChatBusy(true);
-    try {
-      const summary = await requestAiPatch(prompt, selection);
-      setMessages((items) => [...items, { id: crypto.randomUUID(), role: "assistant", text: summary }]);
-    } catch (error) {
-      setMessages((items) => [...items, { id: crypto.randomUUID(), role: "assistant", text: error instanceof Error ? error.message : "AI 편집에 실패했습니다." }]);
-    } finally { setChatBusy(false); }
-  }
-
   /**
    * 새 섹션 만들기입니다.
    *
@@ -800,22 +747,20 @@ export function EditorShell({ initialSource, projectId = null, initialVersions =
     commit(placeholderSource);
 
     const target = { id: sectionId, type: "section", tagName: "section" };
-    setSelection(target); setShowAddSection(false); setLeftPanel("ai"); setChatBusy(true);
-    setMessages((items) => [...items, { id: crypto.randomUUID(), role: "user", text: `${preset.label} 섹션 추가 · ${input.brief}` }]);
+    setSelection(target); setShowAddSection(false); setShowAiTools(false); setLeftPanel("ai"); setChatBusy(true);
     try {
-      const summary = await requestAiPatch(`${preset.label} 섹션을 새로 설계해 추가해줘. 요구사항: ${input.brief}`, target, placeholderSource, {
+      await requestAiPatch(`${preset.label} 섹션을 새로 설계해 추가해줘. 요구사항: ${input.brief}`, target, placeholderSource, {
         operation: "new-section",
         sectionPreset: preset.id,
         sectionBrief: input.brief,
         projectAssetUrls: projectImageUrls(snapshot.source),
       });
-      setMessages((items) => [...items, { id: crypto.randomUUID(), role: "assistant", text: summary }]);
       setToast(`${preset.label} 섹션을 추가했습니다`);
     } catch (error) {
       // 자리표시자까지 함께 되돌립니다. 실패한 요청이 빈 섹션을 남기지 않습니다.
       rollbackToSnapshot(snapshot);
       setSelection(anchor?.getAttribute("data-moire-id") ? { id: anchor.getAttribute("data-moire-id") as string, type: "section", tagName: "section" } : null);
-      setMessages((items) => [...items, { id: crypto.randomUUID(), role: "assistant", text: `${error instanceof Error ? error.message : "새 섹션 생성에 실패했습니다."} 추가하던 섹션 자리는 되돌렸습니다.` }]);
+      setToast(`${error instanceof Error ? error.message : "새 섹션 생성에 실패했습니다."} 추가하던 섹션 자리는 되돌렸습니다.`);
     } finally { setChatBusy(false); }
   }
 
@@ -829,25 +774,23 @@ export function EditorShell({ initialSource, projectId = null, initialVersions =
     const node = selectedNode;
     const id = sectionNodeId();
     if (chatBusy) return;
-    if (node?.isHeader) { setToast("헤더는 Inspector에서 형식만 바꿀 수 있습니다"); return; }
+    if (node?.isHeader || node?.tagName === "header" || node?.type === "header") { setToast("헤더는 Inspector에서 형식만 바꿀 수 있습니다"); return; }
     if (!id || !node) { setToast("다시 디자인할 섹션을 먼저 선택해 주세요"); return; }
     if (node.isProductSection || node.insideProductSlot || activeSectionOwnsProducts) { setToast("상품 진열 영역은 Cafe24 상품 바인딩이 소유합니다"); return; }
 
     const baseSource = sourceRef.current;
     const target = { id, type: "section", tagName: "section" };
-    setSelection(target); setShowRedesign(false); setLeftPanel("ai"); setChatBusy(true);
-    setMessages((items) => [...items, { id: crypto.randomUUID(), role: "user", text: `섹션 다시 디자인 · ${brief}` }]);
+    setSelection(target); setShowRedesign(false); setShowAiTools(false); setLeftPanel("ai"); setChatBusy(true);
     try {
-      const summary = await requestAiPatch(`이 섹션을 다시 디자인해줘. 요구사항: ${brief}`, target, baseSource, {
+      await requestAiPatch(`이 섹션을 다시 디자인해줘. 요구사항: ${brief}`, target, baseSource, {
         operation: "redesign-section",
         sectionBrief: brief,
         projectAssetUrls: projectImageUrls(baseSource),
         reservedNodeIds: reservedNodeIds(baseSource, id),
       });
-      setMessages((items) => [...items, { id: crypto.randomUUID(), role: "assistant", text: summary }]);
       setToast("섹션을 다시 디자인했습니다");
     } catch (error) {
-      setMessages((items) => [...items, { id: crypto.randomUUID(), role: "assistant", text: `${error instanceof Error ? error.message : "섹션 재디자인에 실패했습니다."} 원래 섹션은 그대로 두었습니다.` }]);
+      setToast(`${error instanceof Error ? error.message : "섹션 재디자인에 실패했습니다."} 원래 섹션은 그대로 두었습니다.`);
     } finally { setChatBusy(false); }
   }
 
@@ -896,7 +839,7 @@ export function EditorShell({ initialSource, projectId = null, initialVersions =
       <header className="editor-topbar">
         <div className="topbar-left"><Link className="editor-back" href={projectId ? "/projects" : "/"} aria-label={projectId ? "내 디자인으로" : "홈으로"}><ArrowLeft size={17} /></Link><Brand compact /><span className="topbar-divider" /><b className="project-name">{source.name}</b><span className={`saved-state saved-state-${autosaveState}`}><Save size={12} /> {autosaveLabel(autosaveState, lastSavedAt)}</span></div>
         <div className="viewport-switcher" aria-label="미리보기 기기"><button type="button" aria-label="Desktop 1920 × 1080" title="Desktop 1920 × 1080" className={viewport === "desktop" ? "active" : ""} onClick={() => setViewport("desktop")}><Monitor size={15} /></button><button type="button" aria-label="Tablet 1024 × 768" title="Tablet 1024 × 768" className={viewport === "tablet" ? "active" : ""} onClick={() => setViewport("tablet")}><Tablet size={15} /></button><button type="button" aria-label="Mobile 390 × 844" title="Mobile 390 × 844" className={viewport === "mobile" ? "active" : ""} onClick={() => setViewport("mobile")}><Smartphone size={15} /></button></div>
-        <div className="topbar-actions"><button className="preview-fullscreen-button" onClick={() => setPreviewFullscreen((current) => !current)} title={previewFullscreen ? "Editor 화면으로 돌아가기" : "전체화면 보기"}>{previewFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />} {previewFullscreen ? "Editor로 돌아가기" : "전체화면 보기"}</button><button disabled={!past.length} onClick={undo} title="실행 취소"><Undo2 size={16} /></button><button disabled={!future.length} onClick={redo} title="다시 실행"><Redo2 size={16} /></button><button onClick={() => setShowVersions(true)}><History size={15} /> 버전</button>{projectId ? <a className="standalone-preview-button" href={`/preview/${encodeURIComponent(projectId)}`} target="_blank" rel="noopener noreferrer"><ExternalLink size={15} /> 새 창에서 전체 보기</a> : null}<Link className="new-design-button" href="/"><Sparkles size={15} /> 새 디자인</Link><button className="publish-button" onClick={() => setShowPublish(true)}>게시</button></div>
+        <div className="topbar-actions"><button className="preview-fullscreen-button" onClick={() => setPreviewFullscreen((current) => !current)} title={previewFullscreen ? "Editor 화면으로 돌아가기" : "전체화면 보기"}>{previewFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />} {previewFullscreen ? "Editor로 돌아가기" : "전체화면 보기"}</button><button disabled={!past.length} onClick={undo} title="실행 취소"><Undo2 size={16} /></button><button disabled={!future.length} onClick={redo} title="다시 실행"><Redo2 size={16} /></button><button onClick={() => setShowVersions(true)}><History size={15} /> 버전</button>{projectId ? <a className="standalone-preview-button" href={`/preview/${encodeURIComponent(projectId)}`} target="_blank" rel="noopener noreferrer"><ExternalLink size={15} /> 새 창에서 전체 보기</a> : null}<Link className="new-design-button" href="/"><Sparkles size={15} /> 새 디자인</Link><button className="mobile-ai-tools-button" onClick={() => setShowAiTools(true)}><Sparkles size={15} /> AI 도구</button><button className="publish-button" onClick={() => setShowPublish(true)}>게시</button></div>
       </header>
 
       <div className="editor-workspace">
@@ -907,15 +850,16 @@ export function EditorShell({ initialSource, projectId = null, initialVersions =
             <div className="section-list">{regions.map((region, index) => <div className={`section-list-row ${selection?.id === region.id || selectedNode?.sectionId === region.id ? "active" : ""}`} key={region.id} onClick={() => setSelection({ id: region.id, type: region.type, tagName: region.type })}><GripVertical size={13} /><span>{region.label}</span><div className="row-actions"><button onClick={(event) => { event.stopPropagation(); toggleHidden(region.id); }}>{region.hidden ? <EyeOff size={12} /> : <Eye size={12} />}</button>{region.type !== "header" && region.type !== "footer" && <><button onClick={(event) => { event.stopPropagation(); moveSection(region.id, -1); }} disabled={index === 0}>↑</button><button onClick={(event) => { event.stopPropagation(); moveSection(region.id, 1); }}>↓</button></>}</div></div>)}</div>
             <button className="add-section-button" onClick={() => setShowAddSection(true)}><Plus size={14} /> AI로 새 섹션 설계</button>
             <div className="locked-commerce"><Save size={14} /><div><b>Cafe24 Commerce</b><span>module · 변수 · 결제 hook 보호됨</span></div><span>잠금</span></div>
-          </> : <div className="ai-panel"><div className="ai-panel-title"><div className="ai-orb"><Sparkles /></div><div><b>AI Node Designer</b><span>{selectedNode ? `${selectedNode.type} · ${selectedNode.id}` : "영역을 선택하세요"}</span></div>{creditBalance !== null ? <Link className="editor-credit" href="/pricing">{creditBalance}C · AI 1C</Link> : null}</div><div className="chat-messages">{messages.map((message) => <div className={`chat-message ${message.role}`} key={message.id}>{message.text}</div>)}{chatBusy && <div className="chat-message assistant thinking"><LoaderCircle size={14} /> 선택 영역의 코드를 설계 중</div>}</div><div className="suggestion-chips">{["이 Hero를 더 고급스럽게", "상품 하나를 크게", "구조를 완전히 새롭게"].map((text) => <button key={text} onClick={() => setChatInput(text)}>{text}</button>)}</div><div className="ai-input-wrap"><textarea value={chatInput} onChange={(event) => setChatInput(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void submitAiEdit(); } }} placeholder="선택한 영역의 HTML/CSS만 수정합니다" /><button disabled={!chatInput.trim() || !selection || chatBusy} onClick={() => void submitAiEdit()}><Send size={15} /></button></div></div>}
+          </> : <AiToolMenu creditBalance={creditBalance} busy={chatBusy} selectedLabel={regions.find((region) => region.id === sectionNodeId())?.label ?? null} redesignBlockedReason={redesignBlockedReason} onNewSection={() => setShowAddSection(true)} onRedesign={() => setShowRedesign(true)} />}
         </aside>
 
         <section className="editor-stage"><div className="stage-toolbar"><span>{viewport === "desktop" ? "1920 × 1080" : viewport === "tablet" ? "1024 × 768" : "390 × 844"}</span><b>HTML/CSS 직접 렌더링</b></div><div className={`canvas-viewport viewport-${viewport}`}><EditorCanvas source={source} selection={selection} previewStylePatch={previewStylePatch} previewHeaderPresentation={previewHeaderPresentation} viewport={viewport} onSelectionMetrics={handleSelectionMetrics} onSelect={(next) => { setPreviewStylePatch(null); setPreviewHeaderPresentation(null); selectionMetricsRef.current = null; setSelectionMetrics(null); setSelection(next); setRightOpen(true); }} /></div></section>
 
-        {rightOpen && <aside className="editor-inspector"><div className="inspector-title"><div><span>선택 노드</span><b>{selectedNode ? `${selectedNode.tagName} · ${selectedNode.type}` : "선택 없음"}</b></div><button onClick={() => setRightOpen(false)} aria-label="Inspector 닫기"><X size={16} /></button></div>{selectedNode ? <NodeInspector node={selectedNode} renderMetrics={selectionMetrics?.nodeId === selectedNode.id ? selectionMetrics : null} projectId={projectId} productPresentation={source.architecture.productPresentation} thumbRatioOverride={source.commerce?.thumbRatioOverride} headerVariant={(source.architecture.header as EditorHeaderVariant) ?? "split-utility"} headerTextTone={source.headerTextTone ?? "dark"} headerPresentation={resolveHeaderPresentation(source.headerPresentation)} onPreviewHeaderPresentation={setPreviewHeaderPresentation} onHeaderTextTone={applyHeaderTextTone} onHeaderPresentation={applyHeaderPresentation} onHeaderVariant={(variant) => { if (!applyHeaderVariant(variant)) setToast("헤더가 이미 그 형식입니다"); }} onText={updateText} onAttribute={updateAttribute} onStyle={updateStyle} onStyles={updateStyles} onPreviewStyle={previewStyle} onImageSource={updateImageSource} /> : <p className="empty-inspector">미리보기에서 텍스트, 이미지, 버튼 또는 섹션을 클릭하세요.</p>}{sectionNodeId() && <div className="section-actions"><button className="section-redesign" disabled={activeSectionOwnsProducts} title={activeSectionOwnsProducts ? "상품 진열 영역은 Cafe24가 소유합니다" : "이 섹션을 AI가 다시 디자인합니다"} onClick={() => setShowRedesign(true)}><Sparkles size={14} /> AI 재설계</button><button onClick={duplicateSection}><Copy size={14} /> 복제</button><button onClick={() => toggleHidden()}><EyeOff size={14} /> 숨김</button><button className="danger" onClick={deleteSection}><Trash2 size={14} /> 삭제</button></div>}<button className="inspector-ai-button" onClick={() => setLeftPanel("ai")}><Sparkles size={15} /> AI로 선택 영역 다시 설계</button></aside>}
+        {rightOpen && <aside className="editor-inspector"><div className="inspector-title"><div><span>선택 노드</span><b>{selectedNode ? `${selectedNode.tagName} · ${selectedNode.type}` : "선택 없음"}</b></div><button onClick={() => setRightOpen(false)} aria-label="Inspector 닫기"><X size={16} /></button></div>{selectedNode ? <NodeInspector node={selectedNode} renderMetrics={selectionMetrics?.nodeId === selectedNode.id ? selectionMetrics : null} projectId={projectId} productPresentation={source.architecture.productPresentation} thumbRatioOverride={source.commerce?.thumbRatioOverride} headerVariant={(source.architecture.header as EditorHeaderVariant) ?? "split-utility"} headerTextTone={source.headerTextTone ?? "dark"} headerPresentation={resolveHeaderPresentation(source.headerPresentation)} onPreviewHeaderPresentation={setPreviewHeaderPresentation} onHeaderTextTone={applyHeaderTextTone} onHeaderPresentation={applyHeaderPresentation} onHeaderVariant={(variant) => { if (!applyHeaderVariant(variant)) setToast("헤더가 이미 그 형식입니다"); }} onText={updateText} onAttribute={updateAttribute} onStyle={updateStyle} onStyles={updateStyles} onPreviewStyle={previewStyle} onImageSource={updateImageSource} /> : <p className="empty-inspector">미리보기에서 텍스트, 이미지, 버튼 또는 섹션을 클릭하세요.</p>}{sectionNodeId() && <div className="section-actions"><button className="section-redesign" disabled={Boolean(redesignBlockedReason)} title={redesignBlockedReason ?? "이 섹션을 AI가 다시 디자인합니다"} onClick={() => setShowRedesign(true)}><Sparkles size={14} /> AI 재설계</button><button onClick={duplicateSection}><Copy size={14} /> 복제</button><button onClick={() => toggleHidden()}><EyeOff size={14} /> 숨김</button><button className="danger" onClick={deleteSection}><Trash2 size={14} /> 삭제</button></div>}<button className="inspector-ai-button" onClick={() => { setLeftPanel("ai"); setShowAiTools(true); }}><Sparkles size={15} /> AI 생성 도구 열기</button></aside>}
       </div>
 
       {toast && <div className="editor-toast"><Save size={14} /> {toast}</div>}
+      {showAiTools && <AiToolsModal creditBalance={creditBalance} busy={chatBusy} selectedLabel={regions.find((region) => region.id === sectionNodeId())?.label ?? null} redesignBlockedReason={redesignBlockedReason} onClose={() => setShowAiTools(false)} onNewSection={() => { setShowAiTools(false); setShowAddSection(true); }} onRedesign={() => { setShowAiTools(false); setShowRedesign(true); }} />}
       {showRedesign && <RedesignSectionModal label={regions.find((region) => region.id === sectionNodeId())?.label ?? "선택한 섹션"} busy={chatBusy} onClose={() => setShowRedesign(false)} onSubmit={redesignSection} />}
       {showAddSection && <AddSectionModal anchorLabel={regions.find((region) => region.id === (selectedNode?.sectionId ?? selection?.id))?.label ?? null} busy={chatBusy} onClose={() => setShowAddSection(false)} onAdd={addAiSection} />}
       {showVersions && <VersionModal versions={versions} current={source} activeVersionId={activeVersionId} busy={persistBusy} onClose={() => setShowVersions(false)} onSave={saveVersion} onRestore={restoreVersion} />}
@@ -1161,6 +1105,44 @@ function NodeInspector({ node, renderMetrics, projectId, productPresentation, th
   </div>;
 }
 
+type AiToolMenuProps = {
+  creditBalance: number | null;
+  busy: boolean;
+  selectedLabel: string | null;
+  redesignBlockedReason: string | null;
+  onNewSection: () => void;
+  onRedesign: () => void;
+  showHeader?: boolean;
+};
+
+function AiToolMenu({ creditBalance, busy, selectedLabel, redesignBlockedReason, onNewSection, onRedesign, showHeader = true }: AiToolMenuProps) {
+  return <div className="ai-panel ai-tools-panel">
+    {showHeader ? <div className="ai-panel-title"><div className="ai-orb"><Sparkles /></div><div><b>AI 생성 도구</b><span>할 작업을 선택한 뒤 요구사항을 입력하세요</span></div>{creditBalance !== null ? <Link className="editor-credit" href="/pricing">잔여 {creditBalance} Credit</Link> : null}</div> : null}
+    <div className="ai-tool-list" aria-label="AI 생성 도구">
+      <section className="ai-tool-card">
+        <div className="ai-tool-card-icon"><Plus size={17} /></div>
+        <div><span>새 콘텐츠 추가</span><h3>새 섹션 만들기</h3><p>브랜드 스토리, 혜택·신뢰, 배너 CTA, 이미지 갤러리 중 유형을 골라 원하는 위치에 삽입합니다.</p></div>
+        <button type="button" disabled={busy} onClick={onNewSection}><span>유형 선택하기</span><strong>1 Credit 사용</strong></button>
+      </section>
+      <section className={`ai-tool-card${redesignBlockedReason ? " disabled" : ""}`}>
+        <div className="ai-tool-card-icon"><Sparkles size={17} /></div>
+        <div><span>선택 영역 변경</span><h3>이 섹션 다시 디자인</h3><p>{selectedLabel ? <><b>{selectedLabel}</b> 섹션의 내용은 유지하고 구조와 디자인을 새로 만듭니다.</> : "캔버스에서 선택한 비상품 섹션의 내용은 유지하고 구조와 디자인을 새로 만듭니다."}</p></div>
+        {redesignBlockedReason ? <p className="ai-tool-blocked" role="status">{redesignBlockedReason}</p> : null}
+        <button type="button" disabled={busy || Boolean(redesignBlockedReason)} onClick={onRedesign}><span>요구사항 입력하기</span><strong>1 Credit 사용</strong></button>
+      </section>
+      <aside className="ai-editor-guidance"><b>일반 편집은 Inspector에서</b><span>색상, 여백, 글자 크기, 정렬, 상품 배열은 오른쪽 Editor 기능으로 직접 조정할 수 있습니다.</span></aside>
+      {busy ? <div className="ai-tool-progress" role="status"><LoaderCircle size={14} /> AI 작업을 실행하고 있습니다</div> : null}
+    </div>
+  </div>;
+}
+
+function AiToolsModal({ onClose, ...props }: AiToolMenuProps & { onClose: () => void }) {
+  return <div className="modal-backdrop"><div className="editor-modal ai-tools-modal">
+    <div className="modal-title"><div><Sparkles size={18} /><b>AI 생성 도구</b></div><button type="button" onClick={onClose} aria-label="AI 생성 도구 닫기"><X size={17} /></button></div>
+    <AiToolMenu {...props} showHeader={false} />
+  </div></div>;
+}
+
 function AddSectionModal({ anchorLabel, busy, onClose, onAdd }: { anchorLabel: string | null; busy: boolean; onClose: () => void; onAdd: (input: { presetId: NewSectionPresetId; brief: string; position: NewSectionPosition }) => Promise<void> }) {
   const [presetId, setPresetId] = useState<NewSectionPresetId>(NEW_SECTION_PRESETS[0].id);
   const [brief, setBrief] = useState("");
@@ -1184,6 +1166,7 @@ function AddSectionModal({ anchorLabel, busy, onClose, onAdd }: { anchorLabel: s
           onClick={() => setPresetId(item.id)}
         ><b>{item.label}</b><span>{item.summary}</span></button>)}
       </div>
+      <label className="ai-brief-field"><span>요구사항</span><textarea rows={5} value={brief} onChange={(event) => setBrief(event.target.value)} placeholder={preset.briefPlaceholder} /></label>
       <div className="new-section-position" role="group" aria-label="삽입 위치">
         <span>삽입 위치</span>
         {positions.map((item) => <button
@@ -1195,8 +1178,7 @@ function AddSectionModal({ anchorLabel, busy, onClose, onAdd }: { anchorLabel: s
           onClick={() => setPosition(item.value)}
         >{item.label}</button>)}
       </div>
-      <textarea rows={5} value={brief} onChange={(event) => setBrief(event.target.value)} placeholder={preset.briefPlaceholder} />
-      <button disabled={busy || brief.trim().length < 5} onClick={() => void onAdd({ presetId, brief: brief.trim(), position })}><Sparkles size={15} /> {busy ? "생성 중" : "새 섹션 생성 · 1C"}</button>
+      <div className="ai-modal-actions"><button type="button" className="secondary" disabled={busy} onClick={onClose}>취소</button><button type="button" className="primary" disabled={busy || brief.trim().length < 5} onClick={() => void onAdd({ presetId, brief: brief.trim(), position })}><Sparkles size={15} /> {busy ? "생성 중" : "새 섹션 만들기 · 1 Credit 사용"}</button></div>
     </div>
   </div></div>;
 }
@@ -1207,8 +1189,8 @@ function RedesignSectionModal({ label, busy, onClose, onSubmit }: { label: strin
     <div className="modal-title"><div><Sparkles size={18} /><b>섹션 다시 디자인</b></div><button onClick={onClose} aria-label="재설계 창 닫기"><X size={17} /></button></div>
     <div className="add-section-form">
       <p><b>{label}</b> 섹션의 목적과 지금 적혀 있는 정보는 그대로 두고, 구조와 디자인만 새로 만듭니다. 상품 진열과 헤더는 바뀌지 않습니다.</p>
-      <textarea rows={5} value={brief} onChange={(event) => setBrief(event.target.value)} placeholder="예: 지금은 카드 3개가 나열돼 있는데, 큰 사진 하나와 짧은 문장으로 여백 있게 바꿔줘." />
-      <button disabled={busy || brief.trim().length < 5} onClick={() => void onSubmit(brief.trim())}><Sparkles size={15} /> {busy ? "재설계 중" : "이 섹션 다시 디자인 · 1C"}</button>
+      <label className="ai-brief-field"><span>요구사항</span><textarea rows={5} value={brief} onChange={(event) => setBrief(event.target.value)} placeholder="예: 지금은 카드 3개가 나열돼 있는데, 큰 사진 하나와 짧은 문장으로 여백 있게 바꿔줘." /></label>
+      <div className="ai-modal-actions"><button type="button" className="secondary" disabled={busy} onClick={onClose}>취소</button><button type="button" className="primary" disabled={busy || brief.trim().length < 5} onClick={() => void onSubmit(brief.trim())}><Sparkles size={15} /> {busy ? "재디자인 중" : "이 섹션 다시 디자인 · 1 Credit 사용"}</button></div>
     </div>
   </div></div>;
 }

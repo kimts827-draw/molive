@@ -129,12 +129,13 @@ test("Editor는 텍스트 선택을 섹션 루트로 올리고 실패 시 원본
   assert.match(shell, /const id = sectionNodeId\(\);/);
   assert.match(shell, /const target = \{ id, type: "section", tagName: "section" \};/);
   // 상품 진열과 Header는 요청 자체를 만들지 않습니다.
-  assert.match(shell, /if \(node\?\.isHeader\) \{ setToast/);
+  assert.match(shell, /if \(node\?\.isHeader \|\| node\?\.tagName === "header" \|\| node\?\.type === "header"\) \{ setToast/);
   // 상품 섹션 안의 문단을 골라도 승격될 섹션 루트를 기준으로 잠급니다.
   assert.match(shell, /function sectionOwnsProductSlot\(source: ProjectSource, sectionId: string \| null\)/);
   assert.match(shell, /const activeSectionOwnsProducts = useMemo\(/);
   assert.match(shell, /node\.isProductSection \|\| node\.insideProductSlot \|\| activeSectionOwnsProducts/);
-  assert.match(shell, /disabled=\{activeSectionOwnsProducts\}/);
+  assert.match(shell, /disabled=\{Boolean\(redesignBlockedReason\)\}/);
+  assert.match(shell, /상품 섹션은 Cafe24 상품 바인딩을 보호하기 위해 AI 재디자인을 사용할 수 없습니다/);
   // 서버에 넘길 예약 ID는 선택 섹션 밖 ID만 모읍니다.
   assert.match(shell, /function reservedNodeIds\(source: ProjectSource, sectionId: string\)/);
   assert.match(shell, /reservedNodeIds: reservedNodeIds\(baseSource, id\)/);
