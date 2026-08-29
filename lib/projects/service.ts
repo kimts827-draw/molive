@@ -1,7 +1,7 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { didUpdateProject } from "@/lib/projects/persistence";
-import { isProjectSource, type ProjectSource } from "@/lib/project-source";
+import { isProjectSource, projectSourceSignature, type ProjectSource } from "@/lib/project-source";
 export { hasSupabaseServerConfig } from "@/lib/supabase/config";
 
 export type StoredVersion = {
@@ -105,6 +105,25 @@ export async function createVersion(projectId: string, ownerId: string, label: s
   });
   if (error || !data) throw error ?? new Error("버전을 저장하지 못했습니다.");
   return String(data);
+}
+
+/**
+ * Export와 게시가 Editor의 현재 상태와 반드시 같아지도록 activeVersion을 맞춥니다.
+ *
+ * 그동안 ZIP과 배포는 activeVersion 스냅샷만 읽었고 Editor는 current_document에만 autosave했기 때문에,
+ * 사용자가 "버전 저장"을 누르지 않으면 Preview에는 있는 편집이 결과물에서 빠졌습니다.
+ * 이제 현재 문서와 activeVersion이 다르면 내려받기·게시 직전에 현재 문서를 새 버전으로 승격시킵니다.
+ * 내용이 같으면 새 버전을 만들지 않으므로 같은 디자인을 여러 번 받아도 버전이 쌓이지 않습니다.
+ */
+export async function resolveExportVersion(projectId: string, ownerId: string) {
+  const project = await loadProject(projectId, ownerId);
+  const active = project.versions.find((version) => version.id === project.currentVersionId) ?? null;
+  if (active && projectSourceSignature(active.source) === projectSourceSignature(project.source)) {
+    return { versionId: active.id, source: active.source, createdVersion: false };
+  }
+  const label = `자동 저장 ${project.versions.length + 1}`;
+  const versionId = await createVersion(projectId, ownerId, label, project.source);
+  return { versionId, source: project.source, createdVersion: true };
 }
 
 export async function activateVersion(projectId: string, ownerId: string, versionId: string) {

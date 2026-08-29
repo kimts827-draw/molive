@@ -97,6 +97,6 @@ test("Editor는 반응형 속성을 인라인이 아니라 viewport CSS로 쓴�
   assert.ok(source.includes("isResponsiveProperty(property)"), "속성 성격에 따라 갈라 써야 합니다.");
   assert.ok(source.includes("setEditorDeclarations(current.css"), "반응형 속성은 CSS 블록으로 가야 합니다.");
   // 인라인이 미디어 쿼리를 이기지 않도록 옮긴 속성의 인라인 값을 지웁니다.
-  assert.ok(source.includes("node.style.removeProperty(property);\n        continue;"));
+  assert.match(source, /node\.style\.removeProperty\(property\);\s*continue;/);
   assert.ok(source.includes("readNode(source, selection, viewport)"), "Inspector는 현재 viewport 값을 읽어야 합니다.");
 });

@@ -13,7 +13,9 @@ import { productThumbnailGuidance } from "@/lib/editor/product-thumbnail-guidanc
 import { isResponsiveProperty, readEditorDeclarations, removeEditorBlocks, setEditorDeclarations, type EditorViewport } from "@/lib/editor/responsive-style";
 import { resolveEditorIntent, type EditorHeaderVariant } from "@/lib/editor/style-intent";
 import { HEADER_NODE_ID, resolveHeaderPresentation } from "@/lib/commerce/fixed-components";
-import { cloneProjectSource, type EditorNodeSelection, type ProjectHeaderPresentation, type ProjectSource } from "@/lib/project-source";
+import { cloneProjectSource, projectPagePlan, type EditorNodeSelection, type ProjectHeaderPresentation, type ProjectSource } from "@/lib/project-source";
+import { collectAssetReferences } from "@/lib/assets/asset-policy";
+import { NEW_SECTION_PRESETS, insertArchitectureSection, insertPlanSection, newSectionNodeId, newSectionPlanSection, newSectionPreset, renderNewSectionPlaceholder, type NewSectionPosition, type NewSectionPresetId } from "@/lib/editor/new-section";
 
 type Viewport = "desktop" | "tablet" | "mobile";
 type ChatMessage = { id: string; role: "assistant" | "user"; text: string };
@@ -149,6 +151,19 @@ function listRegions(html: string): RegionSummary[] {
   }));
 }
 
+/** 새 섹션 요청에만 붙는 payload입니다. 프롬프트 문장 대신 이 값으로 서버가 계약을 고릅니다. */
+type NewSectionRequest = { operation: "new-section"; sectionPreset: NewSectionPresetId; sectionBrief: string; projectAssetUrls: string[] };
+
+/**
+ * 새 섹션이 재사용할 수 있는, 이미 이 프로젝트 안에 있는 사진들입니다.
+ * 상품 영역 이미지는 Cafe24 바인딩 소유라 목록에 넣지 않습니다.
+ */
+function projectImageUrls(source: ProjectSource) {
+  return [...new Set(collectAssetReferences(source.html, source.css)
+    .filter((reference) => !reference.inProductArea && /^https:\/\//i.test(reference.url))
+    .map((reference) => reference.url))].slice(0, 24);
+}
+
 function replaceNode(source: ProjectSource, nodeId: string, nodeHtml: string, nodeCss: string) {
   const document = parseSource(source.html);
   const current = document ? findByMoireId(document, nodeId) : null;
@@ -259,6 +274,20 @@ export function EditorShell({ initialSource, projectId = null, initialVersions =
     closeHistoryGroup();
   }, [closeHistoryGroup]);
 
+  /**
+   * 편집 전 상태를 통째로 되돌립니다.
+   * 새 섹션은 placeholder commit 뒤에 AI가 실패할 수 있어, 문서·undo·redo를 한 번에 원위치시킵니다.
+   */
+  const rollbackToSnapshot = useCallback((snapshot: { source: ProjectSource; past: ProjectSource[]; future: ProjectSource[] }) => {
+    sourceRef.current = snapshot.source;
+    setSource(snapshot.source);
+    pastRef.current = snapshot.past;
+    setPast(snapshot.past);
+    futureRef.current = snapshot.future;
+    setFuture(snapshot.future);
+    closeHistoryGroup();
+  }, [closeHistoryGroup]);
+
   const commit = useCallback((next: ProjectSource, historyKey?: string) => {
     const current = sourceRef.current;
     // Header variant·text tone과 상품 썸네일 비율은 HTML/CSS 밖에 있으므로 함께 비교해야 변경이 사라지지 않습니다.
@@ -352,6 +381,34 @@ export function EditorShell({ initialSource, projectId = null, initialVersions =
     }, 900);
     return () => window.clearTimeout(timer);
   }, [hydrated, projectId, source]);
+
+  /**
+   * 저장 대기 중인 편집을 즉시 서버 문서에 밀어 넣습니다.
+   *
+   * ZIP 내려받기와 게시는 서버의 현재 문서를 읽으므로, autosave debounce가 남아 있으면
+   * 방금 만든 편집이 결과물에서 빠질 수 있습니다. 게시 창은 항상 이 flush를 먼저 기다립니다.
+   */
+  const flushDraft = useCallback(async () => {
+    if (!projectId) return true;
+    const sequence = ++autosaveSequenceRef.current;
+    setAutosaveState("saving");
+    try {
+      const response = await fetch(`/api/projects/${projectId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ source: sourceRef.current }),
+      });
+      if (!response.ok) throw new Error();
+      if (autosaveSequenceRef.current === sequence) {
+        setLastSavedAt(new Date().toISOString());
+        setAutosaveState("saved");
+      }
+      return true;
+    } catch {
+      if (autosaveSequenceRef.current === sequence) setAutosaveState("error");
+      return false;
+    }
+  }, [projectId]);
 
   useEffect(() => {
     if (!selection && regions[0]) setSelection({ id: regions[0].id, type: regions[0].type, tagName: regions[0].type });
@@ -504,7 +561,26 @@ export function EditorShell({ initialSource, projectId = null, initialVersions =
     commit({ ...sourceRef.current, html: serializeProjectHtml(document), updatedAt: new Date().toISOString() });
   }
 
-  async function requestAiPatch(prompt: string, target: EditorNodeSelection, baseSource = sourceRef.current) {
+  /**
+   * AI 편집 Credit 정산입니다.
+   *
+   * 서버는 모델 호출이 성공해도 예약만 남기므로, 문서에 실제로 반영됐을 때만 applied로 확정합니다.
+   * 렌더 검증 실패로 되돌린 편집은 discarded로 예약을 풀어 Credit이 소모되지 않습니다.
+   */
+  const settleAiCredit = useCallback(async (reservationId: string, outcome: "applied" | "discarded") => {
+    try {
+      const response = await fetch("/api/ai/edit/settle", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reservationId, outcome, ...(projectId && UUID_PATTERN.test(projectId) ? { projectId } : {}) }),
+      });
+      const payload = await response.json() as { balance?: number | null };
+      if (response.ok && typeof payload.balance === "number") setCreditBalance(payload.balance);
+    } catch {
+      // 정산 호출 실패는 편집 결과를 바꾸지 않습니다. 확정되지 않은 예약은 lease 만료로 회수됩니다.
+    }
+  }, [projectId]);
+
+  async function requestAiPatch(prompt: string, target: EditorNodeSelection, baseSource = sourceRef.current, sectionRequest: NewSectionRequest | null = null) {
     const snapshot = readNode(baseSource, target, viewport);
     if (!snapshot) throw new Error("AI가 수정할 선택 영역을 찾지 못했습니다.");
     const renderMetrics = selectionMetrics?.nodeId === snapshot.id ? {
@@ -520,29 +596,39 @@ export function EditorShell({ initialSource, projectId = null, initialVersions =
     } : undefined;
     const response = await fetch("/api/ai/edit", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt, nodeId: snapshot.id, nodeType: snapshot.type, nodeHtml: snapshot.outerHtml, projectCss: baseSource.css, rootValue: sourceRootValue(baseSource.html), architecture: baseSource.architecture, pagePlan: baseSource.pagePlan, renderMetrics, ...(projectId && UUID_PATTERN.test(projectId) ? { projectId } : {}) }),
+      body: JSON.stringify({ prompt, nodeId: snapshot.id, nodeType: snapshot.type, nodeHtml: snapshot.outerHtml, projectCss: baseSource.css, rootValue: sourceRootValue(baseSource.html), architecture: baseSource.architecture, pagePlan: baseSource.pagePlan, renderMetrics, ...(sectionRequest ?? {}), ...(projectId && UUID_PATTERN.test(projectId) ? { projectId } : {}) }),
     });
-    const payload = await response.json() as { nodeHtml?: string; nodeCss?: string; summary?: string; error?: string; balance?: number };
+    const payload = await response.json() as { nodeHtml?: string; nodeCss?: string; summary?: string; error?: string; balance?: number | null; credit?: { reservationId?: string } | null };
     if (!response.ok || !payload.nodeHtml || payload.nodeCss === undefined) throw new Error(payload.error ?? "AI 영역 편집에 실패했습니다.");
-    const before = sourceRef.current;
-    const previousFuture = futureRef.current;
-    const beforeRender = selectionMetricsRef.current;
-    const next = replaceNode(before, target.id, payload.nodeHtml, payload.nodeCss);
-    // 실제 문서가 바뀌었을 때만 성공으로 봅니다. 바뀐 게 없는데 "완료"라고 말하지 않습니다.
-    if (next.html === before.html && next.css === before.css) {
-      throw new Error("요청을 반영한 실제 변경이 만들어지지 않았습니다. 바꾸고 싶은 부분을 조금 더 구체적으로 적어 주세요.");
-    }
-    commit(next);
-    const styleOnly = classifyAiEditIntent(prompt) === "style-only";
-    const visiblyChanged = await verifyVisibleSelectionChange(target.id, beforeRender, !styleOnly);
-    if (!visiblyChanged) {
-      discardUnappliedChange(before, previousFuture);
-      throw new Error(styleOnly
-        ? "요청한 스타일은 생성됐지만 현재 레이아웃의 실제 계산 결과가 달라지지 않았습니다. 상위 영역의 고정 크기나 기존 CSS 제약 때문에 적용되지 않았을 수 있습니다. Inspector에서 해당 영역을 다시 선택한 뒤 구체적인 px 또는 배율로 요청해 주세요."
-        : "AI가 patch를 만들었지만 실제 문서 구조나 화면 결과가 달라지지 않아 적용을 취소했습니다. 바꿀 대상과 원하는 결과를 조금 더 구체적으로 적어 주세요.");
-    }
+    // 응답 시점 잔액은 예약분을 뺀 사용 가능액입니다. 최종 값은 정산 응답이 확정합니다.
     if (typeof payload.balance === "number") setCreditBalance(payload.balance);
-    return payload.summary ?? "선택한 영역의 HTML/CSS만 업데이트했습니다.";
+    const reservationId = payload.credit?.reservationId ?? null;
+    let applied = false;
+    try {
+      const before = sourceRef.current;
+      const previousFuture = futureRef.current;
+      const beforeRender = selectionMetricsRef.current;
+      const next = replaceNode(before, target.id, payload.nodeHtml, payload.nodeCss);
+      // 실제 문서가 바뀌었을 때만 성공으로 봅니다. 바뀐 게 없는데 "완료"라고 말하지 않습니다.
+      if (next.html === before.html && next.css === before.css) {
+        throw new Error("요청을 반영한 실제 변경이 만들어지지 않았습니다. 바꾸고 싶은 부분을 조금 더 구체적으로 적어 주세요.");
+      }
+      commit(next);
+      // 새 섹션은 언제나 구조 변경이므로 문서 diff까지 반영 근거로 인정합니다.
+      const styleOnly = !sectionRequest && classifyAiEditIntent(prompt) === "style-only";
+      const visiblyChanged = await verifyVisibleSelectionChange(target.id, beforeRender, !styleOnly);
+      if (!visiblyChanged) {
+        discardUnappliedChange(before, previousFuture);
+        throw new Error(styleOnly
+          ? "요청한 스타일은 생성됐지만 현재 레이아웃의 실제 계산 결과가 달라지지 않았습니다. 상위 영역의 고정 크기나 기존 CSS 제약 때문에 적용되지 않았을 수 있습니다. Inspector에서 해당 영역을 다시 선택한 뒤 구체적인 px 또는 배율로 요청해 주세요."
+          : "AI가 patch를 만들었지만 실제 문서 구조나 화면 결과가 달라지지 않아 적용을 취소했습니다. 바꿀 대상과 원하는 결과를 조금 더 구체적으로 적어 주세요.");
+      }
+      applied = true;
+      return payload.summary ?? "선택한 영역의 HTML/CSS만 업데이트했습니다.";
+    } finally {
+      // 적용되지 않은 편집은 어떤 실패 경로에서도 Credit을 소모하지 않습니다.
+      if (reservationId) await settleAiCredit(reservationId, applied ? "applied" : "discarded");
+    }
   }
 
   /**
@@ -634,27 +720,63 @@ export function EditorShell({ initialSource, projectId = null, initialVersions =
     } finally { setChatBusy(false); }
   }
 
-  async function addAiSection(prompt: string) {
-    const id = `section-${crypto.randomUUID()}`;
-    const textId = `text-${crypto.randomUUID()}`;
-    const document = parseSource(sourceRef.current.html);
+  /**
+   * 새 섹션 만들기입니다.
+   *
+   * AI를 부르기 전에 코드가 placeholder 섹션과 pagePlan 항목을 결정적으로 만들어 둡니다.
+   * 그래야 새 섹션도 plan 축(폭·톤·열)의 계약 안에 들어오고, 실패했을 때 되돌릴 대상이 명확합니다.
+   * AI가 실패하면 placeholder와 plan 항목을 함께 되돌려 문서에 빈 섹션이 남지 않습니다.
+   */
+  async function addAiSection(input: { presetId: NewSectionPresetId; brief: string; position: NewSectionPosition }) {
+    const preset = newSectionPreset(input.presetId);
+    if (!preset || chatBusy) return;
+    const snapshot = { source: sourceRef.current, past: pastRef.current, future: futureRef.current };
+    const document = parseSource(snapshot.source.html);
     const main = document?.querySelector("main");
-    if (!document || !main) return;
-    const section = document.createElement("section");
-    section.dataset.moireId = id; section.dataset.moireType = "section";
-    section.innerHTML = `<p data-moire-id="${textId}" data-moire-type="text">새 섹션을 설계하고 있습니다.</p>`;
-    const selected = selection ? findByMoireId(document, selection.id)?.closest("section") : null;
-    if (selected?.parentElement === main) selected.after(section); else main.appendChild(section);
-    const placeholderSource = { ...sourceRef.current, html: serializeProjectHtml(document), updatedAt: new Date().toISOString() };
+    if (!document || !main) { setToast("본문 영역을 찾지 못해 섹션을 추가하지 못했습니다"); return; }
+
+    const selectedSection = selection ? findByMoireId(document, selection.id)?.closest("section") : null;
+    const anchor = selectedSection?.parentElement === main ? selectedSection : null;
+    const position: NewSectionPosition = anchor ? input.position : "end";
+    const sectionId = newSectionNodeId(crypto.randomUUID());
+    const template = document.createElement("template");
+    template.innerHTML = renderNewSectionPlaceholder({ preset, sectionId });
+    const placeholder = template.content.firstElementChild;
+    if (!placeholder) { setToast("섹션 자리를 만들지 못했습니다"); return; }
+    if (anchor && position === "before") anchor.before(placeholder);
+    else if (anchor && position === "after") anchor.after(placeholder);
+    else main.appendChild(placeholder);
+
+    // DOM과 pagePlan을 같은 자리에 함께 넣습니다. 둘이 어긋나면 축 계약이 다른 섹션에 걸립니다.
+    const plan = projectPagePlan(snapshot.source);
+    const nextPlan = plan
+      ? insertPlanSection(plan, newSectionPlanSection(preset, { sectionId, brief: input.brief }), { position, anchorPlanId: anchor?.getAttribute("data-moire-plan") ?? null })
+      : null;
+    const placeholderSource: ProjectSource = {
+      ...snapshot.source,
+      html: serializeProjectHtml(document),
+      ...(nextPlan ? { pagePlan: nextPlan, architecture: insertArchitectureSection(snapshot.source.architecture, nextPlan, sectionId) } : {}),
+      updatedAt: new Date().toISOString(),
+    };
     commit(placeholderSource);
-    const target = { id, type: "section", tagName: "section" };
+
+    const target = { id: sectionId, type: "section", tagName: "section" };
     setSelection(target); setShowAddSection(false); setLeftPanel("ai"); setChatBusy(true);
+    setMessages((items) => [...items, { id: crypto.randomUUID(), role: "user", text: `${preset.label} 섹션 추가 · ${input.brief}` }]);
     try {
-      const summary = await requestAiPatch(`새 섹션을 처음부터 설계해 추가해줘. 요구사항: ${prompt}`, target, placeholderSource);
+      const summary = await requestAiPatch(`${preset.label} 섹션을 새로 설계해 추가해줘. 요구사항: ${input.brief}`, target, placeholderSource, {
+        operation: "new-section",
+        sectionPreset: preset.id,
+        sectionBrief: input.brief,
+        projectAssetUrls: projectImageUrls(snapshot.source),
+      });
       setMessages((items) => [...items, { id: crypto.randomUUID(), role: "assistant", text: summary }]);
-      setToast("AI가 새 섹션을 직접 설계했습니다");
+      setToast(`${preset.label} 섹션을 추가했습니다`);
     } catch (error) {
-      setMessages((items) => [...items, { id: crypto.randomUUID(), role: "assistant", text: error instanceof Error ? error.message : "새 섹션 생성에 실패했습니다." }]);
+      // 자리표시자까지 함께 되돌립니다. 실패한 요청이 빈 섹션을 남기지 않습니다.
+      rollbackToSnapshot(snapshot);
+      setSelection(anchor?.getAttribute("data-moire-id") ? { id: anchor.getAttribute("data-moire-id") as string, type: "section", tagName: "section" } : null);
+      setMessages((items) => [...items, { id: crypto.randomUUID(), role: "assistant", text: `${error instanceof Error ? error.message : "새 섹션 생성에 실패했습니다."} 추가하던 섹션 자리는 되돌렸습니다.` }]);
     } finally { setChatBusy(false); }
   }
 
@@ -723,9 +845,9 @@ export function EditorShell({ initialSource, projectId = null, initialVersions =
       </div>
 
       {toast && <div className="editor-toast"><Save size={14} /> {toast}</div>}
-      {showAddSection && <AddSectionModal onClose={() => setShowAddSection(false)} onAdd={addAiSection} />}
+      {showAddSection && <AddSectionModal anchorLabel={regions.find((region) => region.id === (selectedNode?.sectionId ?? selection?.id))?.label ?? null} busy={chatBusy} onClose={() => setShowAddSection(false)} onAdd={addAiSection} />}
       {showVersions && <VersionModal versions={versions} current={source} activeVersionId={activeVersionId} busy={persistBusy} onClose={() => setShowVersions(false)} onSave={saveVersion} onRestore={restoreVersion} />}
-      {showPublish && <PublishModal projectId={projectId} saveStateLabel={autosaveLabel(autosaveState, lastSavedAt)} onClose={() => setShowPublish(false)} />}
+      {showPublish && <PublishModal projectId={projectId} saveStateLabel={autosaveLabel(autosaveState, lastSavedAt)} onFlushDraft={flushDraft} onClose={() => setShowPublish(false)} />}
     </main>
   );
 }
@@ -967,9 +1089,44 @@ function NodeInspector({ node, renderMetrics, projectId, productPresentation, th
   </div>;
 }
 
-function AddSectionModal({ onClose, onAdd }: { onClose: () => void; onAdd: (prompt: string) => Promise<void> }) {
-  const [prompt, setPrompt] = useState("");
-  return <div className="modal-backdrop"><div className="editor-modal add-ai-section-modal"><div className="modal-title"><div><Sparkles size={18} /><b>AI로 새 섹션 설계</b></div><button onClick={onClose}><X size={17} /></button></div><div className="add-section-form"><p>정해진 섹션 타입을 고르지 않습니다. 필요한 역할과 구성을 자연어로 설명하면 AI가 HTML/CSS를 직접 설계합니다.</p><textarea rows={6} value={prompt} onChange={(event) => setPrompt(event.target.value)} placeholder="예: 대표 제품 하나를 잡지 표지처럼 크게 보여주고, 재료 디테일을 작은 캡션과 함께 비대칭으로 배치해줘" /><button disabled={prompt.trim().length < 5} onClick={() => void onAdd(prompt.trim())}><Sparkles size={15} /> 새 구조 생성</button></div></div></div>;
+function AddSectionModal({ anchorLabel, busy, onClose, onAdd }: { anchorLabel: string | null; busy: boolean; onClose: () => void; onAdd: (input: { presetId: NewSectionPresetId; brief: string; position: NewSectionPosition }) => Promise<void> }) {
+  const [presetId, setPresetId] = useState<NewSectionPresetId>(NEW_SECTION_PRESETS[0].id);
+  const [brief, setBrief] = useState("");
+  const [position, setPosition] = useState<NewSectionPosition>(anchorLabel ? "after" : "end");
+  const preset = NEW_SECTION_PRESETS.find((item) => item.id === presetId) ?? NEW_SECTION_PRESETS[0];
+  const positions: ReadonlyArray<{ value: NewSectionPosition; label: string; disabled: boolean }> = [
+    { value: "before", label: anchorLabel ? `${anchorLabel} 앞` : "선택 섹션 앞", disabled: !anchorLabel },
+    { value: "after", label: anchorLabel ? `${anchorLabel} 뒤` : "선택 섹션 뒤", disabled: !anchorLabel },
+    { value: "end", label: "맨 끝", disabled: false },
+  ];
+  return <div className="modal-backdrop"><div className="editor-modal add-ai-section-modal">
+    <div className="modal-title"><div><Sparkles size={18} /><b>새 섹션 만들기</b></div><button onClick={onClose} aria-label="새 섹션 창 닫기"><X size={17} /></button></div>
+    <div className="add-section-form">
+      <p>유형을 고르고 담고 싶은 내용을 적어 주세요. 섹션의 폭·톤·구성 축은 코드가 정하고, AI는 그 안의 내용을 설계합니다.</p>
+      <div className="new-section-presets">
+        {NEW_SECTION_PRESETS.map((item) => <button
+          key={item.id}
+          type="button"
+          className={`new-section-preset${item.id === presetId ? " active" : ""}`}
+          aria-pressed={item.id === presetId}
+          onClick={() => setPresetId(item.id)}
+        ><b>{item.label}</b><span>{item.summary}</span></button>)}
+      </div>
+      <div className="new-section-position" role="group" aria-label="삽입 위치">
+        <span>삽입 위치</span>
+        {positions.map((item) => <button
+          key={item.value}
+          type="button"
+          className={position === item.value ? "active" : ""}
+          aria-pressed={position === item.value}
+          disabled={item.disabled}
+          onClick={() => setPosition(item.value)}
+        >{item.label}</button>)}
+      </div>
+      <textarea rows={5} value={brief} onChange={(event) => setBrief(event.target.value)} placeholder={preset.briefPlaceholder} />
+      <button disabled={busy || brief.trim().length < 5} onClick={() => void onAdd({ presetId, brief: brief.trim(), position })}><Sparkles size={15} /> {busy ? "생성 중" : "새 섹션 생성 · 1C"}</button>
+    </div>
+  </div></div>;
 }
 
 function VersionModal({ versions, current, activeVersionId, busy, onClose, onSave, onRestore }: { versions: SavedVersion[]; current: ProjectSource; activeVersionId: string | null; busy: boolean; onClose: () => void; onSave: () => Promise<void>; onRestore: (version: SavedVersion) => Promise<void> }) {

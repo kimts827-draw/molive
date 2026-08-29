@@ -2,7 +2,7 @@ import { z } from "zod";
 import { errorResponse, requireApiUser } from "@/lib/api/auth";
 import { cafe24Fetch } from "@/lib/cafe24/client";
 import { injectManagedPresentation, inlinePresentationStyles, prepareProjectPatch, validateThemeMutation } from "@/lib/cafe24/protection";
-import { loadProject } from "@/lib/projects/service";
+import { resolveExportVersion } from "@/lib/projects/service";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 const schema = z.object({ projectId: z.uuid(), connectionId: z.uuid(), skinNo: z.number().int().positive(), mode: z.enum(["runtime", "theme"]).default("runtime") });
@@ -13,10 +13,8 @@ export async function POST(request: Request) {
     const user = await requireApiUser(request);
     const input = schema.parse(await request.json());
     const admin = createAdminClient();
-    const project = await loadProject(input.projectId, user.id);
-    if (!project.currentVersionId) return Response.json({ error: "게시할 activeVersion이 없습니다. 먼저 버전을 저장하세요." }, { status: 409 });
-    const activeVersion = project.versions.find((version) => version.id === project.currentVersionId);
-    if (!activeVersion) return Response.json({ error: "activeVersion의 Project Source를 찾을 수 없습니다." }, { status: 409 });
+    // 게시도 Editor의 현재 문서를 씁니다. 버전이 뒤처져 있으면 승격한 뒤 그 버전으로 배포합니다.
+    const activeVersion = await resolveExportVersion(input.projectId, user.id);
     const patch = prepareProjectPatch(activeVersion.source);
     const { data: connection } = await admin.from("cafe24_connections").select("id,user_id,mall_id,shop_no").eq("id", input.connectionId).eq("user_id", user.id).single();
     if (!connection) return Response.json({ error: "Cafe24 연결을 찾을 수 없습니다." }, { status: 404 });
@@ -61,9 +59,9 @@ export async function POST(request: Request) {
       const { error: activateError } = await admin.from("cafe24_installations").update({ status: "active", script_no: scriptNo, installed_at: deployedAt, last_error: null, updated_at: deployedAt }).eq("id", installation.id);
       if (activateError) throw activateError;
       await admin.from("projects").update({ status: "published", updated_at: deployedAt }).eq("id", input.projectId).eq("owner_id", user.id);
-      const { data: deployment, error: deploymentError } = await admin.from("deployments").insert({ project_id: input.projectId, connection_id: input.connectionId, installation_id: installation.id, version_id: project.currentVersionId, mode: "runtime", skin_no: input.skinNo, status: "active", external_id: scriptNo, payload: { projectSourceId: activeVersion.source.id }, created_by: user.id, deployed_at: deployedAt }).select("id").single();
+      const { data: deployment, error: deploymentError } = await admin.from("deployments").insert({ project_id: input.projectId, connection_id: input.connectionId, installation_id: installation.id, version_id: activeVersion.versionId, mode: "runtime", skin_no: input.skinNo, status: "active", external_id: scriptNo, payload: { projectSourceId: activeVersion.source.id }, created_by: user.id, deployed_at: deployedAt }).select("id").single();
       if (deploymentError) throw deploymentError;
-      return Response.json({ deploymentId: deployment.id, installationId: installation.id, scriptNo, reusedScriptTag: Boolean(installation.script_no), activeVersionId: project.currentVersionId, mode: "runtime", status: "active" });
+      return Response.json({ deploymentId: deployment.id, installationId: installation.id, scriptNo, reusedScriptTag: Boolean(installation.script_no), activeVersionId: activeVersion.versionId, mode: "runtime", status: "active" });
     }
 
     if (process.env.CAFE24_THEME_WRITE_ENABLED !== "true") return Response.json({ error: "Theme Pages 쓰기는 Cafe24의 별도 클라이언트 승인이 필요합니다. Runtime 모드를 사용하세요." }, { status: 409 });
@@ -75,8 +73,8 @@ export async function POST(request: Request) {
     const report = validateThemeMutation("index.html", original, nextSource);
     if (!report.safe) return Response.json({ error: "Cafe24 보호 검사에 실패했습니다.", report }, { status: 422 });
     await cafe24Fetch(input.connectionId, `/themes/${input.skinNo}/pages`, { method: "PUT", body: JSON.stringify({ request: { path: "index.html", source: nextSource } }) });
-    const { data: deployment, error: deploymentError } = await admin.from("deployments").insert({ project_id: input.projectId, connection_id: input.connectionId, version_id: project.currentVersionId, mode: "theme", skin_no: input.skinNo, status: "active", payload: { projectSourceId: activeVersion.source.id }, created_by: user.id, deployed_at: new Date().toISOString() }).select("id").single();
+    const { data: deployment, error: deploymentError } = await admin.from("deployments").insert({ project_id: input.projectId, connection_id: input.connectionId, version_id: activeVersion.versionId, mode: "theme", skin_no: input.skinNo, status: "active", payload: { projectSourceId: activeVersion.source.id }, created_by: user.id, deployed_at: new Date().toISOString() }).select("id").single();
     if (deploymentError) throw deploymentError;
-    return Response.json({ deploymentId: deployment.id, activeVersionId: project.currentVersionId, mode: "theme", status: "active", report });
+    return Response.json({ deploymentId: deployment.id, activeVersionId: activeVersion.versionId, mode: "theme", status: "active", report });
   } catch (error) { return errorResponse(error); }
 }

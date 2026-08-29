@@ -1,7 +1,7 @@
 import "server-only";
 import OpenAI from "openai";
 import { z } from "zod";
-import { ensureEditingMetadata, validateNodePatch, validateProjectSource } from "@/lib/cafe24/protection";
+import { ensureEditingMetadata, validateNodePatch, validateNodePatchStructure, validateProjectSource } from "@/lib/cafe24/protection";
 import { buildDesignGenerationUserPrompt, validateGeneratedDesignContract, type DesignGenerationInput } from "@/lib/openai/design-generation-contract";
 import { generatePagePlan } from "@/lib/openai/page-plan-generator";
 import { pagePlanSectionRefs, pagePlanSignature, renderPagePlanEditContext, type PagePlan } from "@/lib/design-library/page-plan";
@@ -11,12 +11,13 @@ import { auditAssetReferenceTokens, auditGeneratedAssets, collectAssetReferences
 import { resolvePreviewProducts, type PreviewProductMock } from "@/lib/component-library/preview-mock";
 import { applyGeneratedPreviewPhotos, previewPhotoTargets } from "@/lib/openai/preview-image-contract";
 import { generatePreviewProductPhotos, regenerateSectionImage, type GeneratedImageStore } from "@/lib/openai/preview-image-generator";
-import { isRepairableVerdict, verifyGeneralImages, type ImageProbe } from "@/lib/assets/image-verification";
+import { isRepairableVerdict, verifyGeneralImages, type ImageCheck, type ImageProbe } from "@/lib/assets/image-verification";
 import { repairBrokenImages } from "@/lib/assets/image-repair";
 import { writeGenerationTrace, type GenerationTrace } from "@/lib/openai/dev-trace";
 import { usageEventFromResponse, type OpenAIUsageEvent } from "@/lib/openai/usage";
 import { OpenAIUsageRecordingError, runRecordedOpenAICall } from "@/lib/openai/recorded-call";
 import { classifyAiEditIntent } from "@/lib/editor/ai-edit-intent";
+import { newSectionPreset, renderNewSectionContract, type NewSectionPreset } from "@/lib/editor/new-section";
 import type { ProjectSource } from "@/lib/project-source";
 
 const architectureSchema = z.object({
@@ -451,18 +452,47 @@ SELECTED-NODE EDIT MODE
 - Typography requests may safely use font-family, font-size, color, line-height, letter-spacing, font-weight, font-style, text-decoration, text-align, scale, and translate.
 - Prefer responsive-safe properties and avoid absolute positioning unless the selected node already uses it. Never reject these supported style requests merely because the user did not use CSS terminology.`;
 
-export async function editProjectNode(input: { prompt: string; nodeId: string; nodeType: string; nodeHtml: string; projectCss: string; rootValue: string; architecture: ProjectSource["architecture"]; pagePlan?: PagePlan; renderMetrics?: { width: number; height: number; fontSize: number; lineHeight: number; letterSpacing: number; marginTop: number; marginBottom: number; paddingTop: number; paddingBottom: number } }, options?: { onUsage?: (event: OpenAIUsageEvent) => Promise<void> }) {
+/**
+ * 새 섹션 만들기 전용 계약입니다.
+ *
+ * 선택 노드는 코드가 방금 넣은 빈 placeholder이고, plan 축 속성은 코드가 소유합니다.
+ * 모델은 그 자리의 내용만 설계하며 상품 슬롯·Header·Cafe24 binding은 만들 수 없습니다.
+ */
+const newSectionSystemPrompt = `
+NEW SECTION MODE
+- The selected node is an empty placeholder <section> that code inserted into this page a moment ago. Design its final content from scratch.
+- Keep the root element a <section> and keep its data-moire-id exactly. Keep every data-moire-plan, data-moire-tone, data-moire-container, data-moire-columns and data-moire-surface attribute on the root opening tag byte-for-byte. Those attributes are the page-level layout contract owned by code; dropping them breaks this section's width, colour band and grid.
+- Drop the placeholder's inline style attributes and the placeholder sentence. Express all styling through nodeCss instead.
+- Give every element a unique data-moire-id and a useful data-moire-type such as text, image, or button.
+- This page already has its single product area somewhere else. Never output data-cafe24-slot, product cards, prices, product names, stock, a header element, or any Cafe24 module, variable or directive here.
+- Write Korean customer-facing copy for this shop's own product category. Never fabricate reviews, ratings, awards, certifications, sales figures, delivery or refund terms, prices, or discount rates.
+- Build exactly the section type, variant and axes given in the request. Density, tone, alignment, container and media position are already decided; spend your craft on composition, copy, proportion and detail inside them.
+- Never invent an image address. Copy an ALLOWED IMAGES entry verbatim, or use CSS gradients, colour fields and inline data:image/svg+xml art instead. A remembered or guessed stock photo id does not exist and renders broken.
+- The section must read as a finished part of this page, not a demo block: purposeful heading, real supporting copy, and a deliberate vertical rhythm.`;
+
+export async function editProjectNode(input: { prompt: string; nodeId: string; nodeType: string; nodeHtml: string; projectCss: string; rootValue: string; architecture: ProjectSource["architecture"]; pagePlan?: PagePlan; renderMetrics?: { width: number; height: number; fontSize: number; lineHeight: number; letterSpacing: number; marginTop: number; marginBottom: number; paddingTop: number; paddingBottom: number }; operation?: "node-edit" | "new-section"; sectionPreset?: string; sectionBrief?: string; projectAssetUrls?: string[] }, options?: { onUsage?: (event: OpenAIUsageEvent) => Promise<void>; imageProbe?: ImageProbe }) {
   const traceId = crypto.randomUUID();
   const createdAt = new Date().toISOString();
-  const editIntent = classifyAiEditIntent(input.prompt);
+  const operation = input.operation ?? "node-edit";
+  const preset: NewSectionPreset | null = operation === "new-section" ? newSectionPreset(input.sectionPreset ?? "") : null;
+  if (operation === "new-section" && !preset) throw new Error("알 수 없는 섹션 유형입니다.");
+  /**
+   * 새 섹션은 언제나 구조를 새로 만드는 요청입니다.
+   * 브리프에 "색"이나 "크기" 같은 단어가 있어도 style-only로 내려가면 빈 자리표시자만 남습니다.
+   */
+  const editIntent = operation === "new-section" ? "general" : classifyAiEditIntent(input.prompt);
   /**
    * page plan이 있는 프로젝트는 "이 몰이 무엇을 파는 어떤 구성인가"를 참고 컨텍스트로 함께 넘겨
    * 부분 수정이 상품군과 페이지 톤에서 벗어나지 않게 합니다.
    * plan이 없는 기존 프로젝트는 예전 프롬프트를 그대로 씁니다.
    */
   const planContext = input.pagePlan ? renderPagePlanEditContext(input.pagePlan) : "";
-  const scopedSystemPrompt = `${editSystemPrompt.replaceAll("SELECTED_ID", input.nodeId)}\nEvery nodeCss selector must also begin with the exact project selector [data-moire-root="${input.rootValue}"].${editIntent === "style-only" ? "\nThis is a STYLE-ONLY request. Return the selected outerHTML unchanged and put the requested visual change only in nodeCss." : ""}${planContext ? "\nThe user message carries this project's page composition. Treat it as context: keep the edit inside the composition's product category and tone, and never add, remove, or reorder sections outside the selected node." : ""}`;
-  const userPrompt = `${planContext ? `${planContext}\n` : ""}Project architecture (context only):\n${JSON.stringify(input.architecture)}\nSelected node type: ${input.nodeType}\nCurrent selected render metrics (CSS px, use for relative changes):\n${JSON.stringify(input.renderMetrics ?? null)}\nSelected node outerHTML:\n${input.nodeHtml}\nCurrent project CSS for visual context:\n${input.projectCss}\nUser request:\n${input.prompt}`;
+  const scopedSystemPrompt = `${editSystemPrompt.replaceAll("SELECTED_ID", input.nodeId)}\nEvery nodeCss selector must also begin with the exact project selector [data-moire-root="${input.rootValue}"].${editIntent === "style-only" ? "\nThis is a STYLE-ONLY request. Return the selected outerHTML unchanged and put the requested visual change only in nodeCss." : ""}${planContext ? "\nThe user message carries this project's page composition. Treat it as context: keep the edit inside the composition's product category and tone, and never add, remove, or reorder sections outside the selected node." : ""}${preset ? newSectionSystemPrompt : ""}`;
+  /** 이 섹션이 쓸 수 있는 사진은 이미 이 프로젝트 안에 있는 것뿐입니다. 없으면 이번 요청용 스톡만 새로 씁니다. */
+  const allowedImages = preset?.mediaPolicy === "project-or-fresh" ? [...new Set(input.projectAssetUrls ?? [])].slice(0, 12) : [];
+  const userPrompt = preset
+    ? `${planContext ? `${planContext}\n` : ""}NEW SECTION REQUEST\n${renderNewSectionContract(preset)}\nALLOWED IMAGES (${allowedImages.length}):\n${allowedImages.join(`\n`) || "(없음)"}\n사용자 요구사항:\n${input.sectionBrief?.trim() || preset.intent}\nPlaceholder outerHTML (루트 속성은 그대로 두고 내용만 새로 설계):\n${input.nodeHtml}\nCurrent project CSS for visual context:\n${input.projectCss}`
+    : `${planContext ? `${planContext}\n` : ""}Project architecture (context only):\n${JSON.stringify(input.architecture)}\nSelected node type: ${input.nodeType}\nCurrent selected render metrics (CSS px, use for relative changes):\n${JSON.stringify(input.renderMetrics ?? null)}\nSelected node outerHTML:\n${input.nodeHtml}\nCurrent project CSS for visual context:\n${input.projectCss}\nUser request:\n${input.prompt}`;
   const trace: GenerationTrace = { traceId, kind: "edit", createdAt, request: { model: model(), systemPrompt: scopedSystemPrompt, userPrompt } };
   try {
     const requestedModel = model();
@@ -486,19 +516,42 @@ export async function editProjectNode(input: { prompt: string; nodeId: string; n
     const candidateHtml = editIntent === "style-only" ? input.nodeHtml : parsed.nodeHtml;
     const nodeHtml = ensureEditingMetadata(candidateHtml, `moire-${input.nodeId.replace(/[^a-z0-9-]/gi, "").slice(0, 24)}`);
     const patch = { nodeHtml, nodeCss: parsed.nodeCss };
+    /**
+     * 새 섹션의 이미지는 저장 전에 실제로 열리는지 확인합니다.
+     *
+     * 편집 경로에는 생성 경로와 달리 이미지 검증이 없어서, 모델이 지어낸 스톡 사진 ID가
+     * 그대로 Preview와 Export까지 깨진 채로 나갔습니다. 깨진 자리만 팔레트 색면으로 마감하고
+     * 정상 이미지와 나머지 디자인은 건드리지 않습니다.
+     */
+    const imageChecks: ImageCheck[] = preset && options?.imageProbe
+      ? await verifyGeneralImages({ html: patch.nodeHtml, css: patch.nodeCss, allowlist: createAssetAllowlist({ projectAssets: input.projectAssetUrls ?? [] }), probe: options.imageProbe })
+      : [];
+    if (imageChecks.some((check) => isRepairableVerdict(check.verdict))) {
+      const repaired = await repairBrokenImages({
+        source: { html: patch.nodeHtml, css: patch.nodeCss },
+        checks: imageChecks,
+        palette: { surface: input.pagePlan?.palette?.brandColor, accent: input.pagePlan?.palette?.brandColor },
+      });
+      patch.nodeHtml = repaired.html;
+      patch.nodeCss = repaired.css;
+    }
     // 편집은 이미 이 프로젝트에 들어와 있는 이미지만 물려받습니다. 다른 프로젝트의 저장 이미지는 새로 끌어올 수 없습니다.
     const existingReferences = collectAssetReferences(input.nodeHtml, input.projectCss);
-    const editAllowlist = createAssetAllowlist({ projectAssets: existingReferences.map((reference) => reference.url) });
+    // 새 섹션은 이 프로젝트에 이미 들어와 있는 사진도 쓸 수 있습니다. 다른 프로젝트 자산은 그대로 막힙니다.
+    const editAllowlist = createAssetAllowlist({ projectAssets: [...existingReferences.map((reference) => reference.url), ...(preset ? input.projectAssetUrls ?? [] : [])] });
     // 이미 있던 이미지까지 다시 심판하지 않습니다. 보호된 Product DOM이 선택 안에 있다는 이유만으로
     // 이미지를 건드리지 않는 CSS 수정까지 거부되던 원인입니다.
     const introduced = new Set(existingReferences.map((reference) => reference.url.slice(0, 120)));
     const assetViolations = auditGeneratedAssets({ html: patch.nodeHtml, css: patch.nodeCss }, editAllowlist)
       .filter((violation) => !violation.token || !introduced.has(violation.token));
     const nodeValidator = validateNodePatch({ nodeId: input.nodeId, rootValue: input.rootValue, ...patch });
-    const validator = { safe: nodeValidator.safe && assetViolations.length === 0, violations: [...nodeValidator.violations, ...assetViolations] };
+    const structuralViolations = validateNodePatchStructure({ operation, before: input.nodeHtml, after: patch.nodeHtml }).violations;
+    const violations = [...nodeValidator.violations, ...assetViolations, ...structuralViolations];
+    const validator = { safe: violations.length === 0, violations };
     trace.response = responseTrace(response);
     trace.generated = patch;
     trace.validator = validator;
+    if (imageChecks.length) trace.generalImageVerification = { checks: imageChecks, repaired: [], unverified: imageChecks.filter((check) => check.verdict === "unverified").map((check) => check.url) };
     if (!validator.safe) throw new Error(`AI node patch 보호 검사 실패: ${validator.violations.map((item) => item.code).join(", ")}`);
     await writeGenerationTrace(trace);
     return { ...patch, summary: parsed.summary, traceId, validator };

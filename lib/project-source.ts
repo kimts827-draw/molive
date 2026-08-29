@@ -129,6 +129,27 @@ export function cloneProjectSource(source: ProjectSource): ProjectSource {
   return structuredClone(source);
 }
 
+/** 키 순서와 무관하게 값만 비교하기 위한 결정적 직렬화입니다. */
+function stableValue(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(stableValue);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.keys(value as Record<string, unknown>).sort().map((key) => [key, stableValue((value as Record<string, unknown>)[key])]));
+  }
+  return value;
+}
+
+/**
+ * 두 Project Source가 "같은 결과물"인지 판정하는 서명입니다.
+ *
+ * Editor의 현재 문서와 activeVersion 스냅샷을 비교해, 다르면 Export/게시 직전에
+ * 현재 문서를 새 버전으로 승격시키는 데 씁니다. updatedAt은 편집이 없어도 매번 바뀌므로
+ * 서명에서 제외해야 같은 내용에 대해 버전이 무한히 늘어나지 않습니다.
+ */
+export function projectSourceSignature(source: ProjectSource): string {
+  const { updatedAt: _updatedAt, ...rest } = source;
+  return JSON.stringify(stableValue(rest));
+}
+
 export function projectSourceSchemaShape() {
   return {
     id: "string",

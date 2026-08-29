@@ -83,7 +83,7 @@ test("결정적 편집은 실제 변경이 있을 때만 성공으로 보고한�
   const source = await readFile(new URL("../components/editor/editor-shell.tsx", import.meta.url), "utf8");
   assert.ok(source.includes('intent.kind === "header-variant"'));
   assert.ok(source.includes('intent.kind === "unsupported"'));
-  assert.ok(source.includes("visiblyChanged\n          ? intent.summary"), "바뀐 게 없으면 성공이라고 말하지 않습니다.");
+  assert.match(source, /visiblyChanged\s*\? intent\.summary/, "바뀐 게 없으면 성공이라고 말하지 않습니다.");
   assert.ok(source.includes("if (next.html === before.html && next.css === before.css)"), "모델 편집도 실제 diff를 확인해야 합니다.");
   assert.ok(source.includes("verifyVisibleSelectionChange"), "문자열 diff 뒤 실제 computed 결과도 확인해야 합니다.");
   assert.ok(source.includes("discardUnappliedChange"), "화면 변화가 없는 변경은 성공 처리하지 않고 취소해야 합니다.");

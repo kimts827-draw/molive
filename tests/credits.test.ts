@@ -6,6 +6,8 @@ import { CREDIT_COSTS, CREDIT_PLANS, creditPlan } from "../lib/credits/catalog.t
 const migration = await readFile(new URL("../supabase/migrations/20260826070957_open_beta_credits_orders.sql", import.meta.url), "utf8");
 const generationRoute = await readFile(new URL("../app/api/ai/generate/route.ts", import.meta.url), "utf8");
 const editorRoute = await readFile(new URL("../app/api/ai/edit/route.ts", import.meta.url), "utf8");
+const settleRoute = await readFile(new URL("../app/api/ai/edit/settle/route.ts", import.meta.url), "utf8");
+const editorShell = await readFile(new URL("../components/editor/editor-shell.tsx", import.meta.url), "utf8");
 const adminAuth = await readFile(new URL("../lib/admin/auth.ts", import.meta.url), "utf8");
 const creditService = await readFile(new URL("../lib/credits/service.ts", import.meta.url), "utf8");
 const orderRoute = await readFile(new URL("../app/api/orders/route.ts", import.meta.url), "utf8");
@@ -44,12 +46,34 @@ test("balance 음수와 직접 사용자 변경을 막고 자기 데이터 SELEC
 test("AI는 실행 전 Credit을 예약하고 성공 시만 확정하며 실패 시 해제한다", () => {
   for (const [source, operation] of [[generationRoute, "design_generation"], [editorRoute, "editor_ai"]] as const) {
     assert.match(source, new RegExp(`creditReservation = await reserveAiCredits\\(user\\.id, "${operation}"`));
-    assert.match(source, /commitAiCredits/);
     assert.match(source, /finally[\s\S]*releaseAiCredits/);
   }
+  // 생성은 결과가 곧 저장된 프로젝트라 응답 전에 확정합니다.
+  assert.match(generationRoute, /commitAiCredits/);
   assert.match(generationRoute, /"design_generation"/);
   assert.match(editorRoute, /"editor_ai"/);
   assert.match(migration, /raise exception 'INSUFFICIENT_CREDITS'/);
+});
+
+test("Editor AI는 문서에 실제로 반영된 뒤에만 Credit을 확정한다", () => {
+  // 편집 API는 예약만 남기고 응답합니다. 여기서 확정하면 롤백된 편집의 Credit이 그대로 사라집니다.
+  assert.equal(/commitAiCredits/.test(editorRoute), false);
+  assert.match(editorRoute, /let creditDeferred = false/);
+  assert.match(editorRoute, /creditDeferred = Boolean\(creditReservation\)/);
+  assert.match(editorRoute, /credit: creditReservation \? \{ reservationId: creditReservation\.id/);
+  assert.match(editorRoute, /if \(creditReservation && !creditDeferred\)/);
+
+  // 정산 경로가 적용/취소를 명시적으로 받아 commit 또는 release로 보냅니다.
+  assert.match(settleRoute, /outcome: z\.enum\(\["applied", "discarded"\]\)/);
+  assert.match(settleRoute, /settleAiCredits\(\{ reservationId, userId: user\.id, projectId, outcome \}\)/);
+  assert.match(settleRoute, /CREDIT_RESERVATION_RELEASED[\s\S]*CREDIT_RESERVATION_NOT_FOUND[\s\S]*settled: "already"/);
+  assert.match(creditService, /if \(input\.outcome === "applied"\) return commitAiCredits/);
+  assert.match(creditService, /const balance = await releaseAiCredits/);
+
+  // Editor는 실제 반영에 성공했을 때만 applied로 정산하고, 모든 실패 경로는 discarded로 예약을 풉니다.
+  assert.match(editorShell, /await settleAiCredit\(reservationId, applied \? "applied" : "discarded"\)/);
+  assert.match(editorShell, /"\/api\/ai\/edit\/settle"/);
+  assert.match(editorShell, /let applied = false;[\s\S]*applied = true;[\s\S]*\} finally \{/);
 });
 
 test("만료된 예약만 원자적으로 회수하고 30분 lease로 새 예약을 만든다", () => {

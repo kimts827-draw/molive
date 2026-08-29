@@ -353,8 +353,8 @@ test("editProjectNode는 plan이 있을 때만 구성 컨텍스트를 싣고 leg
   assert.ok(source.includes("pagePlan?: PagePlan;"), "editProjectNode 입력에 pagePlan이 없습니다");
   assert.ok(source.includes('const planContext = input.pagePlan ? renderPagePlanEditContext(input.pagePlan) : "";'));
   // plan이 없으면 planContext가 빈 문자열이므로 userPrompt와 systemPrompt가 예전과 완전히 같아진다.
-  // (두 프롬프트 모두 planContext를 조건부로만 끼워 넣는지 확인한다.)
-  assert.equal([...source.matchAll(/\$\{planContext \? /g)].length, 2);
+  // (system prompt 1곳 + userPrompt의 새 섹션/기존 편집 두 분기 모두 조건부인지 확인한다.)
+  assert.equal([...source.matchAll(/\$\{planContext \? /g)].length, 3);
   assert.ok(source.includes('}Project architecture (context only)'));
   assert.ok(source.includes("The user message carries this project's page composition"));
 

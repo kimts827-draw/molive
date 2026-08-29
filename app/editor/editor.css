@@ -227,6 +227,16 @@
 .add-section-form textarea:focus { border-color: #745ce3; box-shadow: 0 0 0 2px rgba(116,92,227,.12); }
 .add-section-form > button { height: 40px; display: flex; align-items: center; justify-content: center; gap: 7px; color: white; background: #6751d9; border-radius: 7px; font-size: 10px; font-weight: 700; }
 .add-section-form > button:disabled { opacity: .4; }
+.new-section-presets { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.new-section-preset { display: grid; gap: 4px; padding: 11px 12px; text-align: left; border: 1px solid #d7d5ce; border-radius: 8px; background: #fff; }
+.new-section-preset b { font-size: 11px; color: #2b2a27; }
+.new-section-preset span { font-size: 9px; line-height: 1.55; color: #78766f; }
+.new-section-preset.active { border-color: #6751d9; background: #f5f3ff; box-shadow: 0 0 0 2px rgba(116,92,227,.12); }
+.new-section-position { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.new-section-position > span { margin-right: 2px; font-size: 10px; font-weight: 700; color: #4a4843; }
+.new-section-position button { height: 28px; padding: 0 11px; border: 1px solid #d7d5ce; border-radius: 999px; background: #fff; font-size: 10px; color: #4a4843; }
+.new-section-position button.active { border-color: #6751d9; background: #6751d9; color: #fff; font-weight: 700; }
+.new-section-position button:disabled { opacity: .35; }
 
 @media (max-width: 1050px) {
   .editor-workspace { grid-template-columns: 200px minmax(0, 1fr); }

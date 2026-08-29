@@ -2,24 +2,22 @@ import { z } from "zod";
 import { errorResponse, requireApiUser } from "@/lib/api/auth";
 import { collectAssetUrls } from "@/lib/cafe24/theme-assets";
 import { buildThemeEntries, collectBaseSkin, fetchThemeAssets, THEME_BASE_DIR } from "@/lib/cafe24/theme-package";
-import { loadProject } from "@/lib/projects/service";
+import { resolveExportVersion } from "@/lib/projects/service";
 import { createZip } from "@/lib/zip";
 
 export async function GET(request: Request) {
   try {
     const user = await requireApiUser(request);
     const projectId = z.uuid().parse(new URL(request.url).searchParams.get("project_id"));
-    const project = await loadProject(projectId, user.id);
-    if (!project.currentVersionId) return Response.json({ error: "내려받을 activeVersion이 없습니다. 먼저 버전을 저장하세요." }, { status: 409 });
-    const activeVersion = project.versions.find((version) => version.id === project.currentVersionId);
-    if (!activeVersion) return Response.json({ error: "activeVersion의 Project Source를 찾을 수 없습니다." }, { status: 409 });
+    // Editor의 현재 문서를 그대로 내보냅니다. 버전이 뒤처져 있으면 여기서 승격됩니다.
+    const activeVersion = await resolveExportVersion(projectId, user.id);
 
     const base = await collectBaseSkin(THEME_BASE_DIR);
     const logoImage = "headerPresentation" in activeVersion.source ? activeVersion.source.headerPresentation?.logo.imageUrl ?? "" : "";
     const assets = await fetchThemeAssets(collectAssetUrls(activeVersion.source.html, activeVersion.source.css, logoImage ? `<img src="${logoImage}">` : ""));
     const built = buildThemeEntries(base, activeVersion.source, assets);
     const zip = createZip(built.entries);
-    const name = `molive-skin-${project.id.slice(0, 8)}-${activeVersion.id.slice(0, 8)}.zip`;
+    const name = `molive-skin-${projectId.slice(0, 8)}-${activeVersion.versionId.slice(0, 8)}.zip`;
     return new Response(new Uint8Array(zip), {
       headers: {
         "Content-Type": "application/zip",
@@ -35,6 +33,8 @@ export async function GET(request: Request) {
         "X-Moire-Global-Theme": built.globalTheme ? "on" : "off",
         "X-Moire-Assets": `${built.assetsEmbedded}/${assets.mapping.size + assets.failed.length}`,
         "X-Moire-Skipped": String(built.skipped.length),
+        "X-Moire-Version": activeVersion.versionId,
+        "X-Moire-Version-Promoted": activeVersion.createdVersion ? "current-document" : "unchanged",
       },
     });
   } catch (error) { return errorResponse(error); }

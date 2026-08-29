@@ -1,3 +1,4 @@
+import { PLAN_ATTRIBUTE_NAMES } from "../design-library/plan-attributes.ts";
 import type { ProjectSource } from "@/lib/project-source";
 
 export type ProtectionLevel = "protected" | "restricted" | "presentation";
@@ -175,6 +176,51 @@ export function validateNodePatch(input: { nodeId: string; rootValue: string; no
   for (const selector of cssSelectors(input.nodeCss)) {
     if (!selector.includes(`[data-moire-id="${input.nodeId}"]`) && !selector.includes(`[data-moire-id='${input.nodeId}']`)) violations.push({ code: "NODE_CSS_SCOPE", message: "AI 편집 CSS는 선택한 node ID에만 스코프되어야 합니다.", token: selector });
     if (!selector.includes(`[data-moire-root="${input.rootValue}"]`) && !selector.includes(`[data-moire-root='${input.rootValue}']`)) violations.push({ code: "NODE_ROOT_SCOPE", message: "AI 편집 CSS는 Project Source root 안에 스코프되어야 합니다.", token: selector });
+  }
+  return { safe: violations.length === 0, violations };
+}
+
+const PLAN_ATTRIBUTE_LIST = Object.values(PLAN_ATTRIBUTE_NAMES);
+const PRODUCT_SLOT_PATTERN = /data-cafe24-slot/i;
+
+function rootOpenTag(html: string) {
+  return html.trim().match(/^<[^>]*>/)?.[0] ?? "";
+}
+
+function planAttributeMap(openTag: string) {
+  const found = new Map<string, string>();
+  for (const name of PLAN_ATTRIBUTE_LIST) {
+    const value = openTag.match(new RegExp(`\\b${name}\\s*=\\s*["']([^"']*)["']`, "i"))?.[1];
+    if (value !== undefined) found.set(name, value);
+  }
+  return found;
+}
+
+/**
+ * 노드 단위 검사만으로는 잡히지 않지만 문서 전체 계약을 깨는 변화를 막습니다.
+ *
+ * 상품 슬롯 유실·중복 생성과 header 생성은 Editor에서는 통과하고 ZIP/게시 단계의
+ * validateProjectSource에서 터집니다. patch 단계에서 거절해야 사용자가 깨진 문서를 들고
+ * 게시까지 갔다가 실패하지 않고, Credit도 소모되지 않습니다.
+ *
+ * new-section에서는 코드가 소유한 plan 축 속성과 section 루트 태그도 함께 지킵니다.
+ */
+export function validateNodePatchStructure(input: { operation: "node-edit" | "new-section"; before: string; after: string }) {
+  const violations: SafetyViolation[] = [];
+  const beforeSlot = PRODUCT_SLOT_PATTERN.test(input.before);
+  const afterSlot = PRODUCT_SLOT_PATTERN.test(input.after);
+  if (!beforeSlot && afterSlot) violations.push({ code: "PRODUCT_SLOT_CREATED", message: "상품 슬롯은 페이지에 하나뿐인 검증 영역입니다. 편집으로 새로 만들 수 없습니다." });
+  if (beforeSlot && !afterSlot) violations.push({ code: "PRODUCT_SLOT_REMOVED", message: "선택 영역 안의 상품 슬롯을 없앨 수 없습니다. Cafe24 상품 진열이 사라집니다." });
+  if (/<header[\s>]/i.test(input.after)) violations.push({ code: "HEADER_ELEMENT_CREATED", message: "헤더는 고정 컴포넌트 HeaderV1이 소유합니다. 편집으로 header 요소를 만들 수 없습니다." });
+
+  if (input.operation === "new-section") {
+    const afterRoot = rootOpenTag(input.after);
+    if (!/^<section[\s>]/i.test(afterRoot)) violations.push({ code: "SECTION_ROOT_TAG_CHANGED", message: "새 섹션의 루트는 section 요소여야 합니다." });
+    const before = planAttributeMap(rootOpenTag(input.before));
+    const after = planAttributeMap(afterRoot);
+    for (const [name, value] of before) {
+      if (after.get(name) !== value) violations.push({ code: "PLAN_ATTRIBUTES_LOST", message: "새 섹션의 plan 축 속성은 코드가 소유합니다. 값을 그대로 유지해야 합니다.", token: name });
+    }
   }
   return { safe: violations.length === 0, violations };
 }

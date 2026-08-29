@@ -6,7 +6,9 @@ import { createGenerationUsageRecorder } from "@/lib/openai/usage-store";
 import { openAIUsageActorType } from "@/lib/auth/roles";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { hasSupabaseServerConfig } from "@/lib/supabase/config";
-import { commitAiCredits, releaseAiCredits, reserveAiCredits } from "@/lib/credits/service";
+import { releaseAiCredits, reserveAiCredits } from "@/lib/credits/service";
+import { NEW_SECTION_PRESET_IDS } from "@/lib/editor/new-section";
+import { createImageProbe } from "@/lib/assets/image-probe";
 
 const requestSchema = z.object({
   prompt: z.string().min(2).max(3000),
@@ -21,6 +23,18 @@ const requestSchema = z.object({
   pagePlan: z.unknown().optional(),
   renderMetrics: z.object({ width: z.number().finite().nonnegative(), height: z.number().finite().nonnegative(), fontSize: z.number().finite().nonnegative(), lineHeight: z.number().finite().nonnegative(), letterSpacing: z.number().finite(), marginTop: z.number().finite(), marginBottom: z.number().finite(), paddingTop: z.number().finite(), paddingBottom: z.number().finite() }).optional(),
   projectId: z.uuid().nullable().optional(),
+  /**
+   * 어떤 AI 기능으로 들어온 요청인지 코드가 명시적으로 받습니다.
+   * 프롬프트 문장을 정규식으로 추측하지 않아야 메뉴별로 계약과 검증을 다르게 걸 수 있습니다.
+   */
+  operation: z.enum(["node-edit", "new-section"]).optional(),
+  sectionPreset: z.enum(NEW_SECTION_PRESET_IDS).optional(),
+  sectionBrief: z.string().max(2000).optional(),
+  /** 새 섹션이 재사용할 수 있는, 이미 이 프로젝트 안에 있는 이미지 주소입니다. */
+  projectAssetUrls: z.array(z.string().max(2000)).max(60).optional(),
+}).refine((value) => value.operation !== "new-section" || Boolean(value.sectionPreset), {
+  message: "새 섹션 유형을 선택해 주세요.",
+  path: ["sectionPreset"],
 });
 
 export async function POST(request: Request) {
@@ -42,20 +56,29 @@ export async function POST(request: Request) {
       if (!ownedProject) return Response.json({ error: "프로젝트에 접근할 수 없습니다." }, { status: 403 });
     }
     let creditReservation: Awaited<ReturnType<typeof reserveAiCredits>> | null = null;
-    let creditCommitted = false;
+    /**
+     * 예약을 클라이언트 정산(POST /api/ai/edit/settle)으로 넘겼는지 표시합니다.
+     * 모델 호출이 성공해도 Editor가 실제로 문서에 반영하기 전에는 확정하지 않습니다.
+     * 여기서 바로 commit하면 렌더 검증 실패로 변경이 롤백돼도 Credit만 사라집니다.
+     */
+    let creditDeferred = false;
     try {
       if (hasSupabaseServerConfig()) creditReservation = await reserveAiCredits(user.id, "editor_ai", projectId);
       const actorType = openAIUsageActorType("app_metadata" in user ? user.app_metadata as Record<string, unknown> : null);
       const onUsage = hasSupabaseServerConfig() ? createGenerationUsageRecorder({ generationId: crypto.randomUUID(), userId: user.id, actorType, projectId, usageType: "editor_ai" }) : undefined;
-      const result = await editProjectNode({ ...parsedInput.data, pagePlan: projectPagePlan(parsedInput.data) ?? undefined }, { onUsage });
-      const balance = creditReservation ? await commitAiCredits(creditReservation.id, user.id, projectId) : null;
-      creditCommitted = true;
-      return Response.json({ ...result, balance });
+      const result = await editProjectNode({ ...parsedInput.data, pagePlan: projectPagePlan(parsedInput.data) ?? undefined }, { onUsage, imageProbe: createImageProbe() });
+      creditDeferred = Boolean(creditReservation);
+      return Response.json({
+        ...result,
+        // 반영이 확정될 때까지 잔액은 예약분을 뺀 사용 가능액으로만 보여 줍니다.
+        balance: creditReservation ? creditReservation.available : null,
+        credit: creditReservation ? { reservationId: creditReservation.id, amount: creditReservation.amount, status: "reserved" as const } : null,
+      });
     } catch (error) {
       if (error instanceof z.ZodError) return Response.json({ error: "AI 수정 결과를 선택 영역 patch로 변환하지 못했습니다. 다시 시도해 주세요." }, { status: 422 });
       throw error;
     } finally {
-      if (creditReservation && !creditCommitted) {
+      if (creditReservation && !creditDeferred) {
         try { await releaseAiCredits(creditReservation.id, user.id); }
         catch (releaseError) { console.error("Credit reservation release failed", releaseError instanceof Error ? releaseError.message : "unknown error"); }
       }

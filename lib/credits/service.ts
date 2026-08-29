@@ -61,8 +61,23 @@ export async function commitAiCredits(reservationId: string, userId: string, pro
 }
 
 export async function releaseAiCredits(reservationId: string, userId: string) {
-  const { error } = await createAdminClient().rpc("release_credit_reservation", { p_reservation_id: reservationId, p_user_id: userId });
+  const { data, error } = await createAdminClient().rpc("release_credit_reservation", { p_reservation_id: reservationId, p_user_id: userId });
   if (error && !error.message.includes("CREDIT_RESERVATION_RELEASED")) throw error;
+  return error ? null : Number(data);
+}
+
+/**
+ * 실행은 성공했지만 실제 적용 여부가 클라이언트에서 갈리는 AI 편집의 정산 경로입니다.
+ *
+ * 편집 API는 예약만 남기고 응답하며, Editor가 문서에 실제로 반영한 뒤에만 applied로 확정합니다.
+ * 렌더 검증 실패처럼 변경이 롤백되면 discarded로 예약을 풀어 사용자 Credit이 소모되지 않습니다.
+ * 클라이언트가 아무것도 부르지 못한 채 사라져도 예약은 30분 lease 만료로 회수되므로,
+ * 어떤 경로로도 "적용되지 않은 편집에 Credit이 차감된 상태"가 남지 않습니다.
+ */
+export async function settleAiCredits(input: { reservationId: string; userId: string; projectId?: string | null; outcome: "applied" | "discarded" }) {
+  if (input.outcome === "applied") return commitAiCredits(input.reservationId, input.userId, input.projectId ?? null);
+  const balance = await releaseAiCredits(input.reservationId, input.userId);
+  return balance ?? (await getCreditBalance(input.userId)).balance;
 }
 
 export async function createBankTransferOrder(userId: string, planId: CreditPlanId, depositorName: string) {
