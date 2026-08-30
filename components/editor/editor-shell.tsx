@@ -41,10 +41,14 @@ type RegionSummary = { id: string; type: string; label: string; hidden: boolean 
  */
 const INSPECTED_STYLE_PROPERTIES = ["color", "backgroundColor", "backgroundImage", "backgroundSize", "backgroundPosition", "objectPosition", "fontFamily", "fontSize", "fontWeight", "fontStyle", "lineHeight", "letterSpacing", "textAlign", "textDecorationLine", "scale", "translate", "width", "height", "aspectRatio", "marginTop", "marginRight", "marginBottom", "marginLeft", "paddingTop", "paddingBottom", "minHeight", "maxWidth", "display"] as const;
 
-const HEADER_VARIANT_OPTIONS: ReadonlyArray<{ value: EditorHeaderVariant; label: string }> = [
-  { value: "split-utility", label: "한 줄" },
-  { value: "centered-brand", label: "두 줄" },
-  { value: "overlay-minimal", label: "오버레이" },
+/** Cafe24 기본 스킨 상단 레이아웃 Top1~5에 대응합니다. 배치만 다르고 기능 DOM은 6종 모두 같습니다. */
+const HEADER_VARIANT_OPTIONS: ReadonlyArray<{ value: EditorHeaderVariant; label: string; hint: string }> = [
+  { value: "split-utility", label: "한 줄", hint: "로고 좌 · 메뉴 좌 · 유틸 우" },
+  { value: "logo-center-row", label: "한 줄 로고 중앙", hint: "메뉴 좌 · 로고 중앙 · 유틸 우" },
+  { value: "stacked-left", label: "두 줄 좌측", hint: "로고 좌 + 유틸 우 / 메뉴 좌" },
+  { value: "stacked-split", label: "두 줄 혼합", hint: "로고 중앙 / 유틸 좌 + 메뉴 우" },
+  { value: "centered-brand", label: "두 줄 중앙", hint: "로고 중앙 + 유틸 우 / 메뉴 중앙" },
+  { value: "overlay-minimal", label: "오버레이", hint: "Hero 위 투명 헤더" },
 ];
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -995,7 +999,7 @@ function HeaderInspector({ projectId, headerVariant, headerTextTone, presentatio
   }
 
   return <div className="inspector-fields header-inspector-fields">
-    <div className="header-variant-fields"><b>헤더 형식</b><span>검색·로그인·장바구니 Cafe24 기능은 그대로 유지됩니다.</span><div className="option-grid header-variant-grid">{HEADER_VARIANT_OPTIONS.map((option) => <button type="button" key={option.value} className={headerVariant === option.value ? "active" : ""} onClick={() => onHeaderVariant(option.value)}>{option.label}</button>)}</div></div>
+    <div className="header-variant-fields"><b>헤더 형식</b><span>검색·로그인·장바구니 Cafe24 기능은 그대로 유지됩니다.</span><div className="option-grid header-variant-grid">{HEADER_VARIANT_OPTIONS.map((option) => <button type="button" key={option.value} title={option.hint} className={headerVariant === option.value ? "active" : ""} onClick={() => onHeaderVariant(option.value)}>{option.label}</button>)}</div></div>
     <section className="header-control-section"><b>글자·아이콘 색상</b><div className="option-grid"><button type="button" className={headerTextTone === "dark" ? "active" : ""} onClick={() => onTextTone("dark")}>검정</button><button type="button" className={headerTextTone === "light" ? "active" : ""} onClick={() => onTextTone("light")}>흰색</button></div></section>
     <section className="header-control-section"><b>로고</b><div className="option-grid logo-mode-grid"><button type="button" className={presentation.logo.mode === "text" ? "active" : ""} onClick={() => updateLogo({ mode: "text" })}>텍스트 로고</button><button type="button" className={presentation.logo.mode === "image" ? "active" : ""} onClick={() => updateLogo({ mode: "image" })}>이미지 로고</button></div>
       {presentation.logo.mode === "text" ? <>

@@ -93,7 +93,8 @@ test("업종 프로필은 고정 flow가 아니라 가중치와 후보 풀만 �
     // 상품 진열은 항상 코드가 넣으므로 가중치 목록에 있어서는 안 된다.
     assert.equal(profile.sectionWeights.featuredProducts, undefined, profile.id);
   }
-  assert.ok(Object.keys(HEADER_STRUCTURES).length === 3);
+  // Cafe24 기본 스킨 상단 레이아웃 Top1~5 + Hero 오버레이
+  assert.ok(Object.keys(HEADER_STRUCTURES).length === 6);
   assert.ok(Object.keys(PRODUCT_PRESENTATIONS).length === 5);
 });
 

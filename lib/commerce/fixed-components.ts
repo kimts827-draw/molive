@@ -10,7 +10,8 @@ import type { PreviewProductMock } from "../component-library/preview-mock.ts";
 import type { ProjectHeaderPresentation } from "../project-source.ts";
 
 export type CommerceVariant = "minimal" | "editorial" | "bold";
-export type HeaderVariant = "split-utility" | "centered-brand" | "overlay-minimal";
+/** Cafe24 기본 스킨 상단 레이아웃(reference/cafe24-headers Top1~5)에 대응하는 배치 variant입니다. */
+export type HeaderVariant = "split-utility" | "centered-brand" | "overlay-minimal" | "logo-center-row" | "stacked-left" | "stacked-split";
 export type ProductLayout = "grid-four" | "large-grid" | "editorial-two" | "featured-grid" | "compact-five";
 export type LegacyComposition = { headerVariant: HeaderVariant; productLayout: ProductLayout };
 
@@ -64,7 +65,7 @@ const DEFAULTS = {
   thumbBackground: "#f2f0ea",
 };
 
-const HEADER_VARIANTS = new Set<HeaderVariant>(["split-utility", "centered-brand", "overlay-minimal"]);
+const HEADER_VARIANTS = new Set<HeaderVariant>(["split-utility", "centered-brand", "overlay-minimal", "logo-center-row", "stacked-left", "stacked-split"]);
 const PRODUCT_LAYOUTS = new Set<ProductLayout>(["grid-four", "large-grid", "editorial-two", "featured-grid", "compact-five"]);
 
 export function resolveLegacyComposition(architecture?: { header?: string; productPresentation?: string }): LegacyComposition {
@@ -282,10 +283,24 @@ export function commerceCss(tokens: CommerceTokens = {}, headerVariant: HeaderVa
 .pocHeader--overlay-minimal .pocHeader__logo img{height:30px}
 .pocHeader--overlay-minimal .pocHeader__category{grid-column:1;grid-row:1;justify-self:start}
 .pocHeader--overlay-minimal .pocHeader__util{grid-column:3;grid-row:1;justify-self:end}
-.pocHeader--overlay-minimal .pocHeader__item,.pocHeader--overlay-minimal .pocHeader__categoryList a{letter-spacing:.12em}
+/* logo-center-row (Cafe24 Top2 / layout01 1단 로고 중앙형): 카테고리 좌 · 로고 중앙 · 유틸 우, 불투명 */
+.pocHeader--logo-center-row .pocHeader__inner{display:grid;grid-template-columns:1fr auto 1fr;gap:24px}
+.pocHeader--logo-center-row .pocHeader__logo{grid-column:2;justify-self:center}
+.pocHeader--logo-center-row .pocHeader__category{grid-column:1;grid-row:1;justify-self:start}
+.pocHeader--logo-center-row .pocHeader__util{grid-column:3;grid-row:1;justify-self:end}
+/* stacked-left (Cafe24 Top3 / layout04 2단 좌측형): 로고 행(좌) + 유틸 우 / 내비 행(좌) */
+.pocHeader--stacked-left .pocHeader__inner{display:grid;grid-template-columns:auto 1fr;grid-template-areas:"logo utility" "category category";gap:24px;row-gap:16px;padding:26px 0 14px}
+.pocHeader--stacked-left .pocHeader__logo{grid-area:logo;justify-self:start}
+.pocHeader--stacked-left .pocHeader__category{grid-area:category;justify-self:start}
+.pocHeader--stacked-left .pocHeader__util{grid-area:utility;justify-self:end;align-self:center}
+/* stacked-split (Cafe24 Top4 / layout02 2단 혼합형): 로고 행(중앙) / 유틸 좌 + 내비 우 */
+.pocHeader--stacked-split .pocHeader__inner{display:grid;grid-template-columns:auto 1fr;grid-template-areas:"logo logo" "utility category";gap:24px;row-gap:16px;padding:26px 0 14px}
+.pocHeader--stacked-split .pocHeader__logo{grid-area:logo;justify-self:center}
+.pocHeader--stacked-split .pocHeader__util{grid-area:utility;justify-self:start;align-self:center}
+.pocHeader--stacked-split .pocHeader__category{grid-area:category;justify-self:end}
 ${VARIANT_CSS[t.variant] ?? ""}
 @media (max-width:1024px){.pocHeader__inner{width:calc(100% - 48px)}}
-@media (max-width:767px){.pocHeader__inner{width:calc(100% - 40px);gap:16px}.pocHeader__category{display:none}.pocHeader--centered-brand .pocHeader__inner,.pocHeader--overlay-minimal .pocHeader__inner{grid-template-columns:1fr auto}.pocHeader--centered-brand .pocHeader__inner{grid-template-areas:"logo utility";row-gap:0;padding:16px 0}.pocHeader--centered-brand .pocHeader__logo img{height:26px}.pocHeader--centered-brand .pocHeader__logo,.pocHeader--overlay-minimal .pocHeader__logo{grid-column:1;justify-self:start}.pocHeader--centered-brand .pocHeader__util,.pocHeader--overlay-minimal .pocHeader__util{grid-column:2;justify-self:end}.pocHeader__order,.pocHeader__state{display:none}}
+@media (max-width:767px){.pocHeader__inner{width:calc(100% - 40px);gap:16px}.pocHeader__category{display:none}.pocHeader--centered-brand .pocHeader__inner,.pocHeader--overlay-minimal .pocHeader__inner,.pocHeader--logo-center-row .pocHeader__inner,.pocHeader--stacked-left .pocHeader__inner,.pocHeader--stacked-split .pocHeader__inner{grid-template-columns:1fr auto}.pocHeader--centered-brand .pocHeader__inner,.pocHeader--stacked-left .pocHeader__inner,.pocHeader--stacked-split .pocHeader__inner{grid-template-areas:"logo utility";row-gap:0;padding:16px 0}.pocHeader--centered-brand .pocHeader__logo img{height:26px}.pocHeader--centered-brand .pocHeader__logo,.pocHeader--overlay-minimal .pocHeader__logo,.pocHeader--logo-center-row .pocHeader__logo,.pocHeader--stacked-split .pocHeader__logo{grid-column:1;justify-self:start}.pocHeader--centered-brand .pocHeader__util,.pocHeader--overlay-minimal .pocHeader__util,.pocHeader--logo-center-row .pocHeader__util,.pocHeader--stacked-split .pocHeader__util{grid-column:2;justify-self:end}.pocHeader__order,.pocHeader__state{display:none}}
 `;
 }
 

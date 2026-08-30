@@ -21,7 +21,7 @@ import { newSectionPreset, renderNewSectionContract, type NewSectionPreset } fro
 import type { ProjectSource } from "@/lib/project-source";
 
 const architectureSchema = z.object({
-  header: z.enum(["split-utility", "centered-brand", "overlay-minimal"]),
+  header: z.enum(["split-utility", "centered-brand", "overlay-minimal", "logo-center-row", "stacked-left", "stacked-split"]),
   hero: z.enum(HERO_VARIANT_IDS),
   sections: z.array(z.string().min(2)).min(2).max(20),
   productPresentation: z.enum(["grid-four", "large-grid", "editorial-two", "featured-grid", "compact-five"] as const),
@@ -71,7 +71,7 @@ const architectureJsonSchema = {
   additionalProperties: false,
   required: ["header", "hero", "sections", "productPresentation", "typography", "footer"],
   properties: {
-    header: { type: "string", enum: ["split-utility", "centered-brand", "overlay-minimal"] },
+    header: { type: "string", enum: ["split-utility", "centered-brand", "overlay-minimal", "logo-center-row", "stacked-left", "stacked-split"] },
     hero: { type: "string", enum: [...HERO_VARIANT_IDS] },
     sections: { type: "array", minItems: 2, maxItems: 20, items: { type: "string" } },
     productPresentation: { type: "string", enum: ["grid-four", "large-grid", "editorial-two", "featured-grid", "compact-five"] }, typography: { type: "string" }, footer: { type: "string" },
@@ -147,7 +147,7 @@ REFERENCE-DERIVED DESIGN GRAMMAR
 - Code also declares the brand palette as --molive-brand, --molive-brand-strong, --molive-brand-tint, --molive-brand-soft and --molive-brand-on on the page root, and paints any section the plan marked as accent tone. Reach for those variables instead of literal hex values, and give the brand colour real area — a band background, a filled CTA, a card ground — not just a hairline or an icon.
 - Avoid a page whose hero is polished but everything below becomes repeated equal cards. Alternate composition, scale, image/text relationships, and background rhythm while keeping one coherent design language.
 - Before writing HTML, commit to headerVariant, heroComposition, productLayout, section order/selection, typography scale, image treatment, spacing/density, and content composition. Do not return vague labels such as modern, premium, or clean by themselves.
-- Encode the deterministic choices in the existing architecture object exactly: header = split-utility | centered-brand | overlay-minimal, hero = the composition's hero variant id (full-bleed | split-editorial | banner-stack | typographic-marquee | cinematic-still | product-forward), productPresentation = the composition's presentation id (grid-four | large-grid | editorial-two | featured-grid | compact-five). architecture.sections must record the composition's sections in order as "type/variant — 헤딩".
+- Encode the deterministic choices in the existing architecture object exactly: header = split-utility | centered-brand | overlay-minimal | logo-center-row | stacked-left | stacked-split, hero = the composition's hero variant id (full-bleed | split-editorial | banner-stack | typographic-marquee | cinematic-still | product-forward), productPresentation = the composition's presentation id (grid-four | large-grid | editorial-two | featured-grid | compact-five). architecture.sections must record the composition's sections in order as "type/variant — 헤딩".
 - A materially different brief must produce visibly different decisions across those six axes, not a recoloured copy of the same page.
 - Keep decoration subordinate to product discovery and purchase flow. Use effects sparingly and preserve scanability, readable contrast, and obvious actions.
 - The product cards render through the verified presentation named by the composition (standard four-column, large three-column, editorial two-column, featured-plus-grid, or compact five-column, each with its own crop, density, and mobile reflow owned by code). Express the brief through the surrounding section rather than authoring card CSS.

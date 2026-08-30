@@ -100,6 +100,21 @@ export const HEADER_STRUCTURES = {
     name: "Hero 오버레이 미니멀",
     spec: "투명 배경으로 Hero 위에 얹히는 오버레이 헤더(로고 중앙 30px, 넓은 자간). Hero 첫 화면이 헤더 뒤까지 차오르도록 Hero 상단 여백을 설계해야 한다.",
   },
+  "logo-center-row": {
+    id: "logo-center-row",
+    name: "한 줄 로고 중앙",
+    spec: "한 줄 안에서 내비가 왼쪽, 로고가 정중앙, 유틸이 오른쪽에 서는 불투명 헤더(Cafe24 1단 로고 중앙형). 브랜드를 가운데 두면서도 헤더 높이는 한 줄로 유지한다. Hero는 헤더 바로 아래에서 시작한다.",
+  },
+  "stacked-left": {
+    id: "stacked-left",
+    name: "2단 좌측",
+    spec: "로고가 왼쪽에 오는 브랜드 행(오른쪽 끝 유틸)과 그 아래 왼쪽 정렬 내비 행의 2단 구조(Cafe24 2단 좌측형). 왼쪽 축이 위아래로 이어져 편집숍의 정돈된 인상을 만든다. Hero는 두 행 아래에서 시작한다.",
+  },
+  "stacked-split": {
+    id: "stacked-split",
+    name: "2단 혼합",
+    spec: "로고만 있는 중앙 브랜드 행 아래, 유틸이 왼쪽 끝·내비가 오른쪽 끝으로 갈라서는 2단 구조(Cafe24 2단 혼합형). 두 번째 행의 좌우가 비대칭이라 메뉴가 많은 몰에서 폭을 넓게 쓴다. Hero는 두 행 아래에서 시작한다.",
+  },
 } as const;
 export type HeaderStructureId = keyof typeof HEADER_STRUCTURES;
 

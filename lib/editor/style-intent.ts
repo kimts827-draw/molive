@@ -7,7 +7,7 @@
  * 여기서 해석되지 않는 요청만 모델로 넘어갑니다.
  */
 
-export type EditorHeaderVariant = "split-utility" | "centered-brand" | "overlay-minimal";
+export type EditorHeaderVariant = "split-utility" | "centered-brand" | "overlay-minimal" | "logo-center-row" | "stacked-left" | "stacked-split";
 
 export type EditorIntentMetrics = {
   width: number;
@@ -63,7 +63,20 @@ function scaleValue(value: string | undefined) {
 function headerIntent(prompt: string, node: EditorIntentNode): EditorIntent | null {
   // Header를 선택한 상태면 "헤더"라는 말을 하지 않아도 헤더 요청으로 봅니다.
   if (!node.isHeader && !/헤더|header|상단\s*바|네비게이션|navigation/i.test(prompt)) return null;
-  if (/두\s*줄|2\s*줄|이단|two[- ]?row|가운데|중앙|센터|center/i.test(prompt)) {
+  // 더 좁은 표현을 먼저 봅니다. "두 줄 좌측"이 "두 줄"보다 앞서야 합니다.
+  if (/(두\s*줄|2\s*줄|이단|two[- ]?row).*?(좌측|왼쪽|left)|(좌측|왼쪽|left).*?(두\s*줄|2\s*줄|이단)/i.test(prompt)) {
+    return { kind: "header-variant", variant: "stacked-left", summary: "헤더를 로고와 메뉴가 모두 왼쪽에 서는 두 줄 형식(stacked-left)으로 바꿨습니다." };
+  }
+  if (/(두\s*줄|2\s*줄|이단|two[- ]?row).*?(혼합|섞|mixed|split)|(혼합|mixed|split).*?(두\s*줄|2\s*줄|이단)/i.test(prompt)) {
+    return { kind: "header-variant", variant: "stacked-split", summary: "헤더를 로고 중앙 아래 유틸 좌·메뉴 우로 나뉜 두 줄 형식(stacked-split)으로 바꿨습니다." };
+  }
+  if (/두\s*줄|2\s*줄|이단|two[- ]?row/i.test(prompt)) {
+    return { kind: "header-variant", variant: "centered-brand", summary: "헤더를 로고 행과 메뉴 행이 나뉜 두 줄 형식(centered-brand)으로 바꿨습니다." };
+  }
+  if (/(한\s*줄|1\s*줄|한줄|single[- ]?row).*?(가운데|중앙|센터|center)|(가운데|중앙|센터|center).*?(한\s*줄|1\s*줄|한줄)/i.test(prompt)) {
+    return { kind: "header-variant", variant: "logo-center-row", summary: "헤더를 로고가 가운데 오는 한 줄 형식(logo-center-row)으로 바꿨습니다." };
+  }
+  if (/가운데|중앙|센터|center/i.test(prompt)) {
     return { kind: "header-variant", variant: "centered-brand", summary: "헤더를 로고 행과 메뉴 행이 나뉜 두 줄 형식(centered-brand)으로 바꿨습니다." };
   }
   if (/한\s*줄|1\s*줄|한줄|컴팩트|compact|single[- ]?row/i.test(prompt)) {
@@ -74,7 +87,7 @@ function headerIntent(prompt: string, node: EditorIntentNode): EditorIntent | nu
   }
   return {
     kind: "unsupported",
-    message: "헤더는 Cafe24 로그인·장바구니 기능이 붙어 있어 구조가 고정되어 있습니다. 지금 바꿀 수 있는 형태는 '두 줄', '한 줄', '오버레이' 세 가지입니다.",
+    message: "헤더는 Cafe24 로그인·장바구니 기능이 붙어 있어 구조가 고정되어 있습니다. 지금 바꿀 수 있는 형태는 '한 줄', '한 줄 로고 중앙', '두 줄 좌측', '두 줄 혼합', '두 줄 중앙', '오버레이' 여섯 가지입니다.",
   };
 }
 
