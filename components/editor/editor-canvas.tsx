@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { buildEditorPreviewDocument } from "@/lib/editor/preview-document";
+import { compositeEditorBackground } from "@/lib/editor/color-value";
 import { HEADER_NODE_ID } from "@/lib/commerce/fixed-components";
 import type { ProjectDocument } from "@/lib/project-document";
 import type { EditorNodeSelection, ProjectHeaderPresentation } from "@/lib/project-source";
@@ -31,6 +32,9 @@ export type SelectionRenderMetrics = {
   marginBottom: number;
   paddingTop: number;
   paddingBottom: number;
+  color: string;
+  backgroundColor: string;
+  ancestorBackgroundColor: string;
 };
 
 const editorOverlayCss = `
@@ -92,6 +96,10 @@ export function EditorCanvas({ source, selection, previewStylePatch = null, prev
     if (!node) { onSelectionMetrics(null); return; }
     const view = node.ownerDocument.defaultView;
     const computed = view?.getComputedStyle(node);
+    const ancestorBackgrounds: string[] = [];
+    for (let ancestor = node.parentElement; ancestor; ancestor = ancestor.parentElement) {
+      ancestorBackgrounds.push(view?.getComputedStyle(ancestor).backgroundColor ?? "");
+    }
     const rect = node.getBoundingClientRect();
     const numeric = (value: string | undefined) => {
       const parsed = Number.parseFloat(value ?? "");
@@ -139,6 +147,9 @@ export function EditorCanvas({ source, selection, previewStylePatch = null, prev
       marginBottom: numeric(computed?.marginBottom),
       paddingTop: numeric(computed?.paddingTop),
       paddingBottom: numeric(computed?.paddingBottom),
+      color: computed?.color ?? "",
+      backgroundColor: computed?.backgroundColor ?? "",
+      ancestorBackgroundColor: compositeEditorBackground(ancestorBackgrounds),
     });
   }, [onSelectionMetrics]);
 

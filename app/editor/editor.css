@@ -102,6 +102,7 @@
 .inspector-fields input:focus, .inspector-fields textarea:focus, .inspector-fields select:focus { border-color: #7965e6; box-shadow: 0 0 0 2px rgba(121,101,230,.12); }
 .color-input { height: 32px; padding: 3px; display: grid; grid-template-columns: 25px 1fr; border: 1px solid #d9d8d2; border-radius: 5px; }
 .color-input input[type="color"] { width: 25px; height: 24px; padding: 0; border: 0; background: none; }
+.color-semantic-swatch { width: 25px; height: 24px; border: 1px solid #d9d8d2; border-radius: 2px; background-color: #fff; background-image: linear-gradient(45deg, #d9d8d2 25%, transparent 25%), linear-gradient(-45deg, #d9d8d2 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #d9d8d2 75%), linear-gradient(-45deg, transparent 75%, #d9d8d2 75%); background-position: 0 0, 0 6px, 6px -6px, -6px 0; background-size: 12px 12px; }
 .color-input input:last-child { min-width: 0; padding: 0 7px; border: 0; outline: 0; font-size: 13px; }
 .option-grid { display: grid; grid-template-columns: repeat(3, 1fr); padding: 2px; background: #efefec; border-radius: 5px; }
 .option-grid button { height: 32px; color: #77766f; border-radius: 4px; font-size: 11px; }

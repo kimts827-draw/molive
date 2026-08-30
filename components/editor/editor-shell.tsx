@@ -10,7 +10,7 @@ import { optimizeImageFile, persistProjectAsset } from "@/lib/client-image";
 import { autosaveLabel, type AutosaveState } from "@/lib/editor/autosave-state";
 import { classifyAiEditIntent } from "@/lib/editor/ai-edit-intent";
 import { productThumbnailGuidance } from "@/lib/editor/product-thumbnail-guidance";
-import { isResponsiveProperty, readEditorDeclarations, removeEditorBlocks, setEditorDeclarations, type EditorViewport } from "@/lib/editor/responsive-style";
+import { isResponsiveProperty, readEditorDeclarations, readEditorFontOverride, removeEditorBlocks, setEditorDeclarations, setEditorFontOverride, type EditorViewport } from "@/lib/editor/responsive-style";
 import { type EditorHeaderVariant } from "@/lib/editor/style-intent";
 import { HEADER_NODE_ID, resolveHeaderPresentation } from "@/lib/commerce/fixed-components";
 import { composeProductDisplayId, DEFAULT_PRODUCT_DISPLAY, productDisplayOf, type ProductDisplayColumns, type ProductDisplayId, type ProductDisplayMode, type ProductDisplayStyle } from "@/lib/commerce/product-display";
@@ -18,6 +18,7 @@ import { cloneProjectSource, projectPagePlan, type EditorNodeSelection, type Pro
 import { collectAssetReferences } from "@/lib/assets/asset-policy";
 import { NEW_SECTION_PRESETS, insertArchitectureSection, insertPlanSection, newSectionNodeId, newSectionPlanSection, newSectionPreset, renderNewSectionPlaceholder, type NewSectionPosition, type NewSectionPresetId } from "@/lib/editor/new-section";
 import { STOREFRONT_FONTS } from "@/lib/fonts/storefront-fonts";
+import { editorColorPickerHex, effectiveEditorColor, normalizeEditorColor } from "@/lib/editor/color-value";
 
 type Viewport = "desktop" | "tablet" | "mobile";
 type SavedVersion = { id: string; label: string; createdAt: string; source: ProjectSource };
@@ -27,6 +28,7 @@ type NodeSnapshot = EditorNodeSelection & {
   src: string;
   alt: string;
   style: Record<string, string>;
+  fontOverride: string;
   outerHtml: string;
   sectionId: string | null;
   insideProductSlot: boolean;
@@ -104,7 +106,7 @@ function headerSnapshot(selection: EditorNodeSelection): NodeSnapshot {
     tagName: "header",
     type: "header",
     text: "", href: "", src: "", alt: "",
-    style: Object.fromEntries(INSPECTED_STYLE_PROPERTIES.map((property) => [property, ""])),
+    style: Object.fromEntries(INSPECTED_STYLE_PROPERTIES.map((property) => [property, ""])), fontOverride: "",
     outerHtml: "", sectionId: null,
     insideProductSlot: false, isProductSection: false, isHeader: true,
   };
@@ -134,6 +136,7 @@ function readNode(source: ProjectSource, selection: EditorNodeSelection | null, 
     src: node.getAttribute("src") ?? "",
     alt: node.getAttribute("alt") ?? "",
     style,
+    fontOverride: readEditorFontOverride(source.css, selection.id),
     outerHtml: node.outerHTML,
     sectionId: section?.dataset.moireId ?? null,
     insideProductSlot: Boolean(productSlot),
@@ -516,6 +519,16 @@ export function EditorShell({ initialSource, projectId = null, initialVersions =
     applyStyleDeclarations(selectedNode.id, { [property]: value }, `node:${selectedNode.id}:${viewport}:style:${property}`);
   }
 
+  function updateFontFamily(value: string) {
+    if (!selectedNode) return;
+    setPreviewStylePatch(null);
+    const current = sourceRef.current;
+    const rootValue = sourceRootValue(current.html);
+    if (!rootValue) return;
+    const css = setEditorFontOverride(current.css, { rootValue, nodeId: selectedNode.id, value });
+    commit({ ...current, css, updatedAt: new Date().toISOString() }, `node:${selectedNode.id}:style:font-family`);
+  }
+
   function updateStyles(styles: Record<string, string>) {
     if (!selectedNode) return;
     setPreviewStylePatch(null);
@@ -876,7 +889,7 @@ export function EditorShell({ initialSource, projectId = null, initialVersions =
 
         <section className="editor-stage"><div className="stage-toolbar"><span>{viewport === "desktop" ? "1920 × 1080" : viewport === "tablet" ? "1024 × 768" : "390 × 844"}</span><b>HTML/CSS 직접 렌더링</b></div><div className={`canvas-viewport viewport-${viewport}`}><EditorCanvas source={source} selection={selection} previewStylePatch={previewStylePatch} previewHeaderPresentation={previewHeaderPresentation} viewport={viewport} onSelectionMetrics={handleSelectionMetrics} onSelect={(next) => { setPreviewStylePatch(null); setPreviewHeaderPresentation(null); selectionMetricsRef.current = null; setSelectionMetrics(null); setSelection(next); setRightOpen(true); }} /></div></section>
 
-        {rightOpen && <aside className="editor-inspector"><div className="inspector-title"><div><span>선택 노드</span><b>{selectedNode ? `${selectedNode.tagName} · ${selectedNode.type}` : "선택 없음"}</b></div><button onClick={() => setRightOpen(false)} aria-label="Inspector 닫기"><X size={16} /></button></div>{selectedNode ? <NodeInspector node={selectedNode} renderMetrics={selectionMetrics?.nodeId === selectedNode.id ? selectionMetrics : null} projectId={projectId} productPresentation={source.architecture.productPresentation} thumbRatioOverride={source.commerce?.thumbRatioOverride} productDisplay={source.commerce?.productDisplay} onProductDisplay={(display) => { if (!applyProductDisplay(display)) setToast("상품 진열이 이미 그 형식입니다"); }} headerVariant={(source.architecture.header as EditorHeaderVariant) ?? "split-utility"} headerTextTone={source.headerTextTone ?? "dark"} headerPresentation={resolveHeaderPresentation(source.headerPresentation)} onPreviewHeaderPresentation={setPreviewHeaderPresentation} onHeaderTextTone={applyHeaderTextTone} onHeaderPresentation={applyHeaderPresentation} onHeaderVariant={(variant) => { if (!applyHeaderVariant(variant)) setToast("헤더가 이미 그 형식입니다"); }} onText={updateText} onAttribute={updateAttribute} onStyle={updateStyle} onStyles={updateStyles} onPreviewStyle={previewStyle} onImageSource={updateImageSource} /> : <p className="empty-inspector">미리보기에서 텍스트, 이미지, 버튼 또는 섹션을 클릭하세요.</p>}{sectionNodeId() && <div className="section-actions"><button className="section-redesign" disabled={Boolean(redesignBlockedReason)} title={redesignBlockedReason ?? "이 섹션을 AI가 다시 디자인합니다"} onClick={() => setShowRedesign(true)}><Sparkles size={14} /> AI 재설계</button><button onClick={duplicateSection}><Copy size={14} /> 복제</button><button onClick={() => toggleHidden()}><EyeOff size={14} /> 숨김</button><button className="danger" onClick={deleteSection}><Trash2 size={14} /> 삭제</button></div>}<button className="inspector-ai-button" onClick={() => { setLeftPanel("ai"); setShowAiTools(true); }}><Sparkles size={15} /> AI 생성 도구 열기</button></aside>}
+        {rightOpen && <aside className="editor-inspector"><div className="inspector-title"><div><span>선택 노드</span><b>{selectedNode ? `${selectedNode.tagName} · ${selectedNode.type}` : "선택 없음"}</b></div><button onClick={() => setRightOpen(false)} aria-label="Inspector 닫기"><X size={16} /></button></div>{selectedNode ? <NodeInspector node={selectedNode} renderMetrics={selectionMetrics?.nodeId === selectedNode.id ? selectionMetrics : null} projectId={projectId} productPresentation={source.architecture.productPresentation} thumbRatioOverride={source.commerce?.thumbRatioOverride} productDisplay={source.commerce?.productDisplay} onProductDisplay={(display) => { if (!applyProductDisplay(display)) setToast("상품 진열이 이미 그 형식입니다"); }} headerVariant={(source.architecture.header as EditorHeaderVariant) ?? "split-utility"} headerTextTone={source.headerTextTone ?? "dark"} headerPresentation={resolveHeaderPresentation(source.headerPresentation)} onPreviewHeaderPresentation={setPreviewHeaderPresentation} onHeaderTextTone={applyHeaderTextTone} onHeaderPresentation={applyHeaderPresentation} onHeaderVariant={(variant) => { if (!applyHeaderVariant(variant)) setToast("헤더가 이미 그 형식입니다"); }} onText={updateText} onAttribute={updateAttribute} onFontFamily={updateFontFamily} onStyle={updateStyle} onStyles={updateStyles} onPreviewStyle={previewStyle} onImageSource={updateImageSource} /> : <p className="empty-inspector">미리보기에서 텍스트, 이미지, 버튼 또는 섹션을 클릭하세요.</p>}{sectionNodeId() && <div className="section-actions"><button className="section-redesign" disabled={Boolean(redesignBlockedReason)} title={redesignBlockedReason ?? "이 섹션을 AI가 다시 디자인합니다"} onClick={() => setShowRedesign(true)}><Sparkles size={14} /> AI 재설계</button><button onClick={duplicateSection}><Copy size={14} /> 복제</button><button onClick={() => toggleHidden()}><EyeOff size={14} /> 숨김</button><button className="danger" onClick={deleteSection}><Trash2 size={14} /> 삭제</button></div>}<button className="inspector-ai-button" onClick={() => { setLeftPanel("ai"); setShowAiTools(true); }}><Sparkles size={15} /> AI 생성 도구 열기</button></aside>}
       </div>
 
       {toast && <div className="editor-toast"><Save size={14} /> {toast}</div>}
@@ -887,15 +900,6 @@ export function EditorShell({ initialSource, projectId = null, initialVersions =
       {showPublish && <PublishModal projectId={projectId} saveStateLabel={autosaveLabel(autosaveState, lastSavedAt)} onFlushDraft={flushDraft} onClose={() => setShowPublish(false)} />}
     </main>
   );
-}
-
-function pickerColor(value: string) {
-  if (/^#[0-9a-f]{6}$/i.test(value)) return value;
-  const short = value.match(/^#([0-9a-f])([0-9a-f])([0-9a-f])$/i);
-  if (short) return `#${short[1]}${short[1]}${short[2]}${short[2]}${short[3]}${short[3]}`;
-  const rgb = value.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
-  if (rgb) return `#${rgb.slice(1, 4).map((part) => Math.min(255, Number(part)).toString(16).padStart(2, "0")).join("")}`;
-  return "#000000";
 }
 
 function normalizeCssValue(value: string, defaultUnit?: string) {
@@ -951,6 +955,7 @@ function NumericSlider({ syncKey, label, value, min, max, step, onPreview, onCom
 function ColorField({ nodeId, property, value, onPreview, onChange, placeholder }: { nodeId: string; property: string; value: string; onPreview: (value: string) => void; onChange: (value: string) => void; placeholder: string }) {
   const [draft, setDraft] = useState(value);
   const pickerRef = useRef<HTMLInputElement>(null);
+  const pickerValue = editorColorPickerHex(draft);
   useEffect(() => setDraft(value), [nodeId, property, value]);
   useEffect(() => {
     const picker = pickerRef.current;
@@ -959,7 +964,8 @@ function ColorField({ nodeId, property, value, onPreview, onChange, placeholder 
     picker.addEventListener("change", commitPicker);
     return () => picker.removeEventListener("change", commitPicker);
   }, [nodeId, onChange, property]);
-  return <div className="color-input"><input ref={pickerRef} type="color" aria-label="색상 선택" value={pickerColor(draft)} onInput={(event) => { const next = event.currentTarget.value; setDraft(next); onPreview(next); }} onBlur={(event) => onChange(event.currentTarget.value)} /><input type="text" aria-label="색상 값" value={draft} onChange={(event) => setDraft(event.target.value)} onBlur={(event) => onChange(event.currentTarget.value.trim())} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); onChange(event.currentTarget.value.trim()); event.currentTarget.blur(); } else if (event.key === "Escape") { setDraft(value); onPreview(value); event.currentTarget.blur(); } }} placeholder={placeholder} /></div>;
+  const commitDraft = (next: string) => { const trimmed = next.trim(); if (trimmed !== value) onChange(trimmed); };
+  return <div className="color-input">{pickerValue ? <input ref={pickerRef} type="color" aria-label="색상 선택" value={pickerValue} onInput={(event) => { const next = event.currentTarget.value; setDraft(next); onPreview(next); }} onBlur={(event) => commitDraft(event.currentTarget.value)} /> : <span className="color-semantic-swatch" aria-hidden="true" />}<input type="text" aria-label="색상 값" value={draft} onChange={(event) => setDraft(event.target.value)} onBlur={(event) => commitDraft(event.currentTarget.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); commitDraft(event.currentTarget.value); event.currentTarget.blur(); } else if (event.key === "Escape") { setDraft(value); onPreview(value); event.currentTarget.blur(); } }} placeholder={placeholder} /></div>;
 }
 
 function scaleParts(value: string) {
@@ -1091,7 +1097,7 @@ function ProductDisplayFields({ value, onChange }: { value?: ProductDisplayId; o
   );
 }
 
-function NodeInspector({ node, renderMetrics, projectId, productPresentation, thumbRatioOverride, productDisplay, onProductDisplay, headerVariant, headerTextTone, headerPresentation, onPreviewHeaderPresentation, onHeaderTextTone, onHeaderPresentation, onHeaderVariant, onText, onAttribute, onStyle, onStyles, onPreviewStyle, onImageSource }: { node: NodeSnapshot; renderMetrics: SelectionRenderMetrics | null; projectId: string | null; productPresentation: string; thumbRatioOverride?: string; productDisplay?: ProductDisplayId; onProductDisplay: (display: ProductDisplayId) => void; headerVariant: EditorHeaderVariant; headerTextTone: "dark" | "light"; headerPresentation: ProjectHeaderPresentation; onPreviewHeaderPresentation: (value: ProjectHeaderPresentation) => void; onHeaderTextTone: (value: "dark" | "light") => void; onHeaderPresentation: (value: ProjectHeaderPresentation) => void; onHeaderVariant: (variant: EditorHeaderVariant) => void; onText: (value: string) => void; onAttribute: (name: string, value: string) => void; onStyle: (property: string, value: string) => void; onStyles: (styles: Record<string, string>) => void; onPreviewStyle: (property: string, value: string) => void; onImageSource: (value: string, kind: ImageEditKind) => void }) {
+function NodeInspector({ node, renderMetrics, projectId, productPresentation, thumbRatioOverride, productDisplay, onProductDisplay, headerVariant, headerTextTone, headerPresentation, onPreviewHeaderPresentation, onHeaderTextTone, onHeaderPresentation, onHeaderVariant, onText, onAttribute, onFontFamily, onStyle, onStyles, onPreviewStyle, onImageSource }: { node: NodeSnapshot; renderMetrics: SelectionRenderMetrics | null; projectId: string | null; productPresentation: string; thumbRatioOverride?: string; productDisplay?: ProductDisplayId; onProductDisplay: (display: ProductDisplayId) => void; headerVariant: EditorHeaderVariant; headerTextTone: "dark" | "light"; headerPresentation: ProjectHeaderPresentation; onPreviewHeaderPresentation: (value: ProjectHeaderPresentation) => void; onHeaderTextTone: (value: "dark" | "light") => void; onHeaderPresentation: (value: ProjectHeaderPresentation) => void; onHeaderVariant: (variant: EditorHeaderVariant) => void; onText: (value: string) => void; onAttribute: (name: string, value: string) => void; onFontFamily: (value: string) => void; onStyle: (property: string, value: string) => void; onStyles: (styles: Record<string, string>) => void; onPreviewStyle: (property: string, value: string) => void; onImageSource: (value: string, kind: ImageEditKind) => void }) {
   const imageInputRef = useRef<HTMLInputElement>(null);
   const [imageBusy, setImageBusy] = useState(false);
   const [imageError, setImageError] = useState<string | null>(null);
@@ -1117,6 +1123,11 @@ function NodeInspector({ node, renderMetrics, projectId, productPresentation, th
   const actualFontSize = Math.max(6, renderMetrics?.fontSize ?? numericCssValue(node.style.fontSize, 32));
   const actualLineHeight = renderMetrics?.lineHeight && actualFontSize ? renderMetrics.lineHeight / actualFontSize : numericCssValue(node.style.lineHeight, 1.2);
   const actualLetterSpacing = renderMetrics?.letterSpacing ?? numericCssValue(node.style.letterSpacing, 0);
+  const actualTextColor = effectiveEditorColor(node.style.color, renderMetrics?.color);
+  const ownBackgroundColor = effectiveEditorColor(node.style.backgroundColor, renderMetrics?.backgroundColor);
+  const actualBackgroundColor = node.isProductSection && normalizeEditorColor(ownBackgroundColor) === "transparent"
+    ? effectiveEditorColor("", renderMetrics?.ancestorBackgroundColor)
+    : ownBackgroundColor;
 
   async function upload(file: File | undefined) {
     if (!file) return;
@@ -1179,18 +1190,18 @@ function NodeInspector({ node, renderMetrics, projectId, productPresentation, th
     {canReplaceImage ? <><label><span>{imageKind === "content" ? "이미지 URL" : imageKind === "icon" ? "아이콘 이미지 URL" : "배경 이미지 URL"}</span><DraftInput syncKey={`${node.id}:${imageKind}`} type="url" value={currentImageUrl} onCommit={(value) => { if (imageKind === "background" && !value) onStyle("background-image", ""); else if (value && value !== currentImageUrl) onImageSource(value, imageKind); }} placeholder={imageKind === "background" ? "https://… 또는 파일 업로드" : "https://…"} /></label>{imageKind === "content" ? <label><span>대체 텍스트</span><input type="text" value={node.alt} onChange={(event) => onAttribute("alt", event.target.value)} /></label> : null}<input ref={imageInputRef} className="visually-hidden-file" type="file" accept="image/*" onChange={(event) => void upload(event.target.files?.[0])} /><button type="button" className="replace-image-button" disabled={imageBusy} onClick={() => imageInputRef.current?.click()}>{imageBusy ? <LoaderCircle size={14} /> : <ImagePlus size={14} />} {imageBusy ? "이미지 준비 중" : imageKind === "background" ? "배경 이미지 교체" : imageKind === "icon" ? "아이콘 교체" : "이미지 교체"}</button>{imageError ? <p className="image-upload-error">{imageError}</p> : null}</> : null}
     {node.tagName === "img" && !node.insideProductSlot ? <div className="image-position-fields"><b>이미지 위치·크기</b><span>보이는 중심과 크기를 조절합니다. 크기는 중앙을 기준으로 커지고 작아지며, 태블릿·모바일은 화면폭에 맞춰 그대로 줄어듭니다.</span><div><label><span>보이는 중심 X <em>%</em></span><NumericSlider syncKey={`${node.id}:object-x`} label="이미지 가로 중심" value={imageX} min={0} max={100} step={1} onPreview={(value) => onPreviewStyle("object-position", `${value}% ${imageY}%`)} onCommit={(value) => updateImagePosition("x", String(value))} /></label><label><span>세로 위치 Y <em>%</em></span><NumericSlider syncKey={`${node.id}:object-y`} label="이미지 세로 중심" value={imageY} min={0} max={100} step={1} onPreview={(value) => onPreviewStyle("object-position", `${imageX}% ${value}%`)} onCommit={(value) => updateImagePosition("y", String(value))} /></label><label><span>크기 배율 <em>%</em></span><NumericSlider syncKey={`${node.id}:image-scale`} label="이미지 크기 배율" value={Math.round(scaleX * 100)} min={20} max={200} step={1} onPreview={(value) => setUniformScale(value, true)} onCommit={(value) => setUniformScale(value)} /></label></div><div><label><span>좌우 위치 <em>px</em></span><NumericSlider syncKey={`${node.id}:image-translate-x`} label="이미지 좌우 위치" value={translateX} min={-400} max={400} step={1} onPreview={(value) => setTranslate("x", value, true)} onCommit={(value) => setTranslate("x", value)} /></label><label><span>상하 위치 <em>px</em></span><NumericSlider syncKey={`${node.id}:image-translate-y`} label="이미지 상하 위치" value={-translateY} min={-400} max={400} step={1} onPreview={(value) => setVerticalSliderPosition(value, true)} onCommit={(value) => setVerticalSliderPosition(value)} /></label></div></div> : null}
     {isText && <>
-      <label><span>폰트</span><select value={node.style.fontFamily || ""} onChange={(event) => onStyle("font-family", event.target.value)}><option value="">디자인 기본값</option><StorefrontFontOptions /></select></label>
+      <label><span>폰트</span><select value={node.fontOverride} onChange={(event) => onFontFamily(event.target.value)}><option value="">디자인 기본값</option><StorefrontFontOptions /></select></label>
       <label><span>글자 크기 <em>px</em></span><NumericSlider syncKey={`${node.id}:font-size`} label="글자 크기" value={actualFontSize} min={6} max={240} step={1} onPreview={(value) => onPreviewStyle("font-size", `${value}px`)} onCommit={(value) => onStyle("font-size", `${value}px`)} /></label>
       <label><span>행간 <em>배율</em></span><NumericSlider syncKey={`${node.id}:line-height`} label="행간" value={actualLineHeight} min={0.6} max={3} step={0.05} onPreview={(value) => onPreviewStyle("line-height", String(value))} onCommit={(value) => onStyle("line-height", String(value))} /></label>
       <label><span>자간 <em>px</em></span><NumericSlider syncKey={`${node.id}:letter-spacing`} label="자간" value={actualLetterSpacing} min={-20} max={60} step={0.5} onPreview={(value) => onPreviewStyle("letter-spacing", `${value}px`)} onCommit={(value) => onStyle("letter-spacing", `${value}px`)} /></label>
       <div className="scale-fields"><label><span>크기 배율 <em>%</em></span><NumericSlider syncKey={`${node.id}:text-scale`} label="텍스트 크기 배율" value={Math.round(scaleX * 100)} min={40} max={200} step={1} onPreview={(value) => setUniformScale(value, true)} onCommit={(value) => setUniformScale(value)} /></label></div>
       <div className="scale-fields"><label><span>좌우 위치 X <em>px</em></span><NumericSlider syncKey={`${node.id}:translate-x`} label="텍스트 좌우 위치" value={translateX} min={-400} max={400} step={1} onPreview={(value) => setTranslate("x", value, true)} onCommit={(value) => setTranslate("x", value)} /></label><label><span>상하 위치 Y <em>px</em></span><NumericSlider syncKey={`${node.id}:translate-y`} label="텍스트 상하 위치" value={-translateY} min={-400} max={400} step={1} onPreview={(value) => setVerticalSliderPosition(value, true)} onCommit={(value) => setVerticalSliderPosition(value)} /></label></div>
       <label><span>굵기</span><select value={node.style.fontWeight || ""} onChange={(event) => onStyle("font-weight", event.target.value)}><option value="">기본값</option><option value="300">Light</option><option value="400">Regular</option><option value="500">Medium</option><option value="700">Bold</option></select></label>
-      <label><span>글자 색상</span><ColorField nodeId={node.id} property="color" value={node.style.color || ""} onPreview={(value) => onPreviewStyle("color", value)} onChange={(value) => onStyle("color", value)} placeholder="#111111" /></label>
+      <label><span>글자 색상</span><ColorField nodeId={node.id} property="color" value={actualTextColor} onPreview={(value) => onPreviewStyle("color", value)} onChange={(value) => onStyle("color", value)} placeholder="#111111" /></label>
       <label><span>정렬</span><div className="option-grid">{["left", "center", "right"].map((align) => <button type="button" className={node.style.textAlign === align ? "active" : ""} key={align} onClick={() => onStyle("text-align", align)}>{align === "left" ? "왼쪽" : align === "center" ? "가운데" : "오른쪽"}</button>)}</div></label>
       <div className="text-style-toggles"><button type="button" className={node.style.textDecorationLine.includes("underline") ? "active" : ""} onClick={() => onStyle("text-decoration-line", node.style.textDecorationLine.includes("underline") ? "" : "underline")}>밑줄</button><button type="button" className={node.style.fontStyle === "italic" ? "active" : ""} onClick={() => onStyle("font-style", node.style.fontStyle === "italic" ? "" : "italic")}>기울임</button></div>
     </>}
-    {(node.tagName === "section" || node.tagName === "header" || node.tagName === "footer") ? <><label><span>배경 색상</span><ColorField nodeId={node.id} property="background-color" value={node.style.backgroundColor || ""} onPreview={(value) => onPreviewStyle("background-color", value)} onChange={(value) => onStyle("background-color", value)} placeholder="#ffffff" /></label><label><span>최대 폭</span><DraftInput syncKey={`${node.id}:max-width`} value={node.style.maxWidth || ""} onCommit={(value) => onStyle("max-width", value)} placeholder="100% 또는 1200px" /></label></> : null}
+    {(node.tagName === "section" || node.tagName === "header" || node.tagName === "footer") ? <><label><span>배경 색상</span><ColorField nodeId={node.id} property="background-color" value={actualBackgroundColor} onPreview={(value) => onPreviewStyle("background-color", value)} onChange={(value) => onStyle("background-color", value)} placeholder="#ffffff" /></label><label><span>최대 폭</span><DraftInput syncKey={`${node.id}:max-width`} value={node.style.maxWidth || ""} onCommit={(value) => onStyle("max-width", value)} placeholder="100% 또는 1200px" /></label></> : null}
     {isLayout ? <div className="layout-fields"><b>레이아웃 높이</b><span>현재 렌더 높이 {actualHeight}px을 기준으로 실제 세로폭을 조절합니다.</span><label><span>높이 <em>px</em></span><NumericSlider syncKey={`${node.id}:layout-height`} label="레이아웃 높이" value={actualHeight} min={40} max={4000} step={1} onPreview={(value) => onPreviewStyle("height", `${value}px`)} onCommit={setLayoutHeight} /></label><div className="height-scale-control"><label><span>현재 높이 배율</span><DraftInput syncKey={`${node.id}:height-ratio:${actualHeight}`} value="1" inputMode="decimal" onCommit={(value) => { const ratio = Number(value.replace(/x$/i, "")); if (Number.isFinite(ratio) && ratio > 0) setLayoutHeight(actualHeight * ratio); }} placeholder="예: 1.2 또는 1.5" /></label><div>{[0.8, 1.2, 1.5].map((ratio) => <button type="button" key={ratio} onClick={() => setLayoutHeight(actualHeight * ratio)}>{ratio}×</button>)}</div></div></div> : null}
     {isLayout ? <div className="spacing-fields"><b>위아래 여백</b><span>바깥 여백은 영역 사이 거리, 안쪽 여백은 영역 내부 공간입니다.</span><div><label><span>바깥 위</span><CssValueField nodeId={node.id} property="margin-top" value={node.style.marginTop || `${renderMetrics?.marginTop ?? 0}px`} defaultUnit="px" onStyle={onStyle} placeholder="0" /></label><label><span>바깥 아래</span><CssValueField nodeId={node.id} property="margin-bottom" value={node.style.marginBottom || `${renderMetrics?.marginBottom ?? 0}px`} defaultUnit="px" onStyle={onStyle} placeholder="0" /></label><label><span>안쪽 위</span><CssValueField nodeId={node.id} property="padding-top" value={node.style.paddingTop || `${renderMetrics?.paddingTop ?? 0}px`} defaultUnit="px" onStyle={onStyle} placeholder="0" /></label><label><span>안쪽 아래</span><CssValueField nodeId={node.id} property="padding-bottom" value={node.style.paddingBottom || `${renderMetrics?.paddingBottom ?? 0}px`} defaultUnit="px" onStyle={onStyle} placeholder="0" /></label></div></div> : null}
   </div>;

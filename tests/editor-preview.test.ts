@@ -131,6 +131,11 @@ test("선택 요소의 실제 렌더 크기와 typography를 Inspector에 전달
   assert.ok(editorCanvasSource.includes("const rect = node.getBoundingClientRect()"));
   assert.ok(editorCanvasSource.includes("fontSize: numeric(computed?.fontSize)"));
   assert.ok(editorCanvasSource.includes("paddingBottom: numeric(computed?.paddingBottom)"));
+  assert.ok(editorCanvasSource.includes('color: computed?.color ?? ""'));
+  assert.ok(editorCanvasSource.includes('backgroundColor: computed?.backgroundColor ?? ""'));
+  assert.ok(editorCanvasSource.includes("ancestorBackgroundColor: compositeEditorBackground(ancestorBackgrounds)"));
+  assert.ok(editorShellSource.includes("effectiveEditorColor(node.style.color, renderMetrics?.color)"));
+  assert.ok(editorShellSource.includes("effectiveEditorColor(node.style.backgroundColor, renderMetrics?.backgroundColor)"));
   assert.ok(editorCanvasSource.includes("new ResizeObserver(() => reportSelectionMetrics(node))"));
 });
 

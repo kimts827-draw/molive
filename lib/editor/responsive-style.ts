@@ -67,6 +67,18 @@ function blockPattern(nodeId: string, viewport: EditorViewport) {
   return new RegExp(`\\n?${escapeRegExp(start)}[\\s\\S]*?${escapeRegExp(end)}`, "g");
 }
 
+function fontOverrideMarkers(nodeId: string) {
+  return {
+    start: `/* MOIRE:EDIT:${nodeId}:font-family:START */`,
+    end: `/* MOIRE:EDIT:${nodeId}:font-family:END */`,
+  };
+}
+
+function fontOverridePattern(nodeId: string) {
+  const { start, end } = fontOverrideMarkers(nodeId);
+  return new RegExp(`\\n?${escapeRegExp(start)}[\\s\\S]*?${escapeRegExp(end)}`, "g");
+}
+
 /**
  * 편집 규칙이 원본 CSS를 확실히 이기도록 노드 속성을 반복해 특이도를 올립니다.
  * Preview는 모든 선택자에 [data-moire-static]을 덧붙이므로 `.hero h1` 같은 평범한 선택자도
@@ -152,9 +164,35 @@ export function setEditorDeclarations(css: string, input: {
   return writeEditorDeclarations(css, { ...input, declarations: next });
 }
 
+/**
+ * 노드의 원본 font-family는 HTML/CSS에 그대로 두고 Editor override만 별도 블록으로 읽습니다.
+ * CSSStyleDeclaration의 font-family 정규화 결과를 select value로 쓰지 않으므로 registry stack과
+ * 정확히 일치하고, 빈 값은 sentinel인 "디자인 기본값"을 뜻합니다.
+ */
+export function readEditorFontOverride(css: string, nodeId: string) {
+  const { start, end } = fontOverrideMarkers(nodeId);
+  const block = css.match(new RegExp(`${escapeRegExp(start)}([\\s\\S]*?)${escapeRegExp(end)}`))?.[1];
+  const value = block?.match(/font-family\s*:\s*([^;}]*?)(?:\s*!important)?\s*[;}]/i)?.[1]?.trim();
+  return value ?? "";
+}
+
+/**
+ * font override는 모든 viewport에 공통입니다. !important는 AI가 만든 inline font-family보다만
+ * 우선하기 위해 사용하며, 블록을 지우면 손대지 않은 원본 typography가 즉시 다시 살아납니다.
+ */
+export function setEditorFontOverride(css: string, input: { rootValue: string; nodeId: string; value: string }) {
+  const cleaned = css.replace(fontOverridePattern(input.nodeId), "").trimEnd();
+  const value = input.value.trim();
+  if (!value) return cleaned;
+  const { start, end } = fontOverrideMarkers(input.nodeId);
+  const rule = `${editorStyleSelector(input.rootValue, input.nodeId)}{font-family:${value}!important}`;
+  return `${cleaned}\n${start}\n${rule}\n${end}`;
+}
+
 /** 노드가 사라질 때 남은 편집 블록을 모두 정리합니다. */
 export function removeEditorBlocks(css: string, nodeId: string) {
-  return EDITOR_VIEWPORTS.reduce((current, viewport) => current.replace(blockPattern(nodeId, viewport), ""), css).trimEnd();
+  const withoutResponsive = EDITOR_VIEWPORTS.reduce((current, viewport) => current.replace(blockPattern(nodeId, viewport), ""), css);
+  return withoutResponsive.replace(fontOverridePattern(nodeId), "").trimEnd();
 }
 
 /**

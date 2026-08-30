@@ -74,9 +74,12 @@ test("숫자 입력은 local draft를 유지하고 px 변환은 blur/Enter commi
 test("Color picker는 조작 중 draft만 갱신하고 blur에서 문서에 반영한다", () => {
   assert.ok(editorSource.includes("setDraft(next); onPreview(next)"));
   assert.ok(editorSource.includes('picker.addEventListener("change", commitPicker)'));
-  assert.ok(editorSource.includes('onBlur={(event) => onChange(event.currentTarget.value)}'));
+  assert.ok(editorSource.includes('onBlur={(event) => commitDraft(event.currentTarget.value)}'));
+  assert.ok(editorSource.includes("if (trimmed !== value) onChange(trimmed)"), "computed 표시값은 사용자가 바꾸지 않은 한 inline override로 저장하지 않습니다.");
   assert.ok(editorSource.includes("previewStylePatch={previewStylePatch}"));
-  assert.equal(editorSource.includes('type="color" aria-label="색상 선택" value={pickerColor(value)} onChange='), false);
+  assert.ok(editorSource.includes("editorColorPickerHex(draft)"));
+  assert.ok(editorSource.includes('className="color-semantic-swatch" aria-hidden="true"'));
+  assert.equal(editorSource.includes("return \"#000000\""), false, "해석할 수 없는 의미값을 임의의 fallback 색으로 치환하지 않습니다.");
 });
 
 test("텍스트 Inspector는 행간·자간·배율·밑줄·기울임을 제공한다", () => {
