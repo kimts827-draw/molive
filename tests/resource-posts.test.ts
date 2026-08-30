@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 import { RESOURCE_ADMIN_EMAIL, isResourceAdminEmail } from "../lib/auth/roles.ts";
 import { RESOURCE_BOARDS, isResourceBoardKey, resourceBoard } from "../lib/resources/board.ts";
 import { resourcePostSchema } from "../lib/resources/schema.ts";
+import { RESOURCE_ASSET_BUCKET, buildResourceImagePath, resourceImageExtension } from "../lib/resources/assets.ts";
 
 const migration = await readFile(new URL("../supabase/migrations/20260829090000_resource_posts.sql", import.meta.url), "utf8");
 const adminAuth = await readFile(new URL("../lib/admin/auth.ts", import.meta.url), "utf8");
@@ -11,6 +12,9 @@ const collectionRoute = await readFile(new URL("../app/api/resources/[board]/rou
 const itemRoute = await readFile(new URL("../app/api/resources/[board]/[postId]/route.ts", import.meta.url), "utf8");
 const boardPage = await readFile(new URL("../components/resources/resource-board-page.tsx", import.meta.url), "utf8");
 const templateBoard = await readFile(new URL("../components/resources/template-board.tsx", import.meta.url), "utf8");
+const uploadRoute = await readFile(new URL("../app/api/resources/uploads/route.ts", import.meta.url), "utf8");
+const bucketMigration = await readFile(new URL("../supabase/migrations/20260830120000_resource_assets_bucket.sql", import.meta.url), "utf8");
+const postEditor = await readFile(new URL("../components/resources/resource-post-editor.tsx", import.meta.url), "utf8");
 
 test("자료실 관리자 계정은 지정된 이메일 하나뿐이다", () => {
   assert.equal(RESOURCE_ADMIN_EMAIL, "kimts8270@naver.com");
@@ -82,6 +86,62 @@ test("템플릿 게시글 스키마는 이미지·카테고리·브랜드 컬러
   for (const key of ["category", "brandColor", "prompt", "imageUrl"]) {
     assert.equal(schema.safeParse({ ...valid, [key]: undefined }).success, false);
   }
+});
+
+test("대표 이미지는 내장 경로와 업로드 버킷 주소만 허용한다", () => {
+  const schema = resourcePostSchema("template");
+  const base = {
+    title: "포근한 베이비 라이프",
+    summary: "포근하고 부드러운 분위기",
+    category: "유아동 / 베이비",
+    brandColor: "#D8C3A9",
+    prompt: "따뜻한 크림색 베이비 쇼핑몰을 만들어줘.",
+  };
+  const allowed = [
+    "/templates/baby.png",
+    `https://demo.supabase.co/storage/v1/object/public/${RESOURCE_ASSET_BUCKET}/template/0f1e2d3c.png`,
+  ];
+  for (const imageUrl of allowed) assert.equal(schema.safeParse({ ...base, imageUrl }).success, true);
+  const rejected = [
+    "https://attacker.example.com/a.png",
+    "https://demo.supabase.co/storage/v1/object/public/project-assets/a.webp",
+    "//attacker.example.com/a.png",
+    "C:\\Users\\me\\Pictures\\a.png",
+    "file:///C:/Users/me/a.png",
+  ];
+  for (const imageUrl of rejected) assert.equal(schema.safeParse({ ...base, imageUrl }).success, false, imageUrl);
+});
+
+test("이미지 업로드 라우트는 관리자만 통과시키고 형식·용량을 제한한다", () => {
+  assert.match(uploadRoute, /export async function POST/);
+  assert.match(uploadRoute, /await requireResourceAdminApi\(\)/);
+  // 인증이 파일 파싱보다 먼저 실행되어야 한다.
+  assert.ok(uploadRoute.indexOf("requireResourceAdminApi") < uploadRoute.indexOf("request.formData()"));
+  assert.match(uploadRoute, /RESOURCE_IMAGE_MAX_BYTES/);
+  assert.match(uploadRoute, /resourceImageExtension\(file\.type\)/);
+  // 업로드는 service_role 클라이언트로만 수행한다(일반 사용자 세션으로는 쓰기 불가).
+  assert.match(uploadRoute, /createAdminClient\(\)/);
+
+  assert.equal(resourceImageExtension("image/png"), "png");
+  assert.equal(resourceImageExtension("image/svg+xml"), null);
+  assert.equal(buildResourceImagePath("template", "0f1e2d3c-4b5a-6978-8765-4321fedcba09", "png"), "template/0f1e2d3c-4b5a-6978-8765-4321fedcba09.png");
+  assert.throws(() => buildResourceImagePath("template", "../../evil", "png"));
+});
+
+test("자료실 이미지 버킷은 공개 열람만 허용하고 쓰기 정책을 열지 않는다", () => {
+  assert.match(bucketMigration, /insert into storage\.buckets/);
+  assert.match(bucketMigration, /'resource-assets', 'resource-assets', true/);
+  assert.doesNotMatch(bucketMigration, /create policy[\s\S]*to (anon|authenticated)/);
+});
+
+test("관리자 이미지 필드는 파일 선택과 미리보기만 제공한다", () => {
+  assert.match(postEditor, /type="file"/);
+  assert.match(postEditor, /\/api\/resources\/uploads/);
+  assert.match(postEditor, /이미지 변경/);
+  assert.match(postEditor, /대표 이미지 미리보기/);
+  // 로컬 경로/임의 URL 직접 입력 UI는 제거한다.
+  assert.doesNotMatch(postEditor, /update\("imageUrl", event\.target\.value\)/);
+  assert.doesNotMatch(postEditor, /public 폴더 경로/);
 });
 
 test("공지사항·블로그·자료모음 게시글 스키마는 제목과 본문을 요구한다", () => {

@@ -9,6 +9,19 @@
 .form small { color: #918c83; font-size: 11px; font-weight: 600; }
 .colorRow { display: grid; grid-template-columns: minmax(0,1fr) 54px; gap: 12px; align-items: end; }
 .colorRow input[type="color"] { min-height: 44px; padding: 4px; }
+.imageField { display: grid; gap: 10px; }
+.fieldLabel { font-size: 12px; font-weight: 800; }
+.imagePreview { position: relative; display: grid; place-items: center; max-height: 420px; padding: 12px; overflow: auto; background: #f8f7f3; border: 1px solid #d7d3ca; border-radius: 12px; }
+.imagePreview img { display: block; width: 100%; max-width: 420px; height: auto; border-radius: 8px; }
+.imagePreview p { margin: 0; padding: 46px 0; color: #918c83; font-size: 12px; font-weight: 700; }
+.imageBadge { position: absolute; top: 12px; right: 12px; padding: 6px 10px; color: white; background: rgb(23 23 19 / .82); border-radius: 999px; font-size: 11px; font-weight: 800; }
+.fileInput { display: none; }
+.imageActions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.imageActions button { min-height: 40px; padding: 0 16px; color: white; background: #171713; border: 0; border-radius: 10px; font-size: 12px; font-weight: 800; cursor: pointer; }
+.imageActions button:hover:not(:disabled) { background: #655bdd; }
+.imageActions button:disabled { opacity: .5; cursor: not-allowed; }
+.imageActions .ghost { color: #66635c; background: transparent; border: 1px solid #d7d3ca; }
+.imageActions .ghost:hover:not(:disabled) { color: #171713; background: #efece5; }
 .actions { display: flex; align-items: center; gap: 12px; }
 .actions button { min-height: 44px; padding: 0 20px; color: white; background: #171713; border: 0; border-radius: 10px; font-size: 13px; font-weight: 800; cursor: pointer; }
 .actions button:hover:not(:disabled) { background: #655bdd; }
