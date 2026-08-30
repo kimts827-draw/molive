@@ -9,6 +9,11 @@ export type RenderTarget = "preview" | "cafe24";
  */
 export type ComponentRenderOptions = {
   previewProducts?: readonly PreviewProductMock[];
+  /**
+   * renderer가 채워 주는 요청 variant입니다. component가 variant별로 DOM을 나눌 때만 씁니다.
+   * (ProductSectionV1의 Cafe24 전시 토큰: grid3 / grid4_slide list_gallery / ...)
+   */
+  variant?: string;
 };
 
 export type ComponentDefinition = {

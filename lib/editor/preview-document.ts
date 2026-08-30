@@ -70,6 +70,6 @@ export function buildEditorPreviewDocument(document: ProjectDocument): EditorPre
   }
   return {
     kind: "legacy",
-    srcDoc: htmlDocument(body, `${buildBridgeCss(document.css)}\n${isolateAiDesignCss(document.css)}\n${commerce}[module="Layout_stateLogon"]{display:none}\n${verifiedProductLayoutCss(composition.productLayout, document.commerce?.thumbRatioOverride)}\n${FOOTER_SHELL_CSS}\n${buildFooterThemeCss(document.css, footerBrandBackground(palette))}\n${brandTheme}\n${planLayout}`),
+    srcDoc: htmlDocument(body, `${buildBridgeCss(document.css)}\n${isolateAiDesignCss(document.css)}\n${commerce}[module="Layout_stateLogon"]{display:none}\n${verifiedProductLayoutCss(composition.productLayout, document.commerce?.thumbRatioOverride, { productDisplay: document.commerce?.productDisplay, target: "preview" })}\n${FOOTER_SHELL_CSS}\n${buildFooterThemeCss(document.css, footerBrandBackground(palette))}\n${brandTheme}\n${planLayout}`),
   };
 }

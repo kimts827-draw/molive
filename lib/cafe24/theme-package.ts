@@ -9,6 +9,8 @@ import { assetFileName, rewriteAssetUrls, THEME_ASSET_DIR } from "@/lib/cafe24/t
 import { buildBridgeCss, buildFooterThemeCss, resolveFooterInk } from "@/lib/cafe24/theme-bridge";
 import { commerceCss, composeCommerce, headerPresentationCss, headerTextToneCss, isolateAiDesignCss, renderProjectHeaderV1, resolveLegacyComposition, verifiedProductLayoutCss } from "@/lib/commerce/fixed-components";
 import { brandThemeCss, footerBrandBackground, resolveProjectPalette } from "@/lib/commerce/brand-theme";
+import { productDisplayOf } from "@/lib/commerce/product-display";
+import { PRODUCT_SLIDE_SCRIPT, PRODUCT_SLIDE_SCRIPT_PATH } from "@/lib/cafe24/product-slide-script";
 import { planLayoutCss } from "@/lib/design-library/plan-layout-css";
 import { replaceFooterShell } from "@/lib/commerce/footer-shell";
 import {
@@ -93,9 +95,11 @@ function buildLegacyThemeEntries(base: Map<string, Buffer>, source: ProjectSourc
   const themeHtml = rewriteAssetUrls(patched.html, mapping);
   const rawThemeCss = rewriteAssetUrls(source.css, mapping);
   const composition = resolveLegacyComposition(source.architecture);
+  // 상품 전시 토큰은 Preview와 같은 값을 씁니다. 슬라이드일 때만 Swiper init을 테마에 싣습니다.
+  const productSlide = productDisplayOf(source.commerce?.productDisplay).mode === "slide" && source.commerce?.productDisplay !== undefined;
   const themeCss = isolateAiDesignCss(rawThemeCss);
   const palette = resolveProjectPalette(source);
-  const protectedCss = `${commerceCss(source.commerce, composition.headerVariant)}\n${headerTextToneCss(source.headerTextTone ?? "dark")}${source.headerPresentation ? `\n${headerPresentationCss(source.headerPresentation)}` : ""}\n${verifiedProductLayoutCss(composition.productLayout, source.commerce?.thumbRatioOverride)}\n${buildFooterThemeCss(rawThemeCss, footerBrandBackground(palette))}\n${brandThemeCss(palette, { radius: source.commerce?.radius })}\n${planLayoutCss(source.pagePlan)}`;
+  const protectedCss = `${commerceCss(source.commerce, composition.headerVariant)}\n${headerTextToneCss(source.headerTextTone ?? "dark")}${source.headerPresentation ? `\n${headerPresentationCss(source.headerPresentation)}` : ""}\n${verifiedProductLayoutCss(composition.productLayout, source.commerce?.thumbRatioOverride, { productDisplay: source.commerce?.productDisplay, target: "cafe24" })}\n${buildFooterThemeCss(rawThemeCss, footerBrandBackground(palette))}\n${brandThemeCss(palette, { radius: source.commerce?.radius })}\n${planLayoutCss(source.pagePlan)}`;
 
   // 고정 커머스 컴포넌트를 씁니다. 상품 슬롯이 없으면 Guide module로 물러나지 않고 실패합니다.
   const composed = composeCommerce(themeHtml, "cafe24", source.commerce, composition, { includeHeader: false });
@@ -112,7 +116,8 @@ function buildLegacyThemeEntries(base: Map<string, Buffer>, source: ProjectSourc
   files.set(BASE_INDEX_PATH, Buffer.from(index.html, "utf8"));
   files.set(MOIRE_CSS_PATH, Buffer.from(themeCss, "utf8"));
   files.set(MOIRE_BRIDGE_CSS_PATH, Buffer.from(buildBridgeCss(rawThemeCss), "utf8"));
-  files.set(MOIRE_LAYOUT_PATH, Buffer.from(buildMoireLayout(baseLayout.toString("utf8"), { rootValue, hasMoireHeader: true }), "utf8"));
+  files.set(MOIRE_LAYOUT_PATH, Buffer.from(buildMoireLayout(baseLayout.toString("utf8"), { rootValue, hasMoireHeader: true, productSlide }), "utf8"));
+  if (productSlide) files.set(PRODUCT_SLIDE_SCRIPT_PATH, Buffer.from(PRODUCT_SLIDE_SCRIPT, "utf8"));
   const exportSource = source.headerPresentation?.logo.imageUrl
     ? { ...source, headerPresentation: { ...source.headerPresentation, logo: { ...source.headerPresentation.logo, imageUrl: rewriteAssetUrls(source.headerPresentation.logo.imageUrl, mapping) } } }
     : source;

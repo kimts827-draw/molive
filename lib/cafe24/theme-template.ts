@@ -7,6 +7,8 @@ export const BASE_LAYOUT_PATH = "layout/basic/main.html";
 export const BASE_INDEX_PATH = "index.html";
 export const SUB_LAYOUT_PATHS = ["layout/basic/layout.html", "layout/basic/detail_layout.html"];
 
+import { PRODUCT_SLIDE_SCRIPT_PATH } from "./product-slide-script.ts";
+
 const SLOT_MARK = 'data-cafe24-slot="product-list"';
 
 /**
@@ -293,11 +295,13 @@ export function buildIndexHtml(patchHtml: string, moduleHtmls: string[]) {
   };
 }
 
-function injectMoireCss(layout: string) {
+function injectMoireCss(layout: string, options: { productSlide?: boolean } = {}) {
   const headClose = layout.indexOf("</head>");
   if (headClose < 0) throw new Error("기준 레이아웃에서 </head>를 찾지 못했습니다.");
   // Guide < AI static design < protected Header/Product/Footer 순으로 cascade를 고정합니다.
-  const includes = `    <!--@css(/${MOIRE_BRIDGE_CSS_PATH})-->\n    <!--@css(/${MOIRE_CSS_PATH})-->\n    <!--@css(/${MOIRE_COMMERCE_CSS_PATH})-->\n`;
+  // 상품 슬라이드 진열일 때만 Swiper init을 싣습니다. Swiper 본체(4.5.1)는 기준 스킨이 이미 싣고 있습니다.
+  const slideScript = options.productSlide ? `    <!--@js(/${PRODUCT_SLIDE_SCRIPT_PATH})-->\n` : "";
+  const includes = `    <!--@css(/${MOIRE_BRIDGE_CSS_PATH})-->\n    <!--@css(/${MOIRE_CSS_PATH})-->\n    <!--@css(/${MOIRE_COMMERCE_CSS_PATH})-->\n${slideScript}`;
   return `${layout.slice(0, headClose)}${includes}${layout.slice(headClose)}`;
 }
 
@@ -318,8 +322,8 @@ function replaceCafe24Header(layout: string, replacement: string) {
 }
 
 /** 홈 전용 레이아웃. 헤더는 MOLIVE import로 바뀌고 Cafe24 푸터는 유지합니다. */
-export function buildMoireLayout(mainHtml: string, options: { rootValue?: string | null; hasMoireHeader?: boolean } = {}) {
-  let layout = injectMoireCss(mainHtml);
+export function buildMoireLayout(mainHtml: string, options: { rootValue?: string | null; hasMoireHeader?: boolean; productSlide?: boolean } = {}) {
+  let layout = injectMoireCss(mainHtml, { productSlide: options.productSlide });
   layout = applyGlobalRoot(layout, options.rootValue ?? null);
   layout = replaceCafe24Header(layout, options.hasMoireHeader ? `<!--@import(/${MOIRE_HEADER_PATH})-->\n` : "");
   // 홈은 Preview와 같은 full-width로 그립니다. Cafe24의 #contents/.inner 폭 제한은 이 표식으로 해제합니다.

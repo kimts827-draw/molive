@@ -140,6 +140,16 @@
 .spacing-fields > div { margin-top: 6px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .spacing-fields label { min-width: 0; display: grid; gap: 5px; }
 .spacing-fields label > span { font-size: 12px; }
+.product-display-fields { margin: 8px 0 12px; padding: 15px; display: grid; gap: 10px; color: #2f2a24; background: #fbf9f5; border: 1px solid #e5e0d6; border-radius: 9px; }
+.product-display-fields > b { font-size: 14px; }
+.product-display-fields > span { color: #7d766b; font-size: 11px; line-height: 1.5; }
+.product-display-fields > label { display: grid; gap: 6px; }
+.product-display-fields > label > span { color: #7d766b; font-size: 11px; letter-spacing: .04em; }
+.product-display-options { display: flex; gap: 6px; flex-wrap: wrap; }
+.product-display-options button { flex: 1 1 auto; padding: 8px 10px; font-size: 12px; font-weight: 600; color: #56504a; background: #fff; border: 1px solid #ddd6ca; border-radius: 7px; cursor: pointer; }
+.product-display-options button:hover { border-color: #b9b0a1; }
+.product-display-options button.active { color: #fff; background: #2f2a24; border-color: #2f2a24; }
+.product-display-fields > small { color: #7d766b; font-size: 11px; }
 .product-guidance { margin: 8px 0 14px; padding: 15px; display: grid; gap: 7px; color: #423a68; background: #f0edff; border: 1px solid #d5ccff; border-radius: 9px; }
 .product-guidance > span { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
 .product-guidance > b { font-size: 16px; }

@@ -9,7 +9,8 @@ export function renderComponent(
   options: ComponentRenderOptions = {},
 ): ComponentRenderArtifact {
   const definition = (registry ?? verifiedComponentRegistry).resolve(request.component, request.variant, target);
-  const html = definition.render(target, options);
+  // variant별로 DOM이 갈리는 component가 있으므로 요청 variant를 render options로 넘깁니다.
+  const html = definition.render(target, { ...options, variant: request.variant });
   return {
     component: definition.id,
     version: definition.version,

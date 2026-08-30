@@ -11,6 +11,7 @@ import {
   type ComponentDefinition,
 } from "../lib/component-library/index.ts";
 import { POC_CSS } from "../lib/cafe24/poc/theme-poc.ts";
+import { LEGACY_GRID_FOUR_VARIANT, PRODUCT_DISPLAY_IDS } from "../lib/commerce/product-display.ts";
 
 const fixtureUrl = (name: string) => new URL(`./fixtures/${name}`, import.meta.url);
 const canonicalHeader = await readFile(fixtureUrl("cafe24-poc-header-v1.html"), "utf8");
@@ -31,7 +32,8 @@ test("Component Registry는 canonical POC와 verified Product v1을 등록한다
     { id: "HeaderV1", version: 1, status: "verified", variants: ["canonical"] },
     { id: "ProductGridV1", version: 1, status: "verified", variants: ["canonical"] },
     { id: "ProductCardV1", version: 1, status: "verified", variants: ["commerce-standard"] },
-    { id: "ProductSectionV1", version: 1, status: "verified", variants: ["grid-four"] },
+    // legacy "grid-four" 별칭 + Cafe24 원본 상품 전시 12종
+    { id: "ProductSectionV1", version: 1, status: "verified", variants: [LEGACY_GRID_FOUR_VARIANT, ...PRODUCT_DISPLAY_IDS] },
   ]);
 });
 

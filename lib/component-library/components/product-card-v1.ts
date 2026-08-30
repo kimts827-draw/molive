@@ -93,10 +93,19 @@ function bindPreviewProductCard(index: number, product: PreviewProductMock) {
   return html;
 }
 
+/**
+ * 반복 <li>에 클래스를 얹습니다. 슬라이드 진열의 swiper-slide처럼 Cafe24 원본이
+ * <li>에만 추가하는 클래스를 위한 것으로, 카드 내부 DOM과 {$...} binding은 건드리지 않습니다.
+ */
+function withListItemClass(html: string, listItemClass?: string) {
+  if (!listItemClass) return html;
+  return html.replace(/^<li id="([^"]*)">/, `<li id="$1" class="${listItemClass}">`);
+}
+
 /** Cafe24 target은 언제나 원본 template을 그대로 돌려줍니다. mock은 Preview에서만 바인딩됩니다. */
-export function renderProductCardV1(target: RenderTarget, sampleIndex = 0, options: ComponentRenderOptions = {}) {
-  if (target === "cafe24") return PRODUCT_CARD_V1_CAFE24_HTML;
-  return bindPreviewProductCard(sampleIndex, previewProductAt(options.previewProducts, sampleIndex));
+export function renderProductCardV1(target: RenderTarget, sampleIndex = 0, options: ComponentRenderOptions = {}, listItemClass?: string) {
+  if (target === "cafe24") return withListItemClass(PRODUCT_CARD_V1_CAFE24_HTML, listItemClass);
+  return withListItemClass(bindPreviewProductCard(sampleIndex, previewProductAt(options.previewProducts, sampleIndex)), listItemClass);
 }
 
 export const productCardV1Definition: ComponentDefinition = {

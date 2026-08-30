@@ -5,6 +5,7 @@
  */
 
 import { renderComponent } from "../component-library/renderer.ts";
+import { DEFAULT_PRODUCT_DISPLAY, PRODUCT_SCOPE, productDisplayCss, resolveProductDisplay, type ProductDisplayId } from "./product-display.ts";
 import type { PreviewProductMock } from "../component-library/preview-mock.ts";
 import type { ProjectHeaderPresentation } from "../project-source.ts";
 
@@ -34,6 +35,12 @@ export type CommerceTokens = {
    * Cafe24 상품 binding과 DOM은 건드리지 않은 채 썸네일 상자의 CSS 비율만 바꿉니다.
    */
   thumbRatioOverride?: string;
+  /**
+   * Cafe24 원본 상품 전시 12종 중 하나입니다(reference/cafe24-product-grid, -slide).
+   * 값이 있으면 legacy presentation(featured-grid 등)의 CSS 뒤층 대신 이 전시를 씁니다.
+   * 저장값이 그대로 <ul class="prdList ..."> 토큰이 되어 Preview·ZIP·실몰이 같은 문자열을 갖습니다.
+   */
+  productDisplay?: ProductDisplayId;
 };
 
 /** Preview에서 Header를 가리키는 편집 ID입니다. Project Source HTML에는 없는 가상 노드입니다. */
@@ -218,17 +225,18 @@ export function headerPresentationCss(value?: Partial<ProjectHeaderPresentation>
 `;
 }
 
-const VERIFIED_PRODUCT_SECTION_REQUEST = {
-  component: "ProductSectionV1",
-  variant: "grid-four",
-} as const;
-
 /**
  * 실몰 검증·동결된 ProductSectionV1 artifact를 Registry에서만 가져옵니다.
  * previewProducts는 Preview render에만 전달되고 Cafe24 render는 실제 상품 binding을 그대로 씁니다.
+ * display는 Cafe24 전시 토큰이며 registry variant로 그대로 전달됩니다.
  */
-export function renderVerifiedProductSection(mode: RenderMode, previewProducts?: readonly PreviewProductMock[]) {
-  return renderComponent(VERIFIED_PRODUCT_SECTION_REQUEST, mode, undefined, mode === "preview" ? { previewProducts } : {});
+export function renderVerifiedProductSection(
+  mode: RenderMode,
+  previewProducts?: readonly PreviewProductMock[],
+  display: ProductDisplayId = DEFAULT_PRODUCT_DISPLAY,
+) {
+  const request = { component: "ProductSectionV1", variant: display };
+  return renderComponent(request, mode, undefined, mode === "preview" ? { previewProducts } : {});
 }
 
 const VARIANT_CSS: Record<CommerceVariant, string> = {
@@ -289,7 +297,7 @@ function stronglyScopeProductCss(css: string) {
 }
 
 /** verified 선언 뒤층에서만 쓰는 presentation 선택자 prefix입니다. */
-const P = "[data-moire-root] [data-cafe24-slot] .moireProductSection.ec-base-product";
+const P = PRODUCT_SCOPE;
 
 /**
  * Presentation variant별 CSS 뒤층입니다. golden DOM/module/변수 계약은 그대로 두고
@@ -370,12 +378,31 @@ ${P} .prdList .thumbnail a{display:block;overflow:hidden;aspect-ratio:${ratio}}
 ${P} .prdList .thumbnail a img{width:100%;height:100%;object-fit:cover}`;
 }
 
-export function verifiedProductLayoutCss(layout: ProductLayout = "grid-four", thumbRatioOverride?: string) {
+export type VerifiedProductLayoutOptions = {
+  /** Cafe24 원본 상품 전시 토큰입니다. 있으면 legacy presentation 대신 이 전시를 씁니다. */
+  productDisplay?: unknown;
+  /** Preview에는 Swiper JS가 없으므로 슬라이드 확인용 CSS 레이어가 한 겹 더 붙습니다. */
+  target?: RenderMode;
+};
+
+export function verifiedProductLayoutCss(
+  layout: ProductLayout = "grid-four",
+  thumbRatioOverride?: string,
+  options: VerifiedProductLayoutOptions = {},
+) {
   if (!PRODUCT_LAYOUTS.has(layout)) throw new Error(`지원하지 않는 Product layout입니다: ${layout}`);
   const contentContract = `${P}{box-sizing:border-box;width:calc(100% - 64px);max-width:1280px;margin-left:auto;margin-right:auto}
 @media all and (max-width:1024px){${P}{width:calc(100% - 48px)}}
 @media all and (max-width:767px){${P}{width:calc(100% - 40px)}}`;
   const canonical = `${stronglyScopeProductCss(renderVerifiedProductSection("preview").css)}\n${contentContract}`;
+  /**
+   * Cafe24 전시 토큰이 정해져 있으면 그 전시만 씁니다.
+   * reference 12종에는 이미지 크롭이 전혀 없으므로 여기서는 비율 override도 얹지 않고
+   * {$image_medium} 원본 비율을 그대로 흘립니다.
+   */
+  if (options.productDisplay !== undefined && options.productDisplay !== null) {
+    return `${canonical}\n${productDisplayCss(options.productDisplay, { target: options.target === "cafe24" ? "cafe24" : "preview" })}`;
+  }
   const base = layout === "grid-four" ? canonical : `${canonical}\n${PRODUCT_LAYOUT_CSS[layout]}`;
   const ratio = normalizeThumbRatio(thumbRatioOverride);
   return ratio ? `${base}\n${thumbRatioCss(ratio)}` : base;
@@ -513,7 +540,9 @@ export function composeCommerce(
   const first = findSlotRange(html, 0);
   if (!first) throw new Error("상품 슬롯(data-cafe24-slot=\"product-list\")이 없습니다. 검증된 ProductSectionV1을 넣을 자리가 필요합니다.");
 
-  const productSection = renderVerifiedProductSection(mode, mode === "preview" ? options.previewProducts : undefined);
+  // 전시 토큰은 Preview와 Cafe24가 같은 값을 씁니다. 저장값이 없으면 지금까지의 기본 진열입니다.
+  const display = tokens.productDisplay === undefined ? DEFAULT_PRODUCT_DISPLAY : resolveProductDisplay(tokens.productDisplay);
+  const productSection = renderVerifiedProductSection(mode, mode === "preview" ? options.previewProducts : undefined, display);
   html = `${html.slice(0, first.openEnd + 1)}\n${productSection.html}\n${html.slice(first.closeStart)}`;
 
   // ProductSectionV1은 검증된 product_listmain_1을 소유하므로 중복 슬롯에는 상품 모듈을 넣지 않습니다.
@@ -525,7 +554,6 @@ export function composeCommerce(
     cursor = extra.openEnd + 1;
   }
 
-  void tokens;
   void composition.productLayout;
   const header = options.includeHeader === false ? "" : renderHeaderV1(mode, composition.headerVariant);
   return { html: `${header}${html}`, slots: 1 };

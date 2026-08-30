@@ -13,6 +13,7 @@ import { productThumbnailGuidance } from "@/lib/editor/product-thumbnail-guidanc
 import { isResponsiveProperty, readEditorDeclarations, removeEditorBlocks, setEditorDeclarations, type EditorViewport } from "@/lib/editor/responsive-style";
 import { type EditorHeaderVariant } from "@/lib/editor/style-intent";
 import { HEADER_NODE_ID, resolveHeaderPresentation } from "@/lib/commerce/fixed-components";
+import { composeProductDisplayId, DEFAULT_PRODUCT_DISPLAY, productDisplayOf, type ProductDisplayColumns, type ProductDisplayId, type ProductDisplayMode, type ProductDisplayStyle } from "@/lib/commerce/product-display";
 import { cloneProjectSource, projectPagePlan, type EditorNodeSelection, type ProjectHeaderPresentation, type ProjectSource } from "@/lib/project-source";
 import { collectAssetReferences } from "@/lib/assets/asset-policy";
 import { NEW_SECTION_PRESETS, insertArchitectureSection, insertPlanSection, newSectionNodeId, newSectionPlanSection, newSectionPreset, renderNewSectionPlaceholder, type NewSectionPosition, type NewSectionPresetId } from "@/lib/editor/new-section";
@@ -687,6 +688,17 @@ export function EditorShell({ initialSource, projectId = null, initialVersions =
     return true;
   }
 
+  /**
+   * 상품 전시 방식은 Cafe24 원본 12종 토큰이 소유합니다.
+   * 저장값이 그대로 <ul class="prdList ..."> 클래스가 되어 Preview·저장·ZIP·실몰이 같은 진열을 씁니다.
+   */
+  function applyProductDisplay(display: ProductDisplayId) {
+    const current = sourceRef.current;
+    if ((current.commerce?.productDisplay ?? DEFAULT_PRODUCT_DISPLAY) === display) return false;
+    commit({ ...current, commerce: { ...current.commerce, productDisplay: display }, updatedAt: new Date().toISOString() });
+    return true;
+  }
+
   /** Header는 AI HTML이 아니라 HeaderV1 variant가 소유하므로 architecture 값으로만 바뀝니다. */
   function applyHeaderVariant(variant: EditorHeaderVariant) {
     const current = sourceRef.current;
@@ -855,7 +867,7 @@ export function EditorShell({ initialSource, projectId = null, initialVersions =
 
         <section className="editor-stage"><div className="stage-toolbar"><span>{viewport === "desktop" ? "1920 × 1080" : viewport === "tablet" ? "1024 × 768" : "390 × 844"}</span><b>HTML/CSS 직접 렌더링</b></div><div className={`canvas-viewport viewport-${viewport}`}><EditorCanvas source={source} selection={selection} previewStylePatch={previewStylePatch} previewHeaderPresentation={previewHeaderPresentation} viewport={viewport} onSelectionMetrics={handleSelectionMetrics} onSelect={(next) => { setPreviewStylePatch(null); setPreviewHeaderPresentation(null); selectionMetricsRef.current = null; setSelectionMetrics(null); setSelection(next); setRightOpen(true); }} /></div></section>
 
-        {rightOpen && <aside className="editor-inspector"><div className="inspector-title"><div><span>선택 노드</span><b>{selectedNode ? `${selectedNode.tagName} · ${selectedNode.type}` : "선택 없음"}</b></div><button onClick={() => setRightOpen(false)} aria-label="Inspector 닫기"><X size={16} /></button></div>{selectedNode ? <NodeInspector node={selectedNode} renderMetrics={selectionMetrics?.nodeId === selectedNode.id ? selectionMetrics : null} projectId={projectId} productPresentation={source.architecture.productPresentation} thumbRatioOverride={source.commerce?.thumbRatioOverride} headerVariant={(source.architecture.header as EditorHeaderVariant) ?? "split-utility"} headerTextTone={source.headerTextTone ?? "dark"} headerPresentation={resolveHeaderPresentation(source.headerPresentation)} onPreviewHeaderPresentation={setPreviewHeaderPresentation} onHeaderTextTone={applyHeaderTextTone} onHeaderPresentation={applyHeaderPresentation} onHeaderVariant={(variant) => { if (!applyHeaderVariant(variant)) setToast("헤더가 이미 그 형식입니다"); }} onText={updateText} onAttribute={updateAttribute} onStyle={updateStyle} onStyles={updateStyles} onPreviewStyle={previewStyle} onImageSource={updateImageSource} /> : <p className="empty-inspector">미리보기에서 텍스트, 이미지, 버튼 또는 섹션을 클릭하세요.</p>}{sectionNodeId() && <div className="section-actions"><button className="section-redesign" disabled={Boolean(redesignBlockedReason)} title={redesignBlockedReason ?? "이 섹션을 AI가 다시 디자인합니다"} onClick={() => setShowRedesign(true)}><Sparkles size={14} /> AI 재설계</button><button onClick={duplicateSection}><Copy size={14} /> 복제</button><button onClick={() => toggleHidden()}><EyeOff size={14} /> 숨김</button><button className="danger" onClick={deleteSection}><Trash2 size={14} /> 삭제</button></div>}<button className="inspector-ai-button" onClick={() => { setLeftPanel("ai"); setShowAiTools(true); }}><Sparkles size={15} /> AI 생성 도구 열기</button></aside>}
+        {rightOpen && <aside className="editor-inspector"><div className="inspector-title"><div><span>선택 노드</span><b>{selectedNode ? `${selectedNode.tagName} · ${selectedNode.type}` : "선택 없음"}</b></div><button onClick={() => setRightOpen(false)} aria-label="Inspector 닫기"><X size={16} /></button></div>{selectedNode ? <NodeInspector node={selectedNode} renderMetrics={selectionMetrics?.nodeId === selectedNode.id ? selectionMetrics : null} projectId={projectId} productPresentation={source.architecture.productPresentation} thumbRatioOverride={source.commerce?.thumbRatioOverride} productDisplay={source.commerce?.productDisplay} onProductDisplay={(display) => { if (!applyProductDisplay(display)) setToast("상품 진열이 이미 그 형식입니다"); }} headerVariant={(source.architecture.header as EditorHeaderVariant) ?? "split-utility"} headerTextTone={source.headerTextTone ?? "dark"} headerPresentation={resolveHeaderPresentation(source.headerPresentation)} onPreviewHeaderPresentation={setPreviewHeaderPresentation} onHeaderTextTone={applyHeaderTextTone} onHeaderPresentation={applyHeaderPresentation} onHeaderVariant={(variant) => { if (!applyHeaderVariant(variant)) setToast("헤더가 이미 그 형식입니다"); }} onText={updateText} onAttribute={updateAttribute} onStyle={updateStyle} onStyles={updateStyles} onPreviewStyle={previewStyle} onImageSource={updateImageSource} /> : <p className="empty-inspector">미리보기에서 텍스트, 이미지, 버튼 또는 섹션을 클릭하세요.</p>}{sectionNodeId() && <div className="section-actions"><button className="section-redesign" disabled={Boolean(redesignBlockedReason)} title={redesignBlockedReason ?? "이 섹션을 AI가 다시 디자인합니다"} onClick={() => setShowRedesign(true)}><Sparkles size={14} /> AI 재설계</button><button onClick={duplicateSection}><Copy size={14} /> 복제</button><button onClick={() => toggleHidden()}><EyeOff size={14} /> 숨김</button><button className="danger" onClick={deleteSection}><Trash2 size={14} /> 삭제</button></div>}<button className="inspector-ai-button" onClick={() => { setLeftPanel("ai"); setShowAiTools(true); }}><Sparkles size={15} /> AI 생성 도구 열기</button></aside>}
       </div>
 
       {toast && <div className="editor-toast"><Save size={14} /> {toast}</div>}
@@ -1001,7 +1013,76 @@ function HeaderInspector({ projectId, headerVariant, headerTextTone, presentatio
   </div>;
 }
 
-function NodeInspector({ node, renderMetrics, projectId, productPresentation, thumbRatioOverride, headerVariant, headerTextTone, headerPresentation, onPreviewHeaderPresentation, onHeaderTextTone, onHeaderPresentation, onHeaderVariant, onText, onAttribute, onStyle, onStyles, onPreviewStyle, onImageSource }: { node: NodeSnapshot; renderMetrics: SelectionRenderMetrics | null; projectId: string | null; productPresentation: string; thumbRatioOverride?: string; headerVariant: EditorHeaderVariant; headerTextTone: "dark" | "light"; headerPresentation: ProjectHeaderPresentation; onPreviewHeaderPresentation: (value: ProjectHeaderPresentation) => void; onHeaderTextTone: (value: "dark" | "light") => void; onHeaderPresentation: (value: ProjectHeaderPresentation) => void; onHeaderVariant: (variant: EditorHeaderVariant) => void; onText: (value: string) => void; onAttribute: (name: string, value: string) => void; onStyle: (property: string, value: string) => void; onStyles: (styles: Record<string, string>) => void; onPreviewStyle: (property: string, value: string) => void; onImageSource: (value: string, kind: ImageEditKind) => void }) {
+/**
+ * 상품 전시 방식 선택입니다. Cafe24 원본 12종(reference/cafe24-product-grid, -slide)을
+ * 전시 방식 × 스타일 × 단 수 세 축으로 그대로 노출합니다. 원본에 없는 축은 만들지 않습니다.
+ */
+const PRODUCT_DISPLAY_MODES: { id: ProductDisplayMode; label: string }[] = [
+  { id: "grid", label: "그리드" },
+  { id: "slide", label: "슬라이드" },
+];
+const PRODUCT_DISPLAY_STYLES: { id: ProductDisplayStyle; label: string }[] = [
+  { id: "normal", label: "일반형" },
+  { id: "gallery", label: "이미지강조형" },
+];
+const PRODUCT_DISPLAY_COLUMNS: { id: ProductDisplayColumns; label: string; hint: string }[] = [
+  { id: 3, label: "3단", hint: "PC 3열 / MOBILE 2열" },
+  { id: 4, label: "4단", hint: "PC 4열 / MOBILE 2열" },
+  { id: 5, label: "5단", hint: "PC 5열 / MOBILE 3열" },
+];
+
+function ProductDisplayFields({ value, onChange }: { value?: ProductDisplayId; onChange: (display: ProductDisplayId) => void }) {
+  const display = productDisplayOf(value ?? DEFAULT_PRODUCT_DISPLAY);
+  return (
+    <div className="product-display-fields">
+      <b>상품 전시 방식</b>
+      <span>Cafe24 기본 스킨의 상품 진열 12종입니다. 미리보기와 실제 쇼핑몰이 같은 진열로 나갑니다.</span>
+      <label>
+        <span>전시 방식</span>
+        <div className="product-display-options">
+          {PRODUCT_DISPLAY_MODES.map((option) => (
+            <button
+              key={option.id}
+              type="button"
+              className={display.mode === option.id ? "active" : ""}
+              onClick={() => onChange(composeProductDisplayId(option.id, display.style, display.columns))}
+            >{option.label}</button>
+          ))}
+        </div>
+      </label>
+      <label>
+        <span>스타일</span>
+        <div className="product-display-options">
+          {PRODUCT_DISPLAY_STYLES.map((option) => (
+            <button
+              key={option.id}
+              type="button"
+              className={display.style === option.id ? "active" : ""}
+              onClick={() => onChange(composeProductDisplayId(display.mode, option.id, display.columns))}
+            >{option.label}</button>
+          ))}
+        </div>
+      </label>
+      <label>
+        <span>단 수</span>
+        <div className="product-display-options">
+          {PRODUCT_DISPLAY_COLUMNS.map((option) => (
+            <button
+              key={option.id}
+              type="button"
+              title={option.hint}
+              className={display.columns === option.id ? "active" : ""}
+              onClick={() => onChange(composeProductDisplayId(display.mode, display.style, option.id))}
+            >{option.label}</button>
+          ))}
+        </div>
+      </label>
+      <small>{display.name}</small>
+    </div>
+  );
+}
+
+function NodeInspector({ node, renderMetrics, projectId, productPresentation, thumbRatioOverride, productDisplay, onProductDisplay, headerVariant, headerTextTone, headerPresentation, onPreviewHeaderPresentation, onHeaderTextTone, onHeaderPresentation, onHeaderVariant, onText, onAttribute, onStyle, onStyles, onPreviewStyle, onImageSource }: { node: NodeSnapshot; renderMetrics: SelectionRenderMetrics | null; projectId: string | null; productPresentation: string; thumbRatioOverride?: string; productDisplay?: ProductDisplayId; onProductDisplay: (display: ProductDisplayId) => void; headerVariant: EditorHeaderVariant; headerTextTone: "dark" | "light"; headerPresentation: ProjectHeaderPresentation; onPreviewHeaderPresentation: (value: ProjectHeaderPresentation) => void; onHeaderTextTone: (value: "dark" | "light") => void; onHeaderPresentation: (value: ProjectHeaderPresentation) => void; onHeaderVariant: (variant: EditorHeaderVariant) => void; onText: (value: string) => void; onAttribute: (name: string, value: string) => void; onStyle: (property: string, value: string) => void; onStyles: (styles: Record<string, string>) => void; onPreviewStyle: (property: string, value: string) => void; onImageSource: (value: string, kind: ImageEditKind) => void }) {
   const imageInputRef = useRef<HTMLInputElement>(null);
   const [imageBusy, setImageBusy] = useState(false);
   const [imageError, setImageError] = useState<string | null>(null);
@@ -1009,7 +1090,7 @@ function NodeInspector({ node, renderMetrics, projectId, productPresentation, th
   const isIcon = node.tagName === "svg" || node.type.toLowerCase().includes("icon");
   const imageKind: ImageEditKind = isIcon ? "icon" : node.tagName === "img" ? "content" : "background";
   const canReplaceImage = !node.insideProductSlot && (node.tagName === "img" || isIcon || !isText);
-  const guidance = productThumbnailGuidance(productPresentation, thumbRatioOverride);
+  const guidance = productThumbnailGuidance(productPresentation, thumbRatioOverride, productDisplay);
   const currentImageUrl = imageKind === "content" ? node.src : imageKind === "background" ? imageUrlFromCss(node.style.backgroundImage) : "";
   const [scaleX] = scaleParts(node.style.scale);
   const [imageX, imageY] = positionParts(node.style.objectPosition);
@@ -1081,6 +1162,7 @@ function NodeInspector({ node, renderMetrics, projectId, productPresentation, th
   }
 
   return <div className="inspector-fields">
+    {node.isProductSection ? <ProductDisplayFields value={productDisplay} onChange={onProductDisplay} /> : null}
     {node.isProductSection ? <div className="product-guidance"><span>상품 썸네일 권장 규격</span><b>{guidance.label}</b><dl><div><dt>비율</dt><dd>{guidance.ratio}</dd></div><div><dt>크기</dt><dd>{guidance.size}</dd></div></dl>{guidance.note ? <small>{guidance.note}</small> : null}<small>Cafe24 상품 이미지를 이 규격에 맞추면 가장 안정적으로 보입니다.</small></div> : null}
     {isText && <label><span>내용</span><textarea rows={node.tagName === "p" ? 5 : 3} value={node.text} onChange={(event) => onText(event.target.value)} /></label>}
     {(node.tagName === "a" || node.tagName === "button") && <label><span>링크</span><input type="text" value={node.href} onChange={(event) => onAttribute("href", event.target.value)} placeholder="/product/list.html" /></label>}
