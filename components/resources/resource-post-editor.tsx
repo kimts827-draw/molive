@@ -4,8 +4,15 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { ResourceNav } from "@/components/resources/resource-nav";
+import { readJsonOrThrow } from "@/lib/api/read-json";
 import { resourceBoard, type ResourceBoardKey } from "@/lib/resources/board";
-import { RESOURCE_IMAGE_ACCEPT } from "@/lib/resources/assets";
+import {
+  RESOURCE_ASSET_BUCKET,
+  RESOURCE_IMAGE_ACCEPT,
+  RESOURCE_IMAGE_MAX_BYTES,
+  resourceImageExtension,
+} from "@/lib/resources/assets";
+import { createClient } from "@/lib/supabase/client";
 import type { ResourcePost } from "@/lib/resources/service";
 import boardStyles from "./resource-board.module.css";
 import styles from "./resource-post-editor.module.css";
@@ -52,22 +59,42 @@ export function ResourcePostEditor({ board, post }: { board: ResourceBoardKey; p
     });
   }
 
+  /**
+   * 파일 본문은 서버 API를 거치지 않습니다. 관리자 인증 API에서 업로드 토큰만 받고
+   * 이미지는 브라우저에서 Storage로 직접 올립니다(Vercel 요청 본문 한도 우회).
+   */
   async function pickImage(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
 
+    if (!resourceImageExtension(file.type)) {
+      setError("PNG, JPG, WebP, AVIF 이미지만 업로드할 수 있습니다.");
+      return;
+    }
+    if (file.size > RESOURCE_IMAGE_MAX_BYTES) {
+      setError("이미지는 10MB 이하만 업로드할 수 있습니다.");
+      return;
+    }
+
     setError(null);
     setUploading(true);
     replaceLocalPreview(URL.createObjectURL(file));
     try {
-      const body = new FormData();
-      body.append("board", board);
-      body.append("file", file);
-      const response = await fetch("/api/resources/uploads", { method: "POST", body });
-      const result = await response.json() as { imageUrl?: string; error?: string };
-      if (!response.ok || !result.imageUrl) throw new Error(result.error ?? "이미지를 업로드하지 못했습니다.");
-      update("imageUrl", result.imageUrl);
+      const response = await fetch("/api/resources/uploads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ board, contentType: file.type, size: file.size }),
+      });
+      const ticket = await readJsonOrThrow<{ path: string; token: string; publicUrl: string }>(response, "이미지 업로드 주소를 발급받지 못했습니다.");
+
+      const { error: uploadError } = await createClient()
+        .storage
+        .from(RESOURCE_ASSET_BUCKET)
+        .uploadToSignedUrl(ticket.path, ticket.token, file, { contentType: file.type });
+      if (uploadError) throw new Error("이미지를 저장소에 업로드하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+
+      update("imageUrl", ticket.publicUrl);
       replaceLocalPreview(null);
     } catch (reason) {
       replaceLocalPreview(null);
@@ -105,9 +132,7 @@ export function ResourcePostEditor({ board, post }: { board: ResourceBoardKey; p
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload()),
       });
-      const result = await response.json() as { post?: ResourcePost; error?: string };
-      if (!response.ok) throw new Error(result.error ?? "게시글을 저장하지 못했습니다.");
-      const saved = result.post;
+      const saved = (await readJsonOrThrow<{ post?: ResourcePost }>(response, "게시글을 저장하지 못했습니다.")).post;
       router.push(isTemplate || !saved ? meta.href : `${meta.href}/${saved.id}`);
       router.refresh();
     } catch (reason) {
@@ -122,10 +147,7 @@ export function ResourcePostEditor({ board, post }: { board: ResourceBoardKey; p
     setError(null);
     try {
       const response = await fetch(`/api/resources/${board}/${post.id}`, { method: "DELETE" });
-      if (!response.ok) {
-        const result = await response.json() as { error?: string };
-        throw new Error(result.error ?? "게시글을 삭제하지 못했습니다.");
-      }
+      await readJsonOrThrow<{ deleted?: boolean }>(response, "게시글을 삭제하지 못했습니다.");
       router.push(meta.href);
       router.refresh();
     } catch (reason) {

@@ -5,6 +5,7 @@ import { RESOURCE_ADMIN_EMAIL, isResourceAdminEmail } from "../lib/auth/roles.ts
 import { RESOURCE_BOARDS, isResourceBoardKey, resourceBoard } from "../lib/resources/board.ts";
 import { resourcePostSchema } from "../lib/resources/schema.ts";
 import { RESOURCE_ASSET_BUCKET, buildResourceImagePath, resourceImageExtension } from "../lib/resources/assets.ts";
+import { readJsonOrThrow } from "../lib/api/read-json.ts";
 
 const migration = await readFile(new URL("../supabase/migrations/20260829090000_resource_posts.sql", import.meta.url), "utf8");
 const adminAuth = await readFile(new URL("../lib/admin/auth.ts", import.meta.url), "utf8");
@@ -115,12 +116,13 @@ test("대표 이미지는 내장 경로와 업로드 버킷 주소만 허용한�
 test("이미지 업로드 라우트는 관리자만 통과시키고 형식·용량을 제한한다", () => {
   assert.match(uploadRoute, /export async function POST/);
   assert.match(uploadRoute, /await requireResourceAdminApi\(\)/);
-  // 인증이 파일 파싱보다 먼저 실행되어야 한다.
-  assert.ok(uploadRoute.indexOf("requireResourceAdminApi") < uploadRoute.indexOf("request.formData()"));
+  // 인증이 요청 본문 파싱보다 먼저 실행되어야 한다.
+  assert.ok(uploadRoute.indexOf("requireResourceAdminApi") < uploadRoute.indexOf("request.json()"));
   assert.match(uploadRoute, /RESOURCE_IMAGE_MAX_BYTES/);
-  assert.match(uploadRoute, /resourceImageExtension\(file\.type\)/);
-  // 업로드는 service_role 클라이언트로만 수행한다(일반 사용자 세션으로는 쓰기 불가).
+  assert.match(uploadRoute, /resourceImageExtension\(input\.contentType\)/);
+  // 토큰 발급은 service_role 클라이언트로만 수행한다(일반 사용자는 발급받을 수 없다).
   assert.match(uploadRoute, /createAdminClient\(\)/);
+  assert.match(uploadRoute, /createSignedUploadUrl\(path\)/);
 
   assert.equal(resourceImageExtension("image/png"), "png");
   assert.equal(resourceImageExtension("image/svg+xml"), null);
@@ -142,6 +144,38 @@ test("관리자 이미지 필드는 파일 선택과 미리보기만 제공한�
   // 로컬 경로/임의 URL 직접 입력 UI는 제거한다.
   assert.doesNotMatch(postEditor, /update\("imageUrl", event\.target\.value\)/);
   assert.doesNotMatch(postEditor, /public 폴더 경로/);
+});
+
+test("이미지 파일은 서버 API를 거치지 않고 Storage로 직접 올린다", () => {
+  // 파일 본문을 Vercel Function으로 보내면 4.5MB 요청 한도에 걸린다.
+  assert.doesNotMatch(postEditor, /new FormData\(\)/);
+  assert.doesNotMatch(uploadRoute, /formData\(\)/);
+  assert.match(postEditor, /uploadToSignedUrl\(ticket\.path, ticket\.token, file/);
+  assert.match(postEditor, /RESOURCE_ASSET_BUCKET/);
+});
+
+test("API 응답은 JSON이 아니어도 파서 오류를 노출하지 않는다", async () => {
+  // 플랫폼이 라우트 실행 전에 끊는 413은 평문으로 온다.
+  const plain413 = new Response("Request Entity Too Large", { status: 413 });
+  await assert.rejects(
+    () => readJsonOrThrow(plain413, "이미지 업로드 주소를 발급받지 못했습니다."),
+    (error: Error) => {
+      assert.equal(error.message, "파일이 너무 커서 전송하지 못했습니다.");
+      assert.doesNotMatch(error.message, /Unexpected token/);
+      return true;
+    },
+  );
+
+  const htmlError = new Response("<html>502</html>", { status: 502 });
+  await assert.rejects(() => readJsonOrThrow(htmlError, "게시글을 저장하지 못했습니다."), /게시글을 저장하지 못했습니다\./);
+
+  const jsonError = new Response(JSON.stringify({ error: "권한이 없습니다." }), { status: 403 });
+  await assert.rejects(() => readJsonOrThrow(jsonError, "실패"), /권한이 없습니다\./);
+
+  // 본문이 비어 있어도 파서 오류가 아니라 안내 문구가 나온다.
+  await assert.rejects(() => readJsonOrThrow(new Response("", { status: 200 }), "응답이 비어 있습니다."), /응답이 비어 있습니다\./);
+
+  assert.deepEqual(await readJsonOrThrow(new Response(JSON.stringify({ post: { id: "x" } }), { status: 200 }), "실패"), { post: { id: "x" } });
 });
 
 test("공지사항·블로그·자료모음 게시글 스키마는 제목과 본문을 요구한다", () => {
