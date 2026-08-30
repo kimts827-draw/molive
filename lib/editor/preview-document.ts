@@ -8,6 +8,7 @@ import { renderProject, type RenderBundle } from "../component-library/index.ts"
 import type { ProjectDocument } from "../project-document.ts";
 import { isProjectSource } from "../project-source.ts";
 import { OVERFLOW_CLIP_CSS } from "./responsive-style.ts";
+import { buildStorefrontFontFaceCss } from "../fonts/storefront-fonts.ts";
 
 export type EditorPreviewDocument = {
   kind: "legacy" | "component-spec";
@@ -37,12 +38,13 @@ function componentSpecErrorDocument(error: unknown) {
 }
 
 export function buildEditorPreviewDocument(document: ProjectDocument): EditorPreviewDocument {
+  const fontFaces = buildStorefrontFontFaceCss("preview");
   if (!isProjectSource(document)) {
     try {
       const bundle = renderProject(document, "preview");
       return {
         kind: "component-spec",
-        srcDoc: htmlDocument(bundle.documentHtml, bundle.css),
+        srcDoc: htmlDocument(bundle.documentHtml, `${fontFaces}\n${bundle.css}`),
         bundle,
       };
     } catch (error) {
@@ -70,6 +72,6 @@ export function buildEditorPreviewDocument(document: ProjectDocument): EditorPre
   }
   return {
     kind: "legacy",
-    srcDoc: htmlDocument(body, `${buildBridgeCss(document.css)}\n${isolateAiDesignCss(document.css)}\n${commerce}[module="Layout_stateLogon"]{display:none}\n${verifiedProductLayoutCss(composition.productLayout, document.commerce?.thumbRatioOverride, { productDisplay: document.commerce?.productDisplay, target: "preview" })}\n${FOOTER_SHELL_CSS}\n${buildFooterThemeCss(document.css, footerBrandBackground(palette))}\n${brandTheme}\n${planLayout}`),
+    srcDoc: htmlDocument(body, `${fontFaces}\n${buildBridgeCss(document.css)}\n${isolateAiDesignCss(document.css)}\n${commerce}[module="Layout_stateLogon"]{display:none}\n${verifiedProductLayoutCss(composition.productLayout, document.commerce?.thumbRatioOverride, { productDisplay: document.commerce?.productDisplay, target: "preview" })}\n${FOOTER_SHELL_CSS}\n${buildFooterThemeCss(document.css, footerBrandBackground(palette))}\n${brandTheme}\n${planLayout}`),
   };
 }

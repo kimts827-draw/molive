@@ -14,6 +14,8 @@ import { THEME_ASSET_DIR } from "../lib/cafe24/theme-assets.ts";
 import { renderProject, structuralFingerprint } from "../lib/component-library/index.ts";
 import { projectSpecV1Schema, type ProjectSpecV1 } from "../lib/project-document.ts";
 import { createZip } from "../lib/zip.ts";
+import { buildStorefrontFontFaceCss } from "../lib/fonts/storefront-fonts.ts";
+import { collectStorefrontFontAssets } from "../lib/fonts/storefront-font-assets.ts";
 
 const fixtureUrl = (name: string) => new URL(`./fixtures/${name}`, import.meta.url);
 const spec = projectSpecV1Schema.parse(JSON.parse(await readFile(fixtureUrl("project-spec-v1-renderer.json"), "utf8")) as unknown);
@@ -29,6 +31,7 @@ async function collectGuideSkin() {
     }
   }
   await walk("");
+  for (const [path, data] of await collectStorefrontFontAssets()) files.set(path, data);
   return files;
 }
 
@@ -70,7 +73,8 @@ test("component-spec fixture로 실제 ZIP을 만들고 RenderBundle HTML/CSS를
 
   assert.equal(zip.readUInt32LE(0), 0x04034b50);
   assert.equal(zipText(files, POC_HEADER_PATH), cafe24.headerHtml);
-  assert.equal(zipText(files, POC_CSS_PATH), cafe24.css);
+  assert.equal(zipText(files, POC_CSS_PATH), `${buildStorefrontFontFaceCss("cafe24")}\n${cafe24.css}`);
+  assert.equal(files.get("fonts/storefront/pretendard/PretendardVariable.woff2")?.subarray(0, 4).toString("ascii"), "wOF2");
   const index = zipText(files, INDEX_PATH);
   const layoutDirective = `<!--@layout(/${POC_LAYOUT_PATH})-->\n`;
   assert.ok(index.startsWith(layoutDirective));

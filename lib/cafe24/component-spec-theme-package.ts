@@ -12,6 +12,7 @@ import {
   buildPocLayout,
 } from "./poc/theme-poc.ts";
 import { isServerManagedSkinFile } from "./theme-template.ts";
+import { buildStorefrontFontFaceCss } from "../fonts/storefront-fonts.ts";
 
 type PackagedAssets = {
   files: Map<string, Buffer>;
@@ -39,7 +40,7 @@ export function buildComponentSpecThemeEntries(
   const mapping = assets?.mapping ?? new Map<string, string>();
   const documentHtml = rewriteAssetUrls(bundle.documentHtml, mapping);
   const headerHtml = rewriteAssetUrls(bundle.headerHtml, mapping);
-  const css = rewriteAssetUrls(bundle.css, mapping);
+  const css = `${buildStorefrontFontFaceCss("cafe24")}\n${rewriteAssetUrls(bundle.css, mapping)}`;
   const bodyHtml = documentBody(documentHtml, headerHtml);
 
   const files = new Map<string, Buffer>(base);

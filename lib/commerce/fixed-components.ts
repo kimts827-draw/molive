@@ -8,6 +8,7 @@ import { renderComponent } from "../component-library/renderer.ts";
 import { cardQuickActionCss, DEFAULT_PRODUCT_DISPLAY, PRODUCT_SCOPE, productDisplayCss, resolveProductDisplay, type ProductDisplayId } from "./product-display.ts";
 import type { PreviewProductMock } from "../component-library/preview-mock.ts";
 import type { ProjectHeaderPresentation } from "../project-source.ts";
+import { STOREFRONT_FONT_FAMILY_SET } from "../fonts/storefront-fonts.ts";
 
 export type CommerceVariant = "minimal" | "editorial" | "bold";
 /** Cafe24 기본 스킨 상단 레이아웃(reference/cafe24-headers Top1~5)에 대응하는 배치 variant입니다. */
@@ -138,10 +139,12 @@ function safeHeaderHref(value: string | undefined) {
 
 const HEADER_LOGO_FONTS = new Set([
   "inherit",
+  // 저장된 기존 프로젝트의 로고 스타일은 그대로 복원합니다.
   "Arial, sans-serif",
   "Pretendard, Arial, sans-serif",
   "Georgia, serif",
   "monospace",
+  ...STOREFRONT_FONT_FAMILY_SET,
 ]);
 
 function safeHeaderLogoFont(value: string | undefined) {

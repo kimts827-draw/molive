@@ -30,6 +30,8 @@ import {
   SUB_LAYOUT_PATHS,
 } from "@/lib/cafe24/theme-template";
 import type { ZipEntry } from "@/lib/zip";
+import { buildStorefrontFontFaceCss } from "@/lib/fonts/storefront-fonts";
+import { collectStorefrontFontAssets } from "@/lib/fonts/storefront-font-assets";
 
 export const THEME_BASE_DIR = "Guide/skin4";
 export const COMMERCE_CSS_PATH = "css/moire-commerce.css";
@@ -77,6 +79,8 @@ export async function collectBaseSkin(baseDir: string) {
     }
   }
   await walk("");
+  // Preview가 public에서 읽는 바로 그 파일을 Cafe24 ZIP에도 복사합니다.
+  for (const [path, data] of await collectStorefrontFontAssets()) files.set(path, data);
   return files;
 }
 
@@ -97,7 +101,7 @@ function buildLegacyThemeEntries(base: Map<string, Buffer>, source: ProjectSourc
   const composition = resolveLegacyComposition(source.architecture);
   // 상품 전시 토큰은 Preview와 같은 값을 씁니다. 슬라이드일 때만 Swiper init을 테마에 싣습니다.
   const productSlide = productDisplayOf(source.commerce?.productDisplay).mode === "slide" && source.commerce?.productDisplay !== undefined;
-  const themeCss = isolateAiDesignCss(rawThemeCss);
+  const themeCss = `${buildStorefrontFontFaceCss("cafe24")}\n${isolateAiDesignCss(rawThemeCss)}`;
   const palette = resolveProjectPalette(source);
   const protectedCss = `${commerceCss(source.commerce, composition.headerVariant)}\n${headerTextToneCss(source.headerTextTone ?? "dark")}${source.headerPresentation ? `\n${headerPresentationCss(source.headerPresentation)}` : ""}\n${verifiedProductLayoutCss(composition.productLayout, source.commerce?.thumbRatioOverride, { productDisplay: source.commerce?.productDisplay, target: "cafe24" })}\n${buildFooterThemeCss(rawThemeCss, footerBrandBackground(palette))}\n${brandThemeCss(palette, { radius: source.commerce?.radius })}\n${planLayoutCss(source.pagePlan)}
 ${buildSubpageSurfaceCss()}`;

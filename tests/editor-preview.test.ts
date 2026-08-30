@@ -12,6 +12,7 @@ import { buildEditorPreviewDocument } from "../lib/editor/preview-document.ts";
 import { OVERFLOW_CLIP_CSS } from "../lib/editor/responsive-style.ts";
 import { projectSpecV1Schema, type ProjectSpecV1 } from "../lib/project-document.ts";
 import { isProjectSource, type ProjectSource } from "../lib/project-source.ts";
+import { buildStorefrontFontFaceCss } from "../lib/fonts/storefront-fonts.ts";
 
 const fixtureUrl = (name: string) => new URL(`./fixtures/${name}`, import.meta.url);
 const spec = projectSpecV1Schema.parse(JSON.parse(await readFile(fixtureUrl("project-spec-v1-renderer.json"), "utf8")) as unknown);
@@ -45,7 +46,7 @@ test("component-spec Preview는 renderProject(spec, preview) RenderBundle을 그
 
   assert.equal(preview.kind, "component-spec");
   assert.deepEqual(preview.bundle, bundle);
-  assert.equal(preview.srcDoc, expectedDocument(bundle.documentHtml, bundle.css));
+  assert.equal(preview.srcDoc, expectedDocument(bundle.documentHtml, `${buildStorefrontFontFaceCss("preview")}\n${bundle.css}`));
 });
 
 test("Editor Preview는 표시 영역과 무관하게 preset별 실제 browser layout viewport를 유지한다", () => {
@@ -171,7 +172,7 @@ test("Legacy ProjectSource Preview 출력은 기존 HTML/CSS 직접 렌더링을
   const verifiedProductCss = verifiedProductLayoutCss(composition.productLayout);
   const rootValue = "moire-legacy-preview";
   const shell = `<div id="wrap" data-moire-root="${rootValue}">${renderProjectHeaderV1("preview", legacySource)}<div id="container"><main id="contents" role="main" data-moire-full="true">${legacyCommerce.html}</main></div>${renderFooterShell("preview")}</div>`;
-  const css = `${buildBridgeCss(legacySource.css)}\n${isolateAiDesignCss(legacySource.css)}\n${commerceCss(legacySource.commerce, composition.headerVariant)}\n${headerTextToneCss("dark")}[module="Layout_stateLogon"]{display:none}\n${verifiedProductCss}\n${FOOTER_SHELL_CSS}\n${buildFooterThemeCss(legacySource.css, footerBrandBackground(resolveProjectPalette(legacySource)))}\n${brandThemeCss(resolveProjectPalette(legacySource), { radius: legacySource.commerce?.radius })}\n${planLayoutCss(projectPagePlan(legacySource))}`;
+  const css = `${buildStorefrontFontFaceCss("preview")}\n${buildBridgeCss(legacySource.css)}\n${isolateAiDesignCss(legacySource.css)}\n${commerceCss(legacySource.commerce, composition.headerVariant)}\n${headerTextToneCss("dark")}[module="Layout_stateLogon"]{display:none}\n${verifiedProductCss}\n${FOOTER_SHELL_CSS}\n${buildFooterThemeCss(legacySource.css, footerBrandBackground(resolveProjectPalette(legacySource)))}\n${brandThemeCss(resolveProjectPalette(legacySource), { radius: legacySource.commerce?.radius })}\n${planLayoutCss(projectPagePlan(legacySource))}`;
 
   assert.equal(preview.kind, "legacy");
   assert.equal(preview.bundle, undefined);

@@ -19,6 +19,7 @@ import { OpenAIUsageRecordingError, runRecordedOpenAICall } from "@/lib/openai/r
 import { classifyAiEditIntent } from "@/lib/editor/ai-edit-intent";
 import { newSectionPreset, renderNewSectionContract, type NewSectionPreset } from "@/lib/editor/new-section";
 import type { ProjectSource } from "@/lib/project-source";
+import { STOREFRONT_FONT_FAMILY_VALUES, storefrontFontPrompt } from "@/lib/fonts/storefront-fonts";
 
 const architectureSchema = z.object({
   header: z.enum(["split-utility", "centered-brand", "overlay-minimal", "logo-center-row", "stacked-left", "stacked-split"]),
@@ -37,7 +38,7 @@ const commerceSchema = z.object({
   surface: z.string().min(3),
   accent: z.string().min(3),
   border: z.string().min(3),
-  fontFamily: z.string().min(3),
+  fontFamily: z.enum(STOREFRONT_FONT_FAMILY_VALUES),
   columns: z.union([z.literal(3), z.literal(4)]),
   gap: z.string().min(1),
   radius: z.string().min(1),
@@ -85,7 +86,7 @@ const commerceJsonSchema = {
   properties: {
     variant: { type: "string", enum: ["minimal", "editorial", "bold"] },
     ink: { type: "string" }, muted: { type: "string" }, surface: { type: "string" }, accent: { type: "string" }, border: { type: "string" },
-    fontFamily: { type: "string" }, columns: { type: "integer", enum: [3, 4] }, gap: { type: "string" }, radius: { type: "string" },
+    fontFamily: { type: "string", enum: [...STOREFRONT_FONT_FAMILY_VALUES] }, columns: { type: "integer", enum: [3, 4] }, gap: { type: "string" }, radius: { type: "string" },
     thumbRatio: { type: "string" }, thumbFit: { type: "string", enum: ["contain", "cover"] }, thumbBackground: { type: "string" },
   },
 } as const;
@@ -119,6 +120,8 @@ const nodeEditJsonSchema = {
   properties: { summary: { type: "string" }, nodeHtml: { type: "string" }, nodeCss: { type: "string" } },
 } as const;
 
+const fontPoolPrompt = storefrontFontPrompt();
+
 const systemPrompt = `You are the autonomous art director and frontend designer for a Korean Cafe24 storefront.
 
 Your primary output is the ACTUAL semantic HTML and CSS that will be stored, previewed, edited, and published. There is no section AST, component renderer, template, or predetermined page skeleton after your response. The architecture summary is audit metadata only and never renders the page.
@@ -147,6 +150,8 @@ REFERENCE-DERIVED DESIGN GRAMMAR
 - Code also declares the brand palette as --molive-brand, --molive-brand-strong, --molive-brand-tint, --molive-brand-soft and --molive-brand-on on the page root, and paints any section the plan marked as accent tone. Reach for those variables instead of literal hex values, and give the brand colour real area — a band background, a filled CTA, a card ground — not just a hairline or an icon.
 - Avoid a page whose hero is polished but everything below becomes repeated equal cards. Alternate composition, scale, image/text relationships, and background rhythm while keeping one coherent design language.
 - Before writing HTML, commit to headerVariant, heroComposition, productLayout, section order/selection, typography scale, image treatment, spacing/density, and content composition. Do not return vague labels such as modern, premium, or clean by themselves.
+- Choose commerce.fontFamily from the exact self-hosted font stacks below. Use that exact stack in root body typography unless a deliberate heading/body contrast calls for one other stack from the same pool. Match the recorded moods to the merchant brief; display faces are for short headings, not long body copy. Never name an unlisted font and never use an external font URL.
+${fontPoolPrompt}
 - Encode the deterministic choices in the existing architecture object exactly: header = split-utility | centered-brand | overlay-minimal | logo-center-row | stacked-left | stacked-split, hero = the composition's hero variant id (full-bleed | split-editorial | banner-stack | typographic-marquee | cinematic-still | product-forward), productPresentation = the composition's presentation id (grid-four | large-grid | editorial-two | featured-grid | compact-five). architecture.sections must record the composition's sections in order as "type/variant — 헤딩".
 - A materially different brief must produce visibly different decisions across those six axes, not a recoloured copy of the same page.
 - Keep decoration subordinate to product discovery and purchase flow. Use effects sparingly and preserve scanability, readable contrast, and obvious actions.
@@ -175,7 +180,7 @@ EDITABILITY AND SAFETY
 - Every footer, section, h1-h6, p, img, a, and button must have a unique data-moire-id and a useful data-moire-type such as hero, section, text, image, button, products, or footer.
 - Use only static HTML. No script, iframe, object, embed, form, input, select, textarea, inline event handler, style tag, link tag, or meta tag.
 - Scope every CSS selector, including every selector in a comma group and media query, under the exact HTML root selector [data-moire-root="..."] so it cannot affect Cafe24 commerce outside the project.
-- Do not use @import. Prefer system font stacks. Do not use CSS keyframes.
+- Do not use @import. Use only the self-hosted font stacks listed above. Do not use CSS keyframes.
 - Do not fabricate reviews, customer logos, awards, certifications, sales numbers, or performance claims.
 - Do not use !important. Do not draw border-bottom on the Hero or border-top on the following major section; transition with background, overlap, or spacing instead.
 
