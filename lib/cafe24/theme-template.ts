@@ -311,6 +311,15 @@ function applyGlobalRoot(layout: string, rootValue: string | null) {
   return layout.replace('<div id="wrap">', `<div id="wrap" data-moire-root="${rootValue}">`);
 }
 
+/**
+ * 이 레이아웃이 홈인지 Cafe24 세부 페이지인지 #wrap에 표시합니다.
+ * 세부 페이지의 본문 지면을 밝게 고정하는 CSS가 이 표식 하나만 보고 갈립니다.
+ */
+function markPageKind(layout: string, kind: "home" | "sub") {
+  if (layout.includes("data-moire-page")) return layout;
+  return layout.replace(/<div id="wrap"([^>]*)>/, (_match, attributes: string) => `<div id="wrap"${attributes} data-moire-page="${kind}">`);
+}
+
 function replaceCafe24Header(layout: string, replacement: string) {
   const headerStart = layout.indexOf('<header id="header">');
   if (headerStart < 0) return layout;
@@ -325,6 +334,7 @@ function replaceCafe24Header(layout: string, replacement: string) {
 export function buildMoireLayout(mainHtml: string, options: { rootValue?: string | null; hasMoireHeader?: boolean; productSlide?: boolean } = {}) {
   let layout = injectMoireCss(mainHtml, { productSlide: options.productSlide });
   layout = applyGlobalRoot(layout, options.rootValue ?? null);
+  layout = markPageKind(layout, "home");
   layout = replaceCafe24Header(layout, options.hasMoireHeader ? `<!--@import(/${MOIRE_HEADER_PATH})-->\n` : "");
   // 홈은 Preview와 같은 full-width로 그립니다. Cafe24의 #contents/.inner 폭 제한은 이 표식으로 해제합니다.
   layout = layout.replace('<main id="contents" role="main">', '<main id="contents" role="main" data-moire-full="true">');
@@ -337,6 +347,7 @@ export function buildMoireLayout(mainHtml: string, options: { rootValue?: string
 export function buildSubLayout(layoutHtml: string, options: { rootValue?: string | null; hasMoireHeader?: boolean } = {}) {
   let layout = injectMoireCss(layoutHtml);
   layout = applyGlobalRoot(layout, options.rootValue ?? null);
+  layout = markPageKind(layout, "sub");
   if (options.hasMoireHeader) layout = replaceCafe24Header(layout, `<!--@import(/${MOIRE_HEADER_PATH})-->\n`);
   return layout.replace(/\n{3,}/g, "\n\n");
 }

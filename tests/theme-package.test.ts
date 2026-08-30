@@ -22,7 +22,7 @@ import {
   SUB_LAYOUT_PATHS,
 } from "../lib/cafe24/theme-template.ts";
 import { assetFileName, collectAssetUrls, rewriteAssetUrls, themeAssetHref } from "../lib/cafe24/theme-assets.ts";
-import { buildBridgeCss, buildFooterThemeCss, resolveFooterBackground, resolveFooterInk, resolveFooterPalette } from "../lib/cafe24/theme-bridge.ts";
+import { buildBridgeCss, buildFooterThemeCss, buildSubpageSurfaceCss, resolveFooterBackground, resolveFooterInk, resolveFooterPalette } from "../lib/cafe24/theme-bridge.ts";
 import { createZip } from "../lib/zip.ts";
 import { PRODUCT_SECTION_V1_CSS } from "../lib/component-library/components/product-section-v1.ts";
 
@@ -103,7 +103,7 @@ test("홈 레이아웃은 MOLIVE 헤더를 import하고 Cafe24 푸터를 유지�
   const layout = buildMoireLayout(guideLayout, { rootValue: "atelier", hasMoireHeader: true });
   assert.ok(layout.includes(`<!--@css(/${MOIRE_CSS_PATH})-->`));
   assert.ok(layout.includes(`<!--@import(/${MOIRE_HEADER_PATH})-->`));
-  assert.ok(layout.includes('<div id="wrap" data-moire-root="atelier">'));
+  assert.ok(layout.includes('<div id="wrap" data-moire-root="atelier" data-moire-page="home">'));
   assert.ok(!layout.includes('<header id="header">'));
   assert.ok(layout.includes("/layout/basic/footer.html"));
   assert.ok(layout.includes("<!--@contents-->"));
@@ -112,7 +112,7 @@ test("홈 레이아웃은 MOLIVE 헤더를 import하고 Cafe24 푸터를 유지�
 test("서브 레이아웃은 Cafe24 기능을 유지한 채 테마만 연결한다", () => {
   const layout = buildSubLayout(guideSubLayout, { rootValue: "atelier", hasMoireHeader: true });
   assert.ok(layout.includes(`<!--@css(/${MOIRE_CSS_PATH})-->`));
-  assert.ok(layout.includes('<div id="wrap" data-moire-root="atelier">'));
+  assert.ok(layout.includes('<div id="wrap" data-moire-root="atelier" data-moire-page="sub">'));
   assert.ok(layout.includes(`<!--@import(/${MOIRE_HEADER_PATH})-->`));
   assert.ok(layout.includes("/layout/basic/footer.html"));
   assert.ok(layout.includes("/layout/basic/css/common.css"));
@@ -169,7 +169,7 @@ test("네비·계정 바인딩이 없으면 서브 레이아웃의 Cafe24 헤더
   assert.ok(layout.includes('<header id="header">'));
   assert.ok(layout.includes("/layout/basic/state_login.html"));
   assert.ok(layout.includes(`<!--@css(/${MOIRE_CSS_PATH})-->`));
-  assert.ok(layout.includes('<div id="wrap" data-moire-root="atelier">'));
+  assert.ok(layout.includes('<div id="wrap" data-moire-root="atelier" data-moire-page="sub">'));
 });
 
 test("어두운 테마 배경이면 밝은 푸터 글씨를 고른다", () => {
@@ -384,7 +384,7 @@ test("Cafe24 변수는 module 블록 안에서만 치환되므로 몰 이름·�
 
 test("흰 줄 방지와 헤더 정렬 규칙이 브리지에 들어간다", () => {
   const bridge = buildBridgeCss('[data-moire-root="a"]{background:#111}');
-  assert.ok(bridge.includes("[data-moire-root] #container,[data-moire-root] #contents"));
+  assert.ok(bridge.includes('[data-moire-root]:not([data-moire-page="sub"]) #container,[data-moire-root]:not([data-moire-page="sub"]) #contents'));
   assert.ok(bridge.includes("[data-moire-root] hr.layout,[data-moire-root] hr{display:none}"));
   assert.ok(bridge.includes("[data-moire-root] [data-cafe24-bind]{display:inline-flex"));
   assert.ok(bridge.includes('[data-moire-root] [data-cafe24-bind] ul{display:inline-flex'));
@@ -415,9 +415,21 @@ test("bridge는 verified 상품 카드에 layout 규칙을 적용하지 않는�
   assert.ok(!/\[data-moire-root\].*\.prdList/.test(bridge));
 });
 
-test("서브 페이지 본문 글자색이 테마를 따른다", () => {
+test("홈 본문 글자색만 테마를 따르고 세부 페이지는 Cafe24 색을 지킨다", () => {
   const bridge = buildBridgeCss('[data-moire-root="a"]{background:#111}');
-  assert.ok(bridge.includes("[data-moire-root] a{color:inherit}"));
-  assert.ok(bridge.includes("[data-moire-root] h1,"));
-  assert.ok(bridge.includes("[data-moire-root] td,"));
+  assert.ok(bridge.includes('[data-moire-root]:not([data-moire-page="sub"]) a{color:inherit}'));
+  assert.ok(bridge.includes('[data-moire-root]:not([data-moire-page="sub"]) h1,'));
+  assert.ok(bridge.includes('[data-moire-root]:not([data-moire-page="sub"]) td,'));
+  // 세부 페이지에는 색 상속 blanket이 한 줄도 걸리지 않습니다.
+  assert.equal(bridge.includes("[data-moire-root] a{color:inherit}"), false);
+  assert.equal(bridge.includes("[data-moire-root] h1,"), false);
+});
+
+test("세부 페이지 본문은 밝은 지면으로 고정되고 브랜드 색은 accent로만 남는다", () => {
+  const css = buildSubpageSurfaceCss();
+  assert.ok(css.includes('[data-moire-root][data-moire-page="sub"] #container{background-color:#ffffff'));
+  assert.ok(css.includes("color:#1b1a17"));
+  assert.ok(css.includes('[data-moire-root][data-moire-page="sub"] #container [class^="btnSubmit"]{background-color:var(--molive-brand,#000000)'));
+  // 세부 페이지 본문 글자를 흰색으로 덮는 규칙은 만들지 않습니다.
+  assert.equal(/color:\s*(#fff|#ffffff|white)/i.test(css.replace(/--molive-brand-on,#ffffff/g, "")), false);
 });

@@ -140,6 +140,42 @@ export function buildFooterThemeCss(css: string, brandBackground?: string | null
 }
 
 /**
+ * 홈 전용 스코프입니다.
+ * 세부 페이지(#wrap[data-moire-page="sub"])는 밝은 본문 지면을 쓰므로,
+ * 어두운 테마 색을 Cafe24 본문에 상속시키는 규칙은 홈에서만 걸립니다.
+ */
+const HOME = '[data-moire-root]:not([data-moire-page="sub"])';
+
+/** 세부 페이지 본문 지면 스코프입니다. buildSubLayout이 #wrap에 건 표식 하나로만 갈립니다. */
+const SUB = '[data-moire-root][data-moire-page="sub"]';
+
+/**
+ * Cafe24 세부 페이지(상품 목록·상세·장바구니·주문·마이페이지·회원·게시판)의 본문 지면 계약입니다.
+ *
+ * 브랜드 테마가 dark일 때 `[data-moire-root]:not([data-moire-static])`(=#wrap)의 배경이
+ * 세부 페이지 전체를 덮어 Cafe24 기본 black/gray 텍스트가 읽히지 않았습니다.
+ * 텍스트 색을 하나씩 고치는 대신, 헤더·푸터는 브랜드 면으로 두고 #container 한 겹만
+ * 밝은 지면으로 고정합니다. 그 위에서 Cafe24 기본 색이 그대로 제 대비를 냅니다.
+ *
+ * moire-commerce.css(마지막 스타일시트)에 실려 bridge의 투명 배경 규칙을 이깁니다.
+ * 브랜드 색은 버튼·active·링크 hover의 accent로만 남습니다.
+ */
+export function buildSubpageSurfaceCss(options: { canvas?: string; ink?: string } = {}) {
+  const canvas = options.canvas ?? "#ffffff";
+  const ink = options.ink ?? DARK_INK;
+  return `/* Moiré subpage content canvas. Header/Footer는 브랜드 면을 유지하고 본문만 밝은 지면으로 고정합니다. */
+${SUB} #container{background-color:${canvas};color:${ink};padding-top:clamp(16px,2.2vw,36px)}
+${SUB} #contents,${SUB} #contents .inner{background-color:transparent}
+/* overlay 헤더는 홈 Hero 위에 겹치라고 만든 것이라, 밝은 본문 지면 위에서는 흐름 안으로 되돌립니다. */
+${SUB} #header.pocHeader--overlay-minimal{position:relative;inset:auto}
+${SUB} .moireAnnouncementBar + #header.pocHeader--overlay-minimal{top:auto}
+/* 브랜드 색은 본문에서 accent로만 씁니다. 변수가 없는 프로젝트는 Cafe24 기본값으로 되돌아갑니다. */
+${SUB} #container [class^="btnSubmit"]{background-color:var(--molive-brand,#000000);border-color:var(--molive-brand,#000000);color:var(--molive-brand-on,#ffffff)}
+${SUB} #container .ec-base-tab .menu li.selected a{color:var(--molive-brand,#000000)}
+${SUB} #container a:hover{color:var(--molive-brand,${ink})}`;
+}
+
+/**
  * Cafe24 모듈 마크업을 MOLIVE 디자인에 맞추는 브리지 CSS입니다.
  * moire.css보다 먼저 실려서 Cafe24 기본값은 이기고 AI 디자인에는 양보합니다.
  * 색은 대부분 상속으로 넘겨 섹션 배경/톤이 그대로 유지됩니다.
@@ -151,15 +187,15 @@ export function buildBridgeCss(css: string) {
 
 /* verified ProductSection은 자체 Guide CSS만 사용합니다. bridge는 카드 내부 layout을 소유하지 않습니다. */
 
-/* 서브 페이지 본문도 테마 색을 따르게 합니다. Cafe24가 요소마다 박아둔 색이 어두운 배경 위에서 안 보이는 문제를 막습니다. */
-[data-moire-root] h1,[data-moire-root] h2,[data-moire-root] h3,[data-moire-root] h4,[data-moire-root] h5,[data-moire-root] h6,
-[data-moire-root] p,[data-moire-root] li,[data-moire-root] dt,[data-moire-root] dd,[data-moire-root] th,[data-moire-root] td,
-[data-moire-root] span,[data-moire-root] strong,[data-moire-root] em,[data-moire-root] label,[data-moire-root] legend,
-[data-moire-root] caption,[data-moire-root] figcaption,[data-moire-root] address,[data-moire-root] a{color:inherit}
-[data-moire-root] #container,[data-moire-root] #contents{color:inherit}
+/* 홈 본문에 꽂힌 Cafe24 요소만 테마 색을 따르게 합니다. 세부 페이지는 밝은 지면 위에서 Cafe24 원래 색을 그대로 씁니다. */
+${HOME} h1,${HOME} h2,${HOME} h3,${HOME} h4,${HOME} h5,${HOME} h6,
+${HOME} p,${HOME} li,${HOME} dt,${HOME} dd,${HOME} th,${HOME} td,
+${HOME} span,${HOME} strong,${HOME} em,${HOME} label,${HOME} legend,
+${HOME} caption,${HOME} figcaption,${HOME} address,${HOME} a{color:inherit}
+${HOME} #container,${HOME} #contents{color:inherit}
 
-[data-moire-root] .ec-base-product,[data-moire-root] .productItem,[data-moire-root] .xans-product-listmain{background:transparent;color:inherit;border:0}
-[data-moire-root] .mainTitle,[data-moire-root] .mainTitle h2,[data-moire-root] .mainTitle h2 span{color:inherit;background:transparent}
+${HOME} .ec-base-product,${HOME} .productItem,${HOME} .xans-product-listmain{background:transparent;color:inherit;border:0}
+${HOME} .mainTitle,${HOME} .mainTitle h2,${HOME} .mainTitle h2 span{color:inherit;background:transparent}
 
 [data-moire-root] #header .topArea,[data-moire-root] .topArea__statelogon,[data-moire-root] .navigation,[data-moire-root] .navigation__util,[data-moire-root] .navigation__category{display:flex;align-items:center;gap:var(--moire-header-gap)}
 [data-moire-root] .topArea__statelogon ul,[data-moire-root] .navigation ul,[data-moire-root] .navigation__util ul{display:flex;align-items:center;gap:var(--moire-header-gap);margin:0;padding:0;list-style:none}
@@ -170,8 +206,8 @@ export function buildBridgeCss(css: string) {
 /* 홈은 Preview와 같은 full-width. Cafe24의 #contents/.inner 폭 제한을 해제합니다. */
 [data-moire-root] main#contents[data-moire-full]{max-width:none;margin:0;padding:0}
 
-/* Cafe24의 흰 #container/#contents 배경이 어두운 섹션 사이로 비쳐 흰 줄이 보이는 것을 막습니다. */
-[data-moire-root] #container,[data-moire-root] #contents,[data-moire-root] #contents .inner{background:transparent}
+/* 홈에서 Cafe24의 흰 #container/#contents 배경이 어두운 섹션 사이로 비쳐 흰 줄이 보이는 것을 막습니다. */
+${HOME} #container,${HOME} #contents,${HOME} #contents .inner{background:transparent}
 [data-moire-root] hr.layout,[data-moire-root] hr{display:none}
 
 /* 헤더에 꽂힌 Cafe24 요소는 아이콘과 글자가 한 줄로 붙게 합니다. */

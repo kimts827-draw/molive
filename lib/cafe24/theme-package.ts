@@ -6,7 +6,7 @@ import { isProjectSource, type ProjectSource } from "@/lib/project-source";
 import { prepareProjectPatch } from "@/lib/cafe24/protection";
 import { buildComponentSpecThemeEntries } from "@/lib/cafe24/component-spec-theme-package";
 import { assetFileName, rewriteAssetUrls, THEME_ASSET_DIR } from "@/lib/cafe24/theme-assets";
-import { buildBridgeCss, buildFooterThemeCss, resolveFooterInk } from "@/lib/cafe24/theme-bridge";
+import { buildBridgeCss, buildFooterThemeCss, buildSubpageSurfaceCss, resolveFooterInk } from "@/lib/cafe24/theme-bridge";
 import { commerceCss, composeCommerce, headerPresentationCss, headerTextToneCss, isolateAiDesignCss, renderProjectHeaderV1, resolveLegacyComposition, verifiedProductLayoutCss } from "@/lib/commerce/fixed-components";
 import { brandThemeCss, footerBrandBackground, resolveProjectPalette } from "@/lib/commerce/brand-theme";
 import { productDisplayOf } from "@/lib/commerce/product-display";
@@ -99,7 +99,8 @@ function buildLegacyThemeEntries(base: Map<string, Buffer>, source: ProjectSourc
   const productSlide = productDisplayOf(source.commerce?.productDisplay).mode === "slide" && source.commerce?.productDisplay !== undefined;
   const themeCss = isolateAiDesignCss(rawThemeCss);
   const palette = resolveProjectPalette(source);
-  const protectedCss = `${commerceCss(source.commerce, composition.headerVariant)}\n${headerTextToneCss(source.headerTextTone ?? "dark")}${source.headerPresentation ? `\n${headerPresentationCss(source.headerPresentation)}` : ""}\n${verifiedProductLayoutCss(composition.productLayout, source.commerce?.thumbRatioOverride, { productDisplay: source.commerce?.productDisplay, target: "cafe24" })}\n${buildFooterThemeCss(rawThemeCss, footerBrandBackground(palette))}\n${brandThemeCss(palette, { radius: source.commerce?.radius })}\n${planLayoutCss(source.pagePlan)}`;
+  const protectedCss = `${commerceCss(source.commerce, composition.headerVariant)}\n${headerTextToneCss(source.headerTextTone ?? "dark")}${source.headerPresentation ? `\n${headerPresentationCss(source.headerPresentation)}` : ""}\n${verifiedProductLayoutCss(composition.productLayout, source.commerce?.thumbRatioOverride, { productDisplay: source.commerce?.productDisplay, target: "cafe24" })}\n${buildFooterThemeCss(rawThemeCss, footerBrandBackground(palette))}\n${brandThemeCss(palette, { radius: source.commerce?.radius })}\n${planLayoutCss(source.pagePlan)}
+${buildSubpageSurfaceCss()}`;
 
   // 고정 커머스 컴포넌트를 씁니다. 상품 슬롯이 없으면 Guide module로 물러나지 않고 실패합니다.
   const composed = composeCommerce(themeHtml, "cafe24", source.commerce, composition, { includeHeader: false });
