@@ -9,7 +9,7 @@ import {
   productDisplayOf,
   resolveProductDisplay,
 } from "../lib/commerce/product-display.ts";
-import { renderProductSectionV1 } from "../lib/component-library/components/product-section-v1.ts";
+import { PRODUCT_SECTION_V1_CSS, renderProductSectionV1 } from "../lib/component-library/components/product-section-v1.ts";
 import { renderComponent } from "../lib/component-library/index.ts";
 import { composeCommerce, verifiedProductLayoutCss } from "../lib/commerce/fixed-components.ts";
 import { PRODUCT_SLIDE_SCRIPT, PRODUCT_SLIDE_SCRIPT_PATH } from "../lib/cafe24/product-slide-script.ts";
@@ -115,6 +115,75 @@ test("그리드 열 수는 Cafe24 reference 값을 그대로 쓴다", () => {
       const css = productDisplayCss(id);
       assert.ok(css.includes(`.prdList > li{width:${row.pc}}`), id);
       assert.ok(css.includes(`@media all and (max-width:1024px){[data-moire-root] [data-cafe24-slot] .moireProductSection.ec-base-product .prdList > li{width:${row.under1024}}}`), id);
+    }
+  }
+});
+
+const QUICK_ACTION_HIDDEN = ".prdList .icon__box{position:absolute;top:45%;right:0;left:0;z-index:3;display:flex;flex-direction:row;align-items:center;justify-content:center;gap:0;opacity:0;pointer-events:none;transition:all 0.3s}";
+const QUICK_ACTION_HOVER = ".prdList > li:hover .icon__box{opacity:1;pointer-events:auto}";
+const QUICK_ACTION_MOBILE = "@media all and (max-width:1024px){[data-moire-root] [data-cafe24-slot] .moireProductSection.ec-base-product .prdList .icon__box{display:none}}";
+
+function assertQuickAction(css: string, label: string) {
+  assert.ok(css.includes(QUICK_ACTION_HIDDEN), `${label} / 평상시 숨김`);
+  assert.ok(css.includes(QUICK_ACTION_HOVER), `${label} / hover 노출`);
+  assert.ok(css.includes("min-width:72px"), `${label} / pill`);
+  assert.ok(css.includes(QUICK_ACTION_MOBILE), `${label} / 1024 이하 숨김`);
+  assert.ok(css.includes(".prdList .thumbnail .badge{display:none}"), `${label} / badge`);
+}
+
+test("퀵액션은 전시 선택과 무관한 카드 공통 동작으로 실린다", () => {
+  // 전시를 고르지 않은 기존/default 프로젝트
+  assertQuickAction(verifiedProductLayoutCss(), "default");
+  assertQuickAction(verifiedProductLayoutCss("grid-four"), "grid-four");
+  for (const layout of ["large-grid", "editorial-two", "featured-grid", "compact-five"] as const) {
+    assertQuickAction(verifiedProductLayoutCss(layout), layout);
+  }
+  // 전시를 고른 12종
+  for (const id of PRODUCT_DISPLAY_IDS) {
+    for (const target of ["preview", "cafe24"] as const) {
+      assertQuickAction(verifiedProductLayoutCss("grid-four", undefined, { productDisplay: id, target }), `${id}/${target}`);
+    }
+  }
+});
+
+test("퀵액션 CSS는 어느 경로에서도 한 번만 실린다", () => {
+  const paths = [
+    verifiedProductLayoutCss(),
+    verifiedProductLayoutCss("featured-grid"),
+    ...PRODUCT_DISPLAY_IDS.map((id) => verifiedProductLayoutCss("grid-four", undefined, { productDisplay: id, target: "cafe24" })),
+  ];
+  for (const css of paths) {
+    assert.equal(css.split(QUICK_ACTION_HIDDEN).length - 1, 1);
+    assert.equal(css.split(QUICK_ACTION_HOVER).length - 1, 1);
+  }
+  // variant layer는 더 이상 퀵액션을 갖지 않습니다.
+  for (const id of PRODUCT_DISPLAY_IDS) {
+    assert.ok(!productDisplayCss(id).includes(QUICK_ACTION_HIDDEN), id);
+  }
+});
+
+test("퀵액션 규칙이 canonical의 우측 상단 세로 배치를 실제로 덮는다", () => {
+  // canonical은 top:12px / right:12px / flex-direction:column / gap:12px 입니다.
+  assert.match(PRODUCT_SECTION_V1_CSS, /\.icon__box \{ position: absolute; top: 12px; right: 12px; display: flex; flex-direction: column; gap: 12px; \}/);
+  const css = verifiedProductLayoutCss();
+  const canonicalAt = css.indexOf("top: 12px; right: 12px");
+  const overrideAt = css.indexOf(QUICK_ACTION_HIDDEN);
+  assert.ok(canonicalAt >= 0 && overrideAt > canonicalAt, "override는 canonical 뒤에 와야 합니다.");
+  for (const property of ["top:45%", "right:0", "left:0", "flex-direction:row", "gap:0"]) {
+    assert.ok(css.includes(property), property);
+  }
+});
+
+test("이미지강조형은 퀵바를 감추고 일반형은 유지한다", () => {
+  for (const id of PRODUCT_DISPLAY_IDS) {
+    const css = verifiedProductLayoutCss("grid-four", undefined, { productDisplay: id, target: "cafe24" });
+    const hideAt = css.lastIndexOf(".prdList .icon__box{display:none}");
+    const showAt = css.lastIndexOf(QUICK_ACTION_HOVER);
+    if (productDisplayOf(id).style === "gallery") {
+      assert.ok(hideAt > showAt, `${id} / 강조형은 퀵바를 감춥니다.`);
+    } else {
+      // 일반형에서 남는 display:none은 1024 이하 media 안의 선언뿐입니다.
+      assert.ok(!productDisplayCss(id).includes(".prdList .icon__box{display:none}"), `${id} / 일반형은 PC에서 퀵바를 유지합니다.`);
     }
   }
 });

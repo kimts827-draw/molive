@@ -5,7 +5,7 @@
  */
 
 import { renderComponent } from "../component-library/renderer.ts";
-import { DEFAULT_PRODUCT_DISPLAY, PRODUCT_SCOPE, productDisplayCss, resolveProductDisplay, type ProductDisplayId } from "./product-display.ts";
+import { cardQuickActionCss, DEFAULT_PRODUCT_DISPLAY, PRODUCT_SCOPE, productDisplayCss, resolveProductDisplay, type ProductDisplayId } from "./product-display.ts";
 import type { PreviewProductMock } from "../component-library/preview-mock.ts";
 import type { ProjectHeaderPresentation } from "../project-source.ts";
 
@@ -394,7 +394,12 @@ export function verifiedProductLayoutCss(
   const contentContract = `${P}{box-sizing:border-box;width:calc(100% - 64px);max-width:1280px;margin-left:auto;margin-right:auto}
 @media all and (max-width:1024px){${P}{width:calc(100% - 48px)}}
 @media all and (max-width:767px){${P}{width:calc(100% - 40px)}}`;
-  const canonical = `${stronglyScopeProductCss(renderVerifiedProductSection("preview").css)}\n${contentContract}`;
+  /**
+   * 상품 카드 퀵액션은 전시 12종에서 달라지지 않는 카드 공통 동작이라 전시 선택 여부와 무관하게
+   * 여기서 한 번만 실립니다. canonical의 우측 상단 세로 배치를 바로 뒤에서 덮으므로
+   * 전시를 아직 고르지 않은 기존 프로젝트도 같은 hover 오버레이로 동작합니다.
+   */
+  const canonical = `${stronglyScopeProductCss(renderVerifiedProductSection("preview").css)}\n${contentContract}\n${cardQuickActionCss()}`;
   /**
    * Cafe24 전시 토큰이 정해져 있으면 그 전시만 씁니다.
    * reference 12종에는 이미지 크롭이 전혀 없으므로 여기서는 비율 override도 얹지 않고

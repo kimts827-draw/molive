@@ -139,6 +139,33 @@ const SLIDE_WIDTH: Record<ProductDisplayColumns, { pc: string; tablet: string; m
   5: { pc: "calc((100% - 80px) / 5)", tablet: "calc(30% - 10px)", mobile: "calc(29% - 10px)" },
 };
 
+/**
+ * 상품 카드의 퀵액션(WISH / ADD / OPTION)입니다. 12종 공통이라 처음 이식에서 뺐지만,
+ * 그 결과 ec-base-product.css의 기본값(top:12px / right:12px / flex-direction:column)이 그대로 남아
+ * 썸네일 우측 상단에 상시 노출되고 하트 버튼과 겹쳤습니다.
+ *
+ * reference는 같은 파일 뒤에 오는 sub_style.css("상품진열 퀵바아이콘", 55~61행)로
+ * 이 기본값을 덮어 hover 오버레이로 바꿉니다. 여기서는 그 규칙만 옮깁니다.
+ * ≤1024는 reference와 같이 퀵바를 감춥니다(hover가 없는 화면에서 상시 노출되지 않게).
+ *
+ * reference와 다른 선언은 pointer-events 한 가지뿐입니다. 원본은 opacity로만 감춰서
+ * 숨은 상태의 버튼이 썸네일 링크 위 클릭을 가로채므로, 감춰진 동안에는 클릭을 통과시킵니다.
+ *
+ * 전시 12종에서만 달라지는 값이 아니라 상품 카드 공통 동작이므로 전시 선택 여부와 무관하게
+ * verifiedProductLayoutCss()의 공통 base에서 한 번만 실립니다. 여기서는 정의만 소유합니다.
+ */
+export function cardQuickActionCss() {
+  return `/* 상품 카드 퀵액션: 평상시 숨김 → 카드 hover 시 썸네일 위 중앙 오버레이 (Cafe24 sub_style.css) */
+${P} .prdList .icon__box{position:absolute;top:45%;right:0;left:0;z-index:3;display:flex;flex-direction:row;align-items:center;justify-content:center;gap:0;opacity:0;pointer-events:none;transition:all 0.3s}
+${P} .prdList > li:hover .icon__box{opacity:1;pointer-events:auto}
+${P} .prdList .prdList__item .icon__box > span{position:relative;display:block;box-sizing:border-box;margin:0 3px;min-width:72px;height:auto;padding:10px 15px;border:1px solid #999;border-radius:10px;font-size:11px;font-weight:500;line-height:1;color:#000;background-color:rgba(255,255,255,0.7);cursor:pointer}
+${P} .prdList .prdList__item .icon__box > span:hover,
+${P} .prdList .prdList__item .icon__box > span.on{color:#fff;background-color:#000;border:1px solid #000}
+${P} .prdList .prdList__item .icon__box > span img{position:absolute;top:0;left:0;width:100%;height:100%;opacity:0}
+${P} .prdList .thumbnail .badge{display:none}
+@media all and (max-width:1024px){${P} .prdList .icon__box{display:none}}`;
+}
+
 /** reference sub_style.css의 "상품진열 강조형" 블록입니다. 이미지 크롭은 원본에 없으므로 넣지 않습니다. */
 function listGalleryCss() {
   return `/* list_gallery(이미지강조형): 정보를 썸네일 위 오버레이로 올리고 hover 퀵바를 끕니다. */
@@ -215,6 +242,7 @@ export type ProductDisplayCssOptions = { target?: "preview" | "cafe24" };
 /** 12종 전시의 CSS 뒤층입니다. golden DOM/module/변수 계약은 그대로 두고 진열만 재선언합니다. */
 export function productDisplayCss(value: unknown, options: ProductDisplayCssOptions = {}) {
   const display = productDisplayOf(value);
+  // 퀵액션은 공통 base(cardQuickActionCss)가 앞서 실리고, 이미지강조형이 뒤에서 그 퀵바를 감춥니다.
   const layers = [display.mode === "slide" ? slideCss(display.columns) : gridCss(display.columns)];
   if (display.style === "gallery") layers.push(listGalleryCss());
   if (display.mode === "slide" && options.target === "preview") layers.push(slidePreviewCss());
