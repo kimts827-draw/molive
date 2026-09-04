@@ -1,6 +1,8 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { creditCost, creditPlan, type CreditOperation, type CreditPlanId } from "@/lib/credits/catalog";
+import { creditCost, creditPlanFor, type CreditOperation, type CreditPlanId } from "@/lib/credits/catalog";
+import { priceGroupForUser } from "@/lib/growth/identify";
+import { recordUserEvent } from "@/lib/growth/events";
 
 export class InsufficientCreditsError extends Error {
   constructor(public readonly required: number) {
@@ -81,7 +83,8 @@ export async function settleAiCredits(input: { reservationId: string; userId: st
 }
 
 export async function createBankTransferOrder(userId: string, planId: CreditPlanId, depositorName: string) {
-  const plan = creditPlan(planId);
+  // 청구 금액은 사용자가 결제 화면에서 본 실험군 가격과 반드시 같아야 한다.
+  const plan = creditPlanFor(await priceGroupForUser(userId), planId);
   if (!plan) throw new Error("구매 플랜을 확인해 주세요.");
   const { data, error } = await createAdminClient().from("orders").insert({
     user_id: userId,
@@ -119,6 +122,9 @@ export async function listAdminOrders(status: "pending" | "paid" | "cancelled" |
 
 /** 관리자 계좌이체 승인과 향후 Toss 승인 webhook이 함께 호출하는 단일 주문 확정 경로입니다. */
 export async function fulfillCreditOrder(orderId: string, approvedBy: string | null, provider: "bank_transfer" | "toss", providerPaymentKey?: string | null) {
+  // 재승인해도 Credit이 중복 지급되지 않듯, purchase 이벤트도 처음 확정될 때만 남긴다.
+  const { data: before } = await createAdminClient().from("orders").select("status,plan_id,amount,credits").eq("id", orderId).maybeSingle();
+  const alreadyPaid = before?.status === "paid";
   const { data, error } = await createAdminClient().rpc("fulfill_credit_order", {
     p_order_id: orderId,
     p_approved_by: approvedBy,
@@ -128,6 +134,17 @@ export async function fulfillCreditOrder(orderId: string, approvedBy: string | n
   if (error) throw error;
   const row = firstRow(data);
   if (!row?.order_id) throw new Error("주문 Credit 지급 결과를 확인하지 못했습니다.");
+  if (!alreadyPaid && before) {
+    const planId = String(before.plan_id);
+    await recordUserEvent("purchase", String(row.user_id), {
+      plan_id: planId,
+      plan_name: creditPlanFor(await priceGroupForUser(String(row.user_id)), planId)?.name ?? planId,
+      amount: Number(before.amount),
+      credits: Number(before.credits),
+      order_id: orderId,
+      payment_provider: provider,
+    });
+  }
   return { orderId: String(row.order_id), userId: String(row.user_id), credited: Number(row.credited), balance: Number(row.balance) };
 }
 

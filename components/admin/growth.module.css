@@ -1,0 +1,21 @@
+.filterBar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 14px 16px; background: #fff; border: 1px solid #dedbd3; border-radius: 14px; font-size: 12px; }
+.filterBar button { padding: 7px 13px; background: #f8f7f4; border: 1px solid #dedbd3; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; }
+.filterBar button:hover { background: #efece5; }
+.toggle { display: inline-flex; align-items: center; gap: 7px; padding: 7px 13px; background: #f8f7f4; border: 1px solid #dedbd3; border-radius: 8px; font-weight: 700; cursor: pointer; }
+.select { display: inline-flex; align-items: center; gap: 7px; color: #77736a; font-weight: 700; }
+.select select { padding: 6px 10px; border: 1px solid #dedbd3; border-radius: 8px; background: #fff; font-size: 12px; }
+.filterCount { margin-left: auto; color: #77736a; }
+
+.paid { color: #2f7a4d; }
+.unpaid { color: #a8a396; }
+
+.rate { display: block; margin-top: 3px; color: #77736a; font-size: 10px; font-weight: 400; }
+.drop { color: #b4562f; }
+
+.delta { font-size: 12px; font-weight: 700; }
+.deltaUp { color: #2f7a4d; }
+.deltaDown { color: #b4562f; }
+.deltaFlat { color: #a8a396; }
+
+.sectionNote { margin: 0; color: #77736a; font-size: 11px; line-height: 1.7; }
+.groupPlans { color: #77736a; }

@@ -4,13 +4,13 @@ import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, LoaderCircle } from "lucide-react";
-import { CREDIT_PLANS, type CreditPlanId } from "@/lib/credits/catalog";
+import type { CreditPlan, CreditPlanId } from "@/lib/credits/catalog";
 import { PlanCards } from "@/components/pricing/plan-cards";
 
 type BankConfig = { bankName: string; accountNumber: string; accountHolder: string; available: boolean };
 type PaymentMethod = "bank" | "card";
 
-export function OrderPanel({ signedIn, bank, tossTestClientKey }: { signedIn: boolean; bank: BankConfig; tossTestClientKey: string }) {
+export function OrderPanel({ signedIn, plans, bank, tossTestClientKey }: { signedIn: boolean; plans: CreditPlan[]; bank: BankConfig; tossTestClientKey: string }) {
   const router = useRouter();
   const [selected, setSelected] = useState<CreditPlanId | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("bank");
@@ -18,7 +18,7 @@ export function OrderPanel({ signedIn, bank, tossTestClientKey }: { signedIn: bo
   const [busy, setBusy] = useState(false);
   const [cardBusy, setCardBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const plan = CREDIT_PLANS.find((item) => item.id === selected) ?? null;
+  const plan = plans.find((item) => item.id === selected) ?? null;
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -66,7 +66,7 @@ export function OrderPanel({ signedIn, bank, tossTestClientKey }: { signedIn: bo
   }
 
   return <>
-    <PlanCards action={(item) => signedIn
+    <PlanCards plans={plans} action={(item) => signedIn
       ? <button type="button" onClick={() => { setSelected(item.id); setPaymentMethod("bank"); setMessage(null); }}>선택하기 <ArrowRight size={15} /></button>
       : <Link href="/login?next=%2Fpricing">선택하기 <ArrowRight size={15} /></Link>} />
     {signedIn && plan ? <section className="purchase-panel">

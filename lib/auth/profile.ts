@@ -51,14 +51,15 @@ function signupPreferences(user: User): ProfilePreferences {
   };
 }
 
-export async function ensureUserProfile(supabase: SupabaseClient, user: User, preferences?: ProfilePreferences) {
+/** 프로필 행을 처음 만들었는지 돌려준다. 신규 가입 시점을 아는 유일한 지점이다. */
+export async function ensureUserProfile(supabase: SupabaseClient, user: User, preferences?: ProfilePreferences): Promise<boolean> {
   const { data: current, error: readError } = await supabase
     .from("profiles")
     .select("id, marketing_emails_enabled")
     .eq("id", user.id)
     .maybeSingle();
   if (readError) throw readError;
-  if (current) return;
+  if (current) return false;
 
   const requested = preferences ?? signupPreferences(user);
   const marketingEnabled = requested.marketingEmailsEnabled === true;
@@ -73,4 +74,5 @@ export async function ensureUserProfile(supabase: SupabaseClient, user: User, pr
     marketing_withdrawn_at: null,
   });
   if (error) throw error;
+  return true;
 }

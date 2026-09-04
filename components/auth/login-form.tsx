@@ -7,6 +7,7 @@ import { ensureUserProfile } from "@/lib/auth/profile";
 import { safeNextPath } from "@/lib/auth/redirect";
 import { readRememberedEmail, updateRememberedEmail } from "@/lib/auth/remembered-email";
 import { createClient } from "@/lib/supabase/client";
+import { reportSignup } from "@/components/growth/growth-tracker";
 
 type AuthMode = "login" | "signup";
 type OAuthProvider = "google" | "kakao";
@@ -67,7 +68,10 @@ export function LoginForm({ enabled, missingEnv }: { enabled: boolean; missingEn
         if (error) throw error;
         if (!data.user) throw new Error("로그인 사용자를 확인하지 못했습니다.");
         try { updateRememberedEmail(window.localStorage, email, rememberEmail); } catch { /* Login must not depend on local storage. */ }
-        await ensureUserProfile(supabase, data.user);
+        // 다른 기기에서 이메일을 확인하고 돌아와 비밀번호로 로그인하면 프로필이 여기서 처음 만들어진다.
+        // 그 경우도 가입으로 보고 첫 유입 UTM을 붙여야 한다. 빠뜨리면 조용히 null로 남는다.
+        const created = await ensureUserProfile(supabase, data.user);
+        if (created) await reportSignup().catch(() => false);
         window.location.assign(next);
         return;
       }
@@ -87,7 +91,10 @@ export function LoginForm({ enabled, missingEnv }: { enabled: boolean; missingEn
       });
       if (error) throw error;
       if (data.session && data.user) {
-        await ensureUserProfile(supabase, data.user, preferences);
+        const created = await ensureUserProfile(supabase, data.user, preferences);
+        // 첫 유입 UTM을 계정에 붙이고 같은 브라우저의 이전 방문을 소급 연결한다.
+        // 실패해도 가입 자체는 막지 않는다. 다음 페이지 진입 때 트래커가 다시 시도한다.
+        if (created) await reportSignup().catch(() => false);
         window.location.assign(next);
         return;
       }

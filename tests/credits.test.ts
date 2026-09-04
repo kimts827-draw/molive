@@ -85,7 +85,8 @@ test("만료된 예약만 원자적으로 회수하고 30분 lease로 새 예약
 
 test("주문 승인과 수동 지급은 공통 원장 변경 함수와 멱등키를 사용한다", () => {
   assert.match(orderRoute, /requireApiUser\(request\)/);
-  assert.match(creditService, /creditPlan\(planId\)/);
+  // 주문 금액은 사용자에게 배정된 가격 실험군의 가격표를 따른다.
+  assert.match(creditService, /creditPlanFor\(await priceGroupForUser\(userId\), planId\)/);
   assert.match(migration, /status text not null default 'pending'/);
   assert.match(approveRoute, /requireAdminApi\(request\)/);
   assert.match(approveRoute, /fulfillCreditOrder\(orderId, admin\.id, "bank_transfer"\)/);

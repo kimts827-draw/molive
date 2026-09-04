@@ -18,7 +18,7 @@ import { PromptComposer } from "@/components/landing/prompt-composer";
 import { ResultGallery } from "@/components/landing/result-gallery";
 import { SiteFooter } from "@/components/site/site-footer";
 import { SiteHeader } from "@/components/site/site-header";
-import { CREDIT_COSTS } from "@/lib/credits/catalog";
+import { CREDIT_COSTS, creditPlansFor } from "@/lib/credits/catalog";
 import { PlanCards } from "@/components/pricing/plan-cards";
 import styles from "./landing-sales.module.css";
 
@@ -53,7 +53,7 @@ function EditorShowcase() {
   </div>;
 }
 
-export function LandingPage({ userEmail, creditBalance, persistenceEnabled, demoMode, missingEnv }: { userEmail: string | null; creditBalance: number | null; persistenceEnabled: boolean; demoMode: boolean; missingEnv: string[] }) {
+export function LandingPage({ userEmail, creditBalance, persistenceEnabled, demoMode, missingEnv, priceGroup }: { userEmail: string | null; creditBalance: number | null; persistenceEnabled: boolean; demoMode: boolean; missingEnv: string[]; priceGroup: string }) {
   const startHref = userEmail ? "/" : "/login?next=%2F";
   return (
     <main className={`marketing-shell ${styles.salesPage}`}>
@@ -119,7 +119,7 @@ export function LandingPage({ userEmail, creditBalance, persistenceEnabled, demo
 
       <section className={`${styles.section} ${styles.price}`} id="price">
         <SectionTitle title={<>디자인을 사는 대신, <span className={styles.headlineAccent}>만들어보세요.</span></>} />
-        <PlanCards action={() => <Link href="/pricing">선택하기 <ArrowRight size={15} /></Link>} />
+        <PlanCards plans={creditPlansFor(priceGroup)} action={() => <Link href="/pricing">선택하기 <ArrowRight size={15} /></Link>} />
         <div className={styles.priceNotes}><p>쇼핑몰 디자인 생성 {CREDIT_COSTS.designGeneration}C · AI 수정 {CREDIT_COSTS.editorAi}C</p><p>직접 수정 · 다운로드 · Cafe24 적용은 추가 Credit 없음</p></div>
       </section>
 

@@ -35,7 +35,7 @@ test("초보자용 판매 랜딩은 요청된 핵심 흐름을 짧은 섹션으�
   ]) assert.match(landingCopy, new RegExp(copy));
   assert.match(landing, /\["AI 생성", "Editor", "Download", "Installer", "Cafe24"\]/);
   assert.match(landing, /<PlanCards /);
-  assert.match(planCards, /CREDIT_PLANS\.map/);
+  assert.match(planCards, /plans\.map/);
   assert.match(landing, /CREDIT_COSTS\.designGeneration/);
 });
 

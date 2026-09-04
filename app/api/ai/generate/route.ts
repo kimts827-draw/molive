@@ -9,6 +9,7 @@ import { openAIUsageActorType } from "@/lib/auth/roles";
 import { createProjectWithVersion } from "@/lib/projects/service";
 import { hasSupabaseServerConfig, isSupabaseDemoMode, missingSupabaseServerEnv } from "@/lib/supabase/config";
 import { commitAiCredits, releaseAiCredits, reserveAiCredits } from "@/lib/credits/service";
+import { creditTypeForUser, recordUserEvent } from "@/lib/growth/events";
 
 const assetUrl = z.string().refine((value) => value.startsWith("https://") || /^data:image\/(jpeg|png|webp|avif);base64,/.test(value), "지원하지 않는 이미지 형식입니다.");
 const requestSchema = z.object({ prompt: z.string().min(10).max(5000), brandName: z.string().max(120).optional(), colors: z.array(z.string()).max(8).optional(), assetSessionId: z.uuid().optional(), assetUrls: z.array(assetUrl).max(6).optional(), assetPaths: z.array(z.string().max(500)).max(6).optional(), assetRoles: z.array(z.enum(["logo", "product", "reference", "image"])).max(6).optional() });
@@ -32,6 +33,9 @@ export async function POST(request: Request) {
     try {
       if (hasSupabaseServerConfig()) creditReservation = await reserveAiCredits(user.id, "design_generation");
       const generationId = crypto.randomUUID();
+      // Credit 예약이 통과한 뒤 = 실제로 생성이 시작되는 시점.
+      const creditType = hasSupabaseServerConfig() ? await creditTypeForUser(user.id) : "free";
+      if (hasSupabaseServerConfig()) await recordUserEvent("generate_start", user.id, { credit_type: creditType, generation_id: generationId });
       const actorType = openAIUsageActorType("app_metadata" in user ? user.app_metadata as Record<string, unknown> : null);
       const onUsage = hasSupabaseServerConfig() ? createGenerationUsageRecorder({ generationId, userId: user.id, actorType, usageType: "design_generation" }) : undefined;
       const onPreviewImageUsage = hasSupabaseServerConfig() ? createGenerationUsageRecorder({ generationId, userId: user.id, actorType, usageType: "preview_image" }) : undefined;
@@ -66,6 +70,8 @@ export async function POST(request: Request) {
       }
       const balance = creditReservation ? await commitAiCredits(creditReservation.id, user.id, stored.projectId) : null;
       creditCommitted = true;
+      // 결과를 돌려줄 수 있는 상태 = 생성 결과 표시 성공.
+      await recordUserEvent("generate_done", user.id, { credit_type: creditType, generation_id: generationId, project_id: stored.projectId });
       return Response.json({ ...result, ...stored, balance });
     } catch (error) {
       if (error instanceof z.ZodError) return Response.json({ error: "AI 디자인 결과를 Project Source로 변환하지 못했습니다. 다시 시도해 주세요." }, { status: 422 });

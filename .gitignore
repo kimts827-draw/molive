@@ -14,6 +14,8 @@ TEST MAKING/
 %SystemDrive%/
 *.tsbuildinfo
 supabase/.temp/
+.claude/scheduled_tasks.lock
+.claude/tmp/
 
 .vercel
 .env*
