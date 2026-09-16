@@ -11,8 +11,10 @@
  */
 
 import { z } from "zod";
+import { STOREFRONT_FONT_IDS, storefrontFontById } from "../fonts/storefront-fonts.ts";
 import { COLOR_STRATEGIES, SURFACE_FAMILIES, brandRamp, parseHex, rgbToHsl, surfaceTokens, toHex, type BrandPalette, type ColorStrategy, type SurfaceFamily } from "../commerce/brand-theme.ts";
 import { INDUSTRY_IDS, industryProfile, type IndustryId } from "./industry.ts";
+import { briefSeed, mulberry32, resolvePlanTypography } from "./plan-typography.ts";
 import {
   SECTION_ALIGNMENTS,
   SECTION_ALIGNMENT_SPECS,
@@ -124,6 +126,14 @@ export const pagePlanSchema = z.object({
   imageTreatment: z.enum(IMAGE_TREATMENT_IDS as [ImageTreatmentId, ...ImageTreatmentId[]]),
   /** 색 계약입니다. palette가 없는 기존 plan도 그대로 열리도록 optional입니다. */
   palette: pagePlanPaletteSchema.optional(),
+  /**
+   * 폰트 계약입니다. 모델 스키마(pagePlanJsonSchema)에는 없고 normalizePagePlan이 코드로 채웁니다.
+   * 폰트가 없던 기존 plan도 그대로 열리도록 optional입니다.
+   */
+  typography: z.object({
+    bodyFont: z.enum(STOREFRONT_FONT_IDS),
+    displayFont: z.enum(STOREFRONT_FONT_IDS).optional(),
+  }).optional(),
   sections: z.array(pagePlanSectionSchema).min(1).max(24),
   /** 왜 이 구성인지에 대한 한 문단 설명입니다. */
   rationale: z.string().trim().max(800),
@@ -446,7 +456,27 @@ export function normalizePagePlan(plan: PagePlan, options: PagePlanNormalizeOpti
 
   const palette = normalizePalette(plan, options);
   const bodySections = ensureAccentBands(sections.slice(0, PAGE_PLAN_MAX_SECTIONS), palette);
-  return { ...plan, palette, sections: bodySections };
+  return { ...plan, palette, typography: normalizeTypography(plan, options), sections: bodySections };
+}
+
+/**
+ * 폰트를 확정합니다. 색과 같은 규칙입니다 — plan이 진실이고 모델은 그 값을 시공합니다.
+ * plan에 이미 폰트가 있으면(저장된 프로젝트를 다시 정규화하는 경우) 그 값을 지키고,
+ * 없을 때만 업종 풀과 타이포 스케일, 브리프 시드로 새로 뽑습니다.
+ */
+function normalizeTypography(plan: PagePlan, options: PagePlanNormalizeOptions): PagePlan["typography"] {
+  if (plan.typography) return plan.typography;
+  const profile = industryProfile(plan.industry);
+  const seedText = options.brief?.trim() || `${plan.industry} ${plan.productCategory} ${plan.mood}`;
+  return resolvePlanTypography(profile, plan.typeScale, mulberry32(briefSeed(seedText)));
+}
+
+/** plan이 확정한 폰트 스택입니다. Preview·Cafe24·계약 텍스트가 같은 문자열을 씁니다. */
+export function pagePlanFontStacks(plan: PagePlan | undefined | null) {
+  if (!plan?.typography) return null;
+  const body = storefrontFontById(plan.typography.bodyFont);
+  const display = plan.typography.displayFont ? storefrontFontById(plan.typography.displayFont) : body;
+  return { body, display };
 }
 
 export function parsePagePlan(value: unknown, options: PagePlanNormalizeOptions = {}): PagePlan {
@@ -494,7 +524,8 @@ export function renderPagePlanEditContext(plan: PagePlan): string {
 업종: ${plan.industryLabel} · 판매 상품군: ${plan.productCategory}${plan.productExamples.length ? ` (예: ${plan.productExamples.join(", ")})` : ""}
 분위기: ${plan.mood || "명시 없음"} · 강조점: ${plan.emphasis.join(", ") || "명시 없음"}
 타이포 스케일: ${plan.typeScale} · 이미지 처리: ${plan.imageTreatment} · 상품 진열: ${plan.productPresentation}${plan.palette ? `
-브랜드 색: ${plan.palette.brandColor} (전략 ${plan.palette.colorStrategy}) · 색은 var(--molive-brand) 계열 변수를 쓴다` : ""}
+브랜드 색: ${plan.palette.brandColor} (전략 ${plan.palette.colorStrategy}) · 색은 var(--molive-brand) 계열 변수를 쓴다` : ""}${plan.typography ? `
+폰트: 본문 var(--molive-font) · 제목 var(--molive-display-font) — 이 몰의 폰트는 코드가 확정했다. 새 폰트 이름을 쓰지 않는다` : ""}
 본문 순서: ${sections.join(" → ")}
 이 구성은 참고용이다. 선택 영역 밖의 섹션을 추가·삭제·재배치하지 말고, 위 상품군과 톤을 벗어나는 카피나 이미지를 만들지 않는다.`;
 }
@@ -533,6 +564,25 @@ export function renderPaletteContract(palette: BrandPalette | undefined) {
   var(--molive-brand)=${ramp.brand} · var(--molive-brand-strong)=${ramp.strong} · var(--molive-brand-tint)=${ramp.tint} · var(--molive-brand-soft)=${ramp.soft} · var(--molive-brand-on)=${ramp.on}${palette.colorStrategy === "duotone" ? ` · var(--molive-brand-secondary)=${ramp.secondary}` : ""}
 - 브랜드 색은 선이나 아이콘 같은 얇은 요소가 아니라 배경 색면, CTA 채움, 카드 바탕처럼 눈에 보이는 면적으로 써야 한다.
 - 레퍼런스 몰은 브랜드 색을 풀폭 밴드, 푸터, 카테고리 타일, 프로모션 패널의 배경으로 쓴다. 같은 방식으로 쓴다.`;
+}
+
+/**
+ * 폰트는 코드가 확정해 내려보냅니다. 모델이 다시 고르지 않게 값과 쓰임을 함께 못박습니다.
+ * 변수로 내려보내는 이유는 색과 같습니다 — 나중에 폰트를 바꿔도 페이지가 따라옵니다.
+ */
+function renderFontContract(plan: PagePlan) {
+  const stacks = pagePlanFontStacks(plan);
+  if (!stacks) return "- 폰트: 지정 없음";
+  const lines = [
+    `- 폰트(구속력 있음): 본문은 ${stacks.body.stack} — commerce.fontFamily에 이 문자열을 그대로 기록하고, 페이지 기본 타이포에는 코드가 선언한 var(--molive-font)를 쓴다.`,
+  ];
+  if (plan.typography?.displayFont) {
+    lines.push(`  제목은 ${stacks.display.stack} — var(--molive-display-font)로 헤딩과 짧은 라벨에만 쓰고 본문에는 쓰지 않는다.`);
+  } else {
+    lines.push("  제목도 같은 스택으로 가고 크기·무게·자간으로만 위계를 만든다. 다른 폰트를 더 들이지 않는다.");
+  }
+  lines.push("  이 몰의 폰트는 여기서 끝이다. 목록에 없는 이름, 시스템 폰트 이름, 외부 폰트 URL을 쓰지 않는다.");
+  return lines.join("\n");
 }
 
 function axisLine(section: PagePlanSection) {
@@ -586,6 +636,7 @@ ${sectionLines.join("\n")}
 페이지 전역 축:
 - Hero 기준 밀도(${plan.hero.density}, 섹션별 밀도 축이 항상 우선): ${DENSITY_SCALES[plan.hero.density]}
 - 타이포 스케일(${plan.typeScale}): ${TYPE_SCALES[plan.typeScale]}
+${renderFontContract(plan)}
 - 이미지 처리(${plan.imageTreatment}): ${IMAGE_TREATMENTS[plan.imageTreatment]}
 - 푸터 무드(${plan.footerMood}): ${FOOTER_MOODS[plan.footerMood].spec}
 

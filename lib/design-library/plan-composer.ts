@@ -29,30 +29,12 @@ import {
   type SectionTone,
   type SectionTypeId,
 } from "./section-registry.ts";
+import { briefSeed as seedFromBrief, mulberry32, resolvePlanTypography } from "./plan-typography.ts";
 import type { DensityId } from "./variants.ts";
 import { COLOR_STRATEGIES, parseHex, toHex, type BrandPalette, type ColorStrategy, type SurfaceFamily } from "../commerce/brand-theme.ts";
 
-/** 시드 고정 시 같은 plan이 나오는 결정적 RNG(mulberry32)입니다. */
-function mulberry32(seed: number) {
-  let a = seed >>> 0;
-  return function next() {
-    a += 0x6d2b79f5;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-/** 브리프 문자열에서 안정적인 시드를 만듭니다. 같은 브리프는 같은 대비 plan을 얻습니다. */
-export function briefSeed(text: string): number {
-  let hash = 0x811c9dc5;
-  for (let index = 0; index < text.length; index += 1) {
-    hash ^= text.charCodeAt(index);
-    hash = Math.imul(hash, 0x01000193);
-  }
-  return hash >>> 0;
-}
+/** RNG와 시드는 폰트 확정과 같은 것을 써야 같은 브리프가 같은 plan을 얻습니다. */
+export { briefSeed } from "./plan-typography.ts";
 
 function choose<T>(values: readonly T[], random: () => number): T {
   return values[Math.min(values.length - 1, Math.floor(random() * values.length))];
@@ -153,7 +135,7 @@ function composePalette(colors: string[] | undefined, random: () => number): Bra
  */
 export function composeFallbackPagePlan(input: PlanCompositionInput, seed?: number): PagePlan {
   const brief = `${input.brandName ?? ""} ${input.prompt}`.trim();
-  const resolvedSeed = seed ?? briefSeed(brief);
+  const resolvedSeed = seed ?? seedFromBrief(brief);
   const random = mulberry32(resolvedSeed);
   const industry: IndustryId = inferIndustry(brief);
   const profile = industryProfile(industry);
@@ -223,6 +205,7 @@ export function composeFallbackPagePlan(input: PlanCompositionInput, seed?: numb
     productPresentation,
     footerMood,
     typeScale,
+    typography: resolvePlanTypography(profile, typeScale, random),
     imageTreatment,
     sections,
     rationale: `AI page planner 응답을 쓰지 못해 ${profile.label} 가중치와 브리프 시드(${resolvedSeed})로 구성했습니다.`,

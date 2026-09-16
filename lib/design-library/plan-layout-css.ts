@@ -22,7 +22,7 @@
  * .pocHeader* / .prdList* / .thumbnail / .ec-base-product selector는 한 번도 쓰지 않습니다.
  */
 
-import type { PagePlan } from "./page-plan.ts";
+import { pagePlanFontStacks, type PagePlan } from "./page-plan.ts";
 import { PLAN_ATTRIBUTE_NAMES } from "./plan-attributes.ts";
 import { SECTION_TYPES } from "./section-registry.ts";
 
@@ -153,6 +153,17 @@ function edgeMediaCss() {
   ];
 }
 
+/**
+ * plan이 확정한 폰트입니다. 색과 같은 이유로 변수로 내려보냅니다.
+ * 루트 선언은 명시도 (0,1,0)이라 AI가 같은 자리에 폰트를 쓰면 AI가 이깁니다.
+ * 다만 계약이 같은 스택을 지시하므로 값은 어차피 같고, AI가 폰트를 잊어도 화면에 남습니다.
+ */
+function typographyCss(plan: PagePlan) {
+  const stacks = pagePlanFontStacks(plan);
+  if (!stacks) return [];
+  return [`${ROOT}{--molive-font:${stacks.body.stack};--molive-display-font:${stacks.display.stack};font-family:var(--molive-font)}`];
+}
+
 function geometryCss(plan: PagePlan) {
   const rules: string[] = [GUTTER_TOKEN];
   // 이번 plan에 media-first full-bleed 섹션이 있을 때만 예외 규칙을 만듭니다.
@@ -180,7 +191,7 @@ function geometryCss(plan: PagePlan) {
 export function planLayoutCss(plan: PagePlan | undefined | null) {
   if (!plan) return "";
   // tone은 브랜드 변수를 읽으므로 palette가 있을 때만, geometry는 색과 무관하므로 항상 만듭니다.
-  const rules = [...(plan.palette ? toneCss(plan) : []), ...geometryCss(plan)];
+  const rules = [...(plan.palette ? toneCss(plan) : []), ...typographyCss(plan), ...geometryCss(plan)];
   if (!rules.length) return "";
   return `/* MOLIVE page plan baseline. plan이 정한 축을 코드가 직접 소비합니다. */\n${rules.join("\n")}`;
 }

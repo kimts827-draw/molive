@@ -4,7 +4,7 @@ import { z } from "zod";
 import { dedupeNodePatchIds, demoteForbiddenChrome, ensureEditingMetadata, validateNodePatch, validateNodePatchStructure, validateProjectSource, type NodePatchOperation } from "@/lib/cafe24/protection";
 import { buildDesignGenerationUserPrompt, validateGeneratedDesignContract, type DesignGenerationInput } from "@/lib/openai/design-generation-contract";
 import { generatePagePlan } from "@/lib/openai/page-plan-generator";
-import { pagePlanSectionRefs, pagePlanSignature, renderPagePlanEditContext, type PagePlan } from "@/lib/design-library/page-plan";
+import { pagePlanFontStacks, pagePlanSectionRefs, pagePlanSignature, renderPagePlanEditContext, type PagePlan } from "@/lib/design-library/page-plan";
 import { applyPagePlanAttributes } from "@/lib/design-library/plan-attributes";
 import { HERO_VARIANT_IDS } from "@/lib/design-library/variants";
 import { auditAssetReferenceTokens, auditGeneratedAssets, collectAssetReferences, createAssetAllowlist, isFreshlyCreatedImage } from "@/lib/assets/asset-policy";
@@ -150,7 +150,7 @@ REFERENCE-DERIVED DESIGN GRAMMAR
 - Code also declares the brand palette as --molive-brand, --molive-brand-strong, --molive-brand-tint, --molive-brand-soft and --molive-brand-on on the page root, and paints any section the plan marked as accent tone. Reach for those variables instead of literal hex values, and give the brand colour real area — a band background, a filled CTA, a card ground — not just a hairline or an icon.
 - Avoid a page whose hero is polished but everything below becomes repeated equal cards. Alternate composition, scale, image/text relationships, and background rhythm while keeping one coherent design language.
 - Before writing HTML, commit to headerVariant, heroComposition, productLayout, section order/selection, typography scale, image treatment, spacing/density, and content composition. Do not return vague labels such as modern, premium, or clean by themselves.
-- Choose commerce.fontFamily from the exact self-hosted font stacks below. Use that exact stack in root body typography unless a deliberate heading/body contrast calls for one other stack from the same pool. Match the recorded moods to the merchant brief; display faces are for short headings, not long body copy. Never name an unlisted font and never use an external font URL.
+- The font is decided by the page composition, not by you. PAGE COMPOSITION names the exact stack for this shop: put it in commerce.fontFamily verbatim, and write page typography against the variables code declares — var(--molive-font) for body and var(--molive-display-font) for headings. Never name an unlisted font, never substitute a system font stack, and never use an external font URL. These are the stacks the builder ships; they exist here so you recognise the one the composition named.
 ${fontPoolPrompt}
 - Encode the deterministic choices in the existing architecture object exactly: header = split-utility | centered-brand | overlay-minimal | logo-center-row | stacked-left | stacked-split, hero = the composition's hero variant id (full-bleed | split-editorial | banner-stack | typographic-marquee | cinematic-still | product-forward), productPresentation = the composition's presentation id (grid-four | large-grid | editorial-two | featured-grid | compact-five). architecture.sections must record the composition's sections in order as "type/variant — 헤딩".
 - A materially different brief must produce visibly different decisions across those six axes, not a recoloured copy of the same page.
@@ -365,7 +365,13 @@ export async function generateProjectSource(input: DesignGenerationInput, option
        * plan.palette가 진실이고, commerce.accent는 그 값을 그대로 따라갑니다.
        * 불일치를 위반으로 잡아 재생성시키면 생성 1건당 비용과 시간이 그대로 늘어납니다.
        */
-      const commerce = plan.palette ? { ...parsed.commerce, accent: plan.palette.brandColor } : parsed.commerce;
+      const planFonts = pagePlanFontStacks(plan);
+      const commerce = {
+        ...parsed.commerce,
+        ...(plan.palette ? { accent: plan.palette.brandColor } : {}),
+        // 폰트도 색과 같습니다. plan이 확정한 값을 코드가 눌러 쓰고, 불일치를 재생성 사유로 삼지 않습니다.
+        ...(planFonts ? { fontFamily: planFonts.body.stack } : {}),
+      };
       const source: ProjectSource = {
         id: projectId,
         brandName: input.brandName?.trim() || parsed.brandName,

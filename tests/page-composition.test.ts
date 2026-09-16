@@ -5,6 +5,7 @@ import {
   PAGE_PLAN_MAX_SECTIONS,
   PAGE_PLAN_VERSION,
   normalizePagePlan,
+  pagePlanFontStacks,
   pagePlanJsonSchema,
   pagePlanSchema,
   pagePlanSectionRefs,
@@ -14,6 +15,8 @@ import {
   type PagePlan,
 } from "../lib/design-library/page-plan.ts";
 import { composeFallbackPagePlan } from "../lib/design-library/plan-composer.ts";
+import { planLayoutCss } from "../lib/design-library/plan-layout-css.ts";
+import { STOREFRONT_FONT_FAMILY_SET } from "../lib/fonts/storefront-fonts.ts";
 import { SECTION_TYPES } from "../lib/design-library/section-registry.ts";
 import { buildDesignGenerationUserPrompt, validateGeneratedDesignContract } from "../lib/openai/design-generation-contract.ts";
 import { buildPreviewImagePrompt, buildSectionImagePrompt } from "../lib/openai/preview-image-contract.ts";
@@ -121,6 +124,55 @@ test("붙어 있는 섹션은 같은 배경 톤으로 뭉치지 않는다", () =
       assert.notEqual(current.tone, previous.tone, `${key}의 ${current.type}이 앞 섹션과 같은 톤입니다`);
     }
   }
+});
+
+test("폰트는 코드가 업종과 타이포 스케일로 확정하고 브리프마다 갈린다", () => {
+  const fonts = new Map<string, string[]>();
+  for (const [key, plan] of plans) {
+    const stacks = pagePlanFontStacks(plan);
+    assert.ok(stacks, `${key} plan에 폰트 계약이 없습니다`);
+    assert.ok(STOREFRONT_FONT_FAMILY_SET.has(stacks.body.stack), `${key}: 등록되지 않은 본문 폰트 ${stacks.body.stack}`);
+    // display 계열은 본문에 쓰면 읽기가 무너집니다. 본문 폰트로는 절대 나오지 않아야 합니다.
+    assert.notEqual(stacks.body.category, "display", `${key}: display 폰트를 본문에 배정했습니다`);
+    const label = `${plan.typography?.bodyFont}+${plan.typography?.displayFont ?? "-"}`;
+    fonts.set(label, [...(fonts.get(label) ?? []), key]);
+  }
+  // 9개 업종이 한두 벌로 수렴하면 이 축은 존재 이유가 없습니다.
+  assert.ok(fonts.size >= 5, `업종별 폰트가 ${fonts.size}벌로 수렴했습니다: ${[...fonts.keys()].join(", ")}`);
+
+  // 같은 브리프는 항상 같은 폰트를 얻습니다.
+  const repeated = composeFallbackPagePlan(BRIEFS[0]);
+  assert.deepEqual(repeated.typography, plans.get("패션")?.typography);
+});
+
+test("타이포 스케일과 폰트 분류가 어긋나지 않는다", () => {
+  for (const [key, plan] of plans) {
+    const stacks = pagePlanFontStacks(plan);
+    if (!stacks) continue;
+    if (plan.typeScale === "serif-display") assert.equal(stacks.body.category, "serif", `${key}: serif-display인데 본문이 ${stacks.body.category}`);
+    if (plan.typeScale === "sans-modern") assert.equal(stacks.body.category, "gothic", `${key}: sans-modern인데 본문이 ${stacks.body.category}`);
+  }
+});
+
+test("폰트 계약은 plan·CSS 변수·2단계 프롬프트가 같은 스택을 가리킨다", () => {
+  const plan = plans.get("반려동물") as PagePlan;
+  const stacks = pagePlanFontStacks(plan) as NonNullable<ReturnType<typeof pagePlanFontStacks>>;
+  const css = planLayoutCss(plan);
+  assert.ok(css.includes(`--molive-font:${stacks.body.stack}`), css.slice(0, 200));
+  assert.ok(css.includes(`--molive-display-font:${stacks.display.stack}`));
+  assert.ok(css.includes("font-family:var(--molive-font)"));
+  const contract = renderPagePlanContract(plan);
+  assert.ok(contract.includes(`본문은 ${stacks.body.stack}`), "계약 텍스트에 본문 스택이 없습니다");
+  assert.ok(contract.includes("var(--molive-font)"));
+  // 타이포 스케일 설명이 다시 시스템 폰트를 지시하면 모델이 plan 폰트를 버립니다.
+  assert.equal(/시스템 산세리프|Georgia/.test(contract), false, "타이포 스케일 설명이 폰트를 다시 지정하고 있습니다");
+});
+
+test("폰트가 없던 기존 plan은 그대로 열리고 폰트 CSS도 만들지 않는다", () => {
+  const plan = plans.get("패션") as PagePlan;
+  const legacy = { ...plan, typography: undefined } as PagePlan;
+  assert.equal(pagePlanFontStacks(legacy), null);
+  assert.equal(planLayoutCss(legacy).includes("--molive-font"), false);
 });
 
 test("같은 시드는 같은 plan을, 시드가 다르면 다른 plan을 만든다", () => {

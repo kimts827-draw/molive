@@ -181,8 +181,8 @@ export type DensityId = keyof typeof DENSITY_SCALES;
 
 /** 타이포 스케일: 디스플레이/본문의 성격 계약 */
 export const TYPE_SCALES = {
-  "serif-display": "디스플레이는 Georgia 계열 세리프 clamp(44px~84px)·좁은 자간, 본문은 시스템 산세리프 13~15px. 에디토리얼 대비를 크게.",
-  "sans-modern": "디스플레이·본문 모두 시스템 산세리프. 디스플레이 clamp(36px~64px)에 -0.02em 자간, 라벨은 넓은 자간 대문자. 정밀하고 기술적인 인상.",
+  "serif-display": "디스플레이는 clamp(44px~84px)·좁은 자간, 본문은 13~15px. 에디토리얼 대비를 크게. 폰트는 plan이 확정한 스택을 쓴다.",
+  "sans-modern": "디스플레이 clamp(36px~64px)에 -0.02em 자간, 라벨은 넓은 자간 대문자. 정밀하고 기술적인 인상. 폰트는 plan이 확정한 스택을 쓴다.",
   "rounded-warm": "디스플레이 clamp(34px~56px)의 부드러운 무게(600~700), 행간 넉넉하게. 라벨은 소문자 혼용도 허용. 다정하고 따뜻한 인상.",
   "bold-retail": "섹션 헤딩은 작게(18~26px) 중앙 정렬하고 상품과 색면이 화면을 채운다. 라벨은 굵은 대문자, 본문은 12~14px로 촘촘하게. 레퍼런스 리테일 몰의 표준 리듬.",
 } as const;

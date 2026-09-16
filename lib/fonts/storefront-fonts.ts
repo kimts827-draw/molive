@@ -163,6 +163,15 @@ export const STOREFRONT_FONTS = [
   },
 ] as const satisfies readonly StorefrontFontDefinition[];
 
+export type StorefrontFontId = (typeof STOREFRONT_FONTS)[number]["id"];
+
+export const STOREFRONT_FONT_IDS = STOREFRONT_FONTS.map((font) => font.id) as [StorefrontFontId, ...StorefrontFontId[]];
+
+/** id로 폰트 정의를 찾습니다. 모르는 id는 등록 순서상 첫 폰트로 둡니다. */
+export function storefrontFontById(id: string) {
+  return STOREFRONT_FONTS.find((font) => font.id === id) ?? STOREFRONT_FONTS[0];
+}
+
 export const STOREFRONT_FONT_FAMILY_VALUES = STOREFRONT_FONTS.map((font) => font.stack) as [string, ...string[]];
 export const STOREFRONT_FONT_FAMILY_SET = new Set<string>(STOREFRONT_FONT_FAMILY_VALUES);
 

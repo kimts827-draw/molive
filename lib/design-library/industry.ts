@@ -13,6 +13,7 @@
  */
 
 import type { SectionTypeId } from "./section-registry.ts";
+import type { StorefrontFontId } from "../fonts/storefront-fonts.ts";
 import type { DensityId, FooterMoodId, HeaderStructureId, HeroVariantId, ImageTreatmentId, ProductPresentationId, TypeScaleId } from "./variants.ts";
 
 export const INDUSTRY_IDS = [
@@ -48,6 +49,10 @@ export type IndustryProfile = {
   presentationPool: ProductPresentationId[];
   footerPool: FooterMoodId[];
   typeScalePool: TypeScaleId[];
+  /** 이 업종의 본문 폰트 후보입니다. plan이 타이포 스케일과 교차해 한 벌을 확정합니다. */
+  bodyFontPool: StorefrontFontId[];
+  /** 제목에만 쓰는 후보입니다. 본문 폰트가 고딕·라운드일 때만 쓰입니다. 없으면 빈 배열입니다. */
+  displayFontPool: StorefrontFontId[];
   imageTreatmentPool: ImageTreatmentId[];
   densityPool: DensityId[];
   /** 본문 섹션 개수 범위(상품 진열 포함). */
@@ -89,6 +94,8 @@ export const INDUSTRY_PROFILES: Record<IndustryId, IndustryProfile> = {
     presentationPool: ["editorial-two", "large-grid"],
     footerPool: ["ink-dark", "paper-light"],
     typeScalePool: ["serif-display", "sans-modern"],
+    bodyFontPool: ["hahmlet", "noto-serif-kr", "pretendard"],
+    displayFontPool: ["black-han-sans"],
     imageTreatmentPool: ["desaturated-editorial", "vivid-clean"],
     densityPool: ["airy", "regular"],
     bodyCount: [4, 6],
@@ -105,6 +112,8 @@ export const INDUSTRY_PROFILES: Record<IndustryId, IndustryProfile> = {
     presentationPool: ["grid-four", "editorial-two", "large-grid"],
     footerPool: ["paper-light", "ink-dark"],
     typeScalePool: ["sans-modern", "serif-display"],
+    bodyFontPool: ["hahmlet", "pretendard", "noto-serif-kr", "gowun-dodum"],
+    displayFontPool: [],
     imageTreatmentPool: ["vivid-clean", "desaturated-editorial", "dark-cinematic"],
     densityPool: ["regular", "airy"],
     bodyCount: [5, 7],
@@ -121,6 +130,8 @@ export const INDUSTRY_PROFILES: Record<IndustryId, IndustryProfile> = {
     presentationPool: ["featured-grid", "grid-four", "large-grid"],
     footerPool: ["warm-tinted", "ink-dark", "paper-light"],
     typeScalePool: ["rounded-warm", "serif-display", "sans-modern"],
+    bodyFontPool: ["gowun-batang", "gowun-dodum", "noto-serif-kr", "pretendard"],
+    displayFontPool: ["jua"],
     imageTreatmentPool: ["warm-film", "vivid-clean"],
     densityPool: ["regular", "airy"],
     bodyCount: [5, 7],
@@ -137,6 +148,8 @@ export const INDUSTRY_PROFILES: Record<IndustryId, IndustryProfile> = {
     presentationPool: ["grid-four", "compact-five", "featured-grid"],
     footerPool: ["paper-light", "warm-tinted"],
     typeScalePool: ["sans-modern", "rounded-warm"],
+    bodyFontPool: ["pretendard", "noto-sans-kr", "gowun-dodum", "ibm-plex-sans-kr"],
+    displayFontPool: [],
     imageTreatmentPool: ["vivid-clean", "warm-film"],
     densityPool: ["regular", "dense"],
     bodyCount: [5, 7],
@@ -153,6 +166,8 @@ export const INDUSTRY_PROFILES: Record<IndustryId, IndustryProfile> = {
     presentationPool: ["compact-five", "grid-four"],
     footerPool: ["ink-dark", "paper-light"],
     typeScalePool: ["sans-modern"],
+    bodyFontPool: ["ibm-plex-sans-kr", "pretendard", "noto-sans-kr"],
+    displayFontPool: ["black-han-sans"],
     imageTreatmentPool: ["dark-cinematic", "vivid-clean"],
     densityPool: ["dense", "regular"],
     bodyCount: [5, 7],
@@ -169,6 +184,8 @@ export const INDUSTRY_PROFILES: Record<IndustryId, IndustryProfile> = {
     presentationPool: ["large-grid", "editorial-two", "grid-four"],
     footerPool: ["paper-light", "ink-dark"],
     typeScalePool: ["serif-display", "sans-modern"],
+    bodyFontPool: ["noto-serif-kr", "gowun-batang", "pretendard", "hahmlet"],
+    displayFontPool: [],
     imageTreatmentPool: ["desaturated-editorial", "vivid-clean", "warm-film"],
     densityPool: ["airy", "regular"],
     bodyCount: [5, 7],
@@ -185,6 +202,8 @@ export const INDUSTRY_PROFILES: Record<IndustryId, IndustryProfile> = {
     presentationPool: ["compact-five", "grid-four", "featured-grid"],
     footerPool: ["paper-light", "warm-tinted"],
     typeScalePool: ["bold-retail", "sans-modern", "rounded-warm"],
+    bodyFontPool: ["noto-sans-kr", "pretendard", "gowun-dodum"],
+    displayFontPool: ["black-han-sans"],
     imageTreatmentPool: ["saturated-pop", "vivid-clean"],
     densityPool: ["dense", "regular"],
     bodyCount: [5, 7],
@@ -201,6 +220,8 @@ export const INDUSTRY_PROFILES: Record<IndustryId, IndustryProfile> = {
     presentationPool: ["grid-four", "editorial-two", "large-grid"],
     footerPool: ["paper-light", "ink-dark", "warm-tinted"],
     typeScalePool: ["serif-display", "sans-modern", "rounded-warm"],
+    bodyFontPool: ["noto-serif-kr", "gowun-batang", "pretendard", "hahmlet"],
+    displayFontPool: [],
     imageTreatmentPool: ["desaturated-editorial", "vivid-clean", "warm-film"],
     densityPool: ["airy", "regular"],
     bodyCount: [4, 6],
@@ -217,6 +238,8 @@ export const INDUSTRY_PROFILES: Record<IndustryId, IndustryProfile> = {
     presentationPool: ["compact-five", "grid-four", "featured-grid"],
     footerPool: ["warm-tinted", "paper-light"],
     typeScalePool: ["rounded-warm", "bold-retail", "sans-modern"],
+    bodyFontPool: ["gowun-dodum", "noto-sans-kr", "pretendard"],
+    displayFontPool: ["jua"],
     imageTreatmentPool: ["saturated-pop", "vivid-clean", "warm-film"],
     densityPool: ["dense", "regular"],
     bodyCount: [5, 7],
@@ -233,6 +256,8 @@ export const INDUSTRY_PROFILES: Record<IndustryId, IndustryProfile> = {
     presentationPool: ["featured-grid", "grid-four", "large-grid"],
     footerPool: ["warm-tinted", "paper-light"],
     typeScalePool: ["rounded-warm", "bold-retail", "sans-modern"],
+    bodyFontPool: ["gowun-dodum", "noto-sans-kr", "pretendard"],
+    displayFontPool: ["jua"],
     imageTreatmentPool: ["saturated-pop", "vivid-clean", "warm-film"],
     densityPool: ["regular", "dense"],
     bodyCount: [5, 7],
@@ -249,6 +274,8 @@ export const INDUSTRY_PROFILES: Record<IndustryId, IndustryProfile> = {
     presentationPool: ["large-grid", "grid-four", "compact-five"],
     footerPool: ["ink-dark", "paper-light"],
     typeScalePool: ["sans-modern"],
+    bodyFontPool: ["pretendard", "ibm-plex-sans-kr", "noto-sans-kr"],
+    displayFontPool: ["black-han-sans"],
     imageTreatmentPool: ["dark-cinematic", "vivid-clean"],
     densityPool: ["regular", "dense"],
     bodyCount: [5, 7],
@@ -265,6 +292,8 @@ export const INDUSTRY_PROFILES: Record<IndustryId, IndustryProfile> = {
     presentationPool: ["grid-four", "compact-five", "large-grid"],
     footerPool: ["ink-dark", "paper-light"],
     typeScalePool: ["sans-modern"],
+    bodyFontPool: ["ibm-plex-sans-kr", "pretendard", "noto-sans-kr"],
+    displayFontPool: [],
     imageTreatmentPool: ["dark-cinematic", "vivid-clean"],
     densityPool: ["dense", "regular"],
     bodyCount: [5, 7],
@@ -281,6 +310,8 @@ export const INDUSTRY_PROFILES: Record<IndustryId, IndustryProfile> = {
     presentationPool: ["grid-four", "large-grid", "editorial-two", "featured-grid", "compact-five"],
     footerPool: ["paper-light", "ink-dark", "warm-tinted"],
     typeScalePool: ["bold-retail", "sans-modern", "serif-display", "rounded-warm"],
+    bodyFontPool: ["pretendard", "noto-sans-kr", "gowun-dodum", "noto-serif-kr"],
+    displayFontPool: ["black-han-sans"],
     imageTreatmentPool: ["vivid-clean", "saturated-pop", "desaturated-editorial", "warm-film", "dark-cinematic"],
     densityPool: ["regular", "airy", "dense"],
     bodyCount: [4, 7],
