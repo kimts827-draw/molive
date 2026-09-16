@@ -161,6 +161,11 @@ test("상품 슬롯 geometry는 코드 소유라 AI 레이아웃이 진열을 �
     // 부모 지면 자체가 좁을 때만 작동하는 하한선입니다. 정상 지면에서는 margin이 정확히 0이 됩니다.
     assert.match(css, /min-width:min\(55vw, 800px\)!important/);
     assert.match(css, /margin-left:min\(0px,calc\(\(100% - min\(55vw, 800px\)\) \/ 2\)\)!important/);
+    /**
+     * container 규칙의 padding은 부모 폭 기준이라, AI가 같은 섹션을 이미 1200px로 묶어 두면
+     * 1200 안에서 좌우를 한 번 더 깎습니다(실측 495px). 상품 섹션의 바깥 상자는 코드가 가집니다.
+     */
+    assert.match(css, /\[data-moire-container\]:has\(\[data-cafe24-slot="product-list"\]\)\{width:auto!important;max-width:none!important\}/);
   }
   // AI CSS는 슬롯 셀렉터를 가질 수 없어 이 계약을 되돌릴 방법이 없습니다.
   const aimedAtSlot = isolateAiDesignCss('[data-moire-root="x"] [data-cafe24-slot="product-list"]{width:240px}');

@@ -407,6 +407,23 @@ export type VerifiedProductLayoutOptions = {
 const PRODUCT_SLOT = '[data-moire-root] [data-cafe24-slot="product-list"]';
 
 /**
+ * 상품 슬롯을 품은, plan이 지면을 정한 섹션입니다.
+ *
+ * plan-layout-css의 container 규칙은 `padding-inline:max(gutter,calc((100% - 1200px)/2))`로
+ * 지면을 만드는데, 이 100%는 그 섹션이 아니라 부모의 폭입니다. 그래서 섹션이 전폭일 때만
+ * 안쪽이 정확히 1200px이 되고, AI가 같은 섹션에 max-width:1200px이나 width:min(…,1200px)을
+ * 이미 걸어 두면 1200짜리 상자에서 좌우를 한 번 더 깎아 콘텐츠가 495px까지 줄어듭니다.
+ * (1905px 부모 기준 padding 352.5px × 2 — 실제 프로젝트에서 관측된 값입니다.)
+ *
+ * container 축은 코드가 소유하므로 그 계산의 전제를 코드가 직접 참으로 만듭니다.
+ * full-bleed가 이미 같은 이유로 max-width:none을 쓰고 있고, 여기서는 그 처리를
+ * 상품 섹션에만 한정합니다. 다른 섹션의 배경 폭은 건드리지 않습니다.
+ *
+ * :has()를 모르는 브라우저는 이 규칙만 통째로 무시하고 지금까지의 동작을 그대로 유지합니다.
+ */
+const PRODUCT_FRAME = '[data-moire-root] [data-moire-container]:has([data-cafe24-slot="product-list"])';
+
+/**
  * 상품 진열이 좁은 지면에 갇혔을 때 되찾는 최소 가로 폭입니다.
  *
  * "정상 레이아웃은 절대 건드리지 않는다"가 이 값의 유일한 기준이라 일부러 낮게 잡았습니다.
@@ -435,7 +452,8 @@ const PRODUCT_SLOT_FLOOR = "min(55vw, 800px)";
 function productSlotGeometryCss() {
   return `/* 상품 슬롯 geometry는 코드 소유입니다. AI 레이아웃이 진열을 좁히는 경로만 막습니다. */
 ${PRODUCT_SLOT}{display:block!important;box-sizing:border-box!important;position:static!important;float:none!important;transform:none!important;width:100%!important;max-width:none!important;padding-inline:0!important;grid-column:1/-1!important;justify-self:stretch!important;align-self:stretch!important;flex:1 1 100%!important}
-${PRODUCT_SLOT}{min-width:${PRODUCT_SLOT_FLOOR}!important;margin-left:min(0px,calc((100% - ${PRODUCT_SLOT_FLOOR}) / 2))!important;margin-right:0!important}`;
+${PRODUCT_SLOT}{min-width:${PRODUCT_SLOT_FLOOR}!important;margin-left:min(0px,calc((100% - ${PRODUCT_SLOT_FLOOR}) / 2))!important;margin-right:0!important}
+${PRODUCT_FRAME}{width:auto!important;max-width:none!important}`;
 }
 
 export function verifiedProductLayoutCss(
