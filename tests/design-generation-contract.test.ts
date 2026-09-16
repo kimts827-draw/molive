@@ -62,6 +62,52 @@ test("Header·중복/비어있지 않은 상품 슬롯·verified 상품 CSS·얕
   }
 });
 
+const frameHtml = `<div data-moire-root="frame-test">
+  <main>
+    <section data-moire-id="hero" data-moire-type="hero"><h1>Brand</h1></section>
+    <section data-moire-id="category" data-moire-type="section"><p>Collection</p></section>
+    <section class="shopProducts" data-moire-id="products" data-moire-type="products">
+      <div class="shopProducts__intro"><h2>신상품</h2><a class="shopProducts__more" href="/product/list.html">전체 보기</a></div>
+      <div class="shopProducts__slot" data-cafe24-slot="product-list"></div>
+    </section>
+    <section data-moire-id="story" data-moire-type="section"><p>Story</p></section>
+  </main>
+</div>`;
+const frameCodes = (css: string) =>
+  validateGeneratedDesignContract({ html: frameHtml, css: `${css}\n@media(max-width:767px){[data-moire-root="frame-test"] section{padding:48px 20px}}` }).map((item) => item.code);
+
+test("상품 슬롯을 굶기는 프레임(좁은 measure·다중 트랙 grid)은 생성 단계에서 되돌린다", () => {
+  assert.ok(frameCodes('[data-moire-root="frame-test"] .shopProducts{max-width:420px;margin:0 auto}').includes("PRODUCT_FRAME_NARROW"));
+  assert.ok(frameCodes('[data-moire-root="frame-test"] .shopProducts{width:min(100% - 64px, 520px)}').includes("PRODUCT_FRAME_NARROW"));
+  assert.ok(frameCodes('[data-moire-root="frame-test"] .shopProducts__slot{max-width:26rem}').includes("PRODUCT_FRAME_NARROW"));
+  assert.ok(frameCodes('[data-moire-root="frame-test"] .shopProducts{display:grid;grid-template-columns:repeat(4, 1fr);gap:24px}').includes("PRODUCT_FRAME_GRID_TRACK"));
+  assert.ok(frameCodes('[data-moire-root="frame-test"] .shopProducts{display:grid;grid-template-columns:280px 1fr}').includes("PRODUCT_FRAME_GRID_TRACK"));
+  assert.ok(frameCodes('[data-moire-root="frame-test"] .shopProducts{display:grid;grid-auto-flow:column}').includes("PRODUCT_FRAME_GRID_TRACK"));
+  // class 대신 편집 ID로 지면을 잡아도 같은 계약입니다.
+  assert.ok(frameCodes('[data-moire-root="frame-test"] [data-moire-id="products"]{max-width:480px}').includes("PRODUCT_FRAME_NARROW"));
+});
+
+test("정상 상품 프레임은 좁은 자식·모바일 override·단일 트랙 grid까지 통과시킨다", () => {
+  // 위반 하나가 생성 1건을 통째로 재시도시키므로 오탐이 없어야 합니다.
+  for (const css of [
+    '[data-moire-root="frame-test"] .shopProducts{width:min(100% - 64px, 1200px);margin:0 auto}',
+    '[data-moire-root="frame-test"] .shopProducts{width:calc(100% - 40px)}',
+    '[data-moire-root="frame-test"] .shopProducts{display:grid;grid-template-columns:repeat(1, 1fr);row-gap:40px}',
+    '[data-moire-root="frame-test"] .shopProducts{display:grid;grid-template-columns:1fr}',
+    // 좁은 것은 슬롯이 아니라 그 옆 카피·링크입니다.
+    '[data-moire-root="frame-test"] .shopProducts__intro p{max-width:420px}',
+    '[data-moire-root="frame-test"] .shopProducts__more{max-width:180px}',
+    // 다중 트랙 grid지만 슬롯의 부모가 아니라 헤딩 줄입니다.
+    '[data-moire-root="frame-test"] .shopProducts__intro{display:grid;grid-template-columns:1fr auto}',
+    // 좁은 화면에서 좁아지는 것은 정상입니다.
+    '[data-moire-root="frame-test"] .shopProducts{width:min(100% - 64px, 1200px)}\n@media(max-width:600px){[data-moire-root="frame-test"] .shopProducts{max-width:360px}}',
+  ]) {
+    const codes = frameCodes(css);
+    assert.equal(codes.includes("PRODUCT_FRAME_NARROW"), false, css);
+    assert.equal(codes.includes("PRODUCT_FRAME_GRID_TRACK"), false, css);
+  }
+});
+
 test("AI CSS의 !important는 고정 Header/Product 격리를 우회할 수 없어 거부한다", () => {
   const codes = validateGeneratedDesignContract({ html: validHtml, css: `${validCss}\n[data-moire-root="quality-test"] img{width:1px!important}` }).map((item) => item.code);
   assert.ok(codes.includes("CSS_IMPORTANT_FORBIDDEN"));

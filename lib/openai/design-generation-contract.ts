@@ -52,6 +52,144 @@ const PRODUCT_SELECTORS = [
   ".icon__box",
 ] as const;
 
+/**
+ * 상품 슬롯을 감싸는 지면이 진열을 굶기는지 봅니다.
+ *
+ * 슬롯 안쪽은 전부 "부모의 100%" 기준이라 프레임이 좁으면 썸네일과 글자까지 같이 줄어듭니다.
+ * 렌더링 단계에서는 fixed-components의 슬롯 geometry 계약이 이미 되돌리지만, 그건 증상을 막는
+ * 마지막 방어선이고 여기서는 AI가 애초에 그런 프레임을 짜지 않게 되돌려 보냅니다.
+ *
+ * 위반 하나가 생성 1건을 통째로 재시도시키므로 오탐이 없는 두 가지만 봅니다.
+ * 1) 슬롯의 조상에 걸린 좁은 절대 measure(720px 미만)
+ * 2) 슬롯 바로 위 부모의 다중 트랙 grid — 슬롯이 그 중 한 칸에 갇힙니다
+ * 둘 다 @media 안의 선언은 보지 않습니다. 좁은 화면에서 좁아지는 것은 정상입니다.
+ */
+const PRODUCT_FRAME_MIN_WIDTH = 720;
+
+/** at-rule 블록을 통째로 지워 무조건 적용되는 규칙만 남깁니다. */
+function stripAtRuleBlocks(css: string) {
+  let output = "";
+  let cursor = 0;
+  while (cursor < css.length) {
+    const at = css.indexOf("@", cursor);
+    if (at < 0) return output + css.slice(cursor);
+    const open = css.indexOf("{", at);
+    if (open < 0) return output + css.slice(cursor, at);
+    output += css.slice(cursor, at);
+    let depth = 1;
+    let index = open + 1;
+    while (index < css.length && depth > 0) {
+      if (css[index] === "{") depth += 1;
+      else if (css[index] === "}") depth -= 1;
+      index += 1;
+    }
+    cursor = index;
+  }
+  return output;
+}
+
+/** 이 요소를 가리킬 수 있는 셀렉터 토큰입니다. AI CSS가 실제로 쓰는 class·id·편집 ID만 봅니다. */
+function elementTokens(attributes: string) {
+  const tokens = new Set<string>();
+  for (const value of attributes.match(/class\s*=\s*["']([^"']*)["']/i)?.[1]?.split(/\s+/) ?? []) if (value) tokens.add(`.${value}`);
+  const id = attributes.match(/\bid\s*=\s*["']([^"']*)["']/i)?.[1];
+  if (id) tokens.add(`#${id}`);
+  const nodeId = attributes.match(/data-moire-id\s*=\s*["']([^"']*)["']/i)?.[1];
+  if (nodeId) tokens.add(`[data-moire-id="${nodeId}"]`);
+  return tokens;
+}
+
+/**
+ * 슬롯 자신과 그 조상들의 class/id 토큰입니다.
+ * frame은 바깥에서 안쪽 순서이고 마지막 원소가 슬롯 자신, parent는 그 바로 위입니다.
+ */
+function productSlotFrameTokens(html: string) {
+  const slotAt = html.search(/<[a-z][a-z0-9-]*\b[^>]*data-cafe24-slot\s*=\s*["']product-list["']/i);
+  if (slotAt < 0) return { frame: [] as Array<Set<string>>, parent: undefined as Set<string> | undefined };
+  const stack: Array<{ tag: string; tokens: Set<string> }> = [];
+  const tagPattern = /<(\/?)([a-z][a-z0-9-]*)\b([^>]*)>/gi;
+  for (const match of html.slice(0, slotAt).matchAll(tagPattern)) {
+    const [raw, closing, tag, attributes] = match;
+    if (closing) {
+      for (let index = stack.length - 1; index >= 0; index -= 1) {
+        if (stack[index].tag === tag.toLowerCase()) { stack.length = index; break; }
+      }
+      continue;
+    }
+    if (raw.endsWith("/>") || /^(?:img|br|hr|input|meta|link|source|track|area|base|col|embed|param|wbr)$/i.test(tag)) continue;
+    stack.push({ tag: tag.toLowerCase(), tokens: elementTokens(attributes) });
+  }
+  const parent = stack[stack.length - 1]?.tokens;
+  const slotAttributes = html.slice(slotAt).match(/^<[a-z][a-z0-9-]*\b([^>]*)>/i)?.[1] ?? "";
+  return { frame: [...stack.map((entry) => entry.tokens), elementTokens(slotAttributes)], parent };
+}
+
+/** 셀렉터가 가리키는 대상(마지막 compound)의 토큰입니다. 상태·가상요소가 붙으면 보지 않습니다. */
+function selectorSubjectTokens(selector: string) {
+  const subject = selector.trim().split(/[\s>+~]+/).filter(Boolean).pop() ?? "";
+  if (!subject || /::|:/.test(subject)) return null;
+  const tokens = subject.match(/\[data-moire-id\s*=\s*["'][^"']*["']\]|[.#][A-Za-z_-][\w-]*/g);
+  return tokens?.length ? tokens.map((token) => token.replace(/\[data-moire-id\s*=\s*["']([^"']*)["']\]/, '[data-moire-id="$1"]')) : null;
+}
+
+/** 값이 좁은 절대 measure인지 봅니다. bare length와 min()/clamp()의 마지막 인자만 봅니다. */
+function narrowMeasure(value: string) {
+  const trimmed = value.trim();
+  const functional = trimmed.match(/^(?:min|clamp)\(([\s\S]*)\)$/i);
+  const candidate = functional ? functional[1].split(",").pop()?.trim() ?? "" : trimmed;
+  const length = candidate.match(/^(\d+(?:\.\d+)?)(px|rem)$/i);
+  if (!length) return null;
+  const pixels = Number(length[1]) * (length[2].toLowerCase() === "rem" ? 16 : 1);
+  return pixels > 0 && pixels < PRODUCT_FRAME_MIN_WIDTH ? trimmed : null;
+}
+
+/** grid-template-columns가 두 칸 이상인지 봅니다. repeat(1,…)과 단일 트랙은 넘어갑니다. */
+function multiTrackGrid(body: string) {
+  if (/grid-auto-flow\s*:\s*column/i.test(body)) return "grid-auto-flow:column";
+  const columns = body.match(/grid-template-columns\s*:\s*([^;]+)/i)?.[1]?.trim();
+  if (!columns) return null;
+  const repeat = columns.match(/^repeat\(\s*([^,]+),/i)?.[1]?.trim();
+  if (repeat) return repeat === "1" ? null : `grid-template-columns:${columns}`;
+  const tracks = columns.split(/\s+/).filter(Boolean);
+  return tracks.length > 1 ? `grid-template-columns:${columns}` : null;
+}
+
+function productFrameViolations(html: string, css: string): SafetyViolation[] {
+  const { frame, parent } = productSlotFrameTokens(html);
+  if (!frame.length) return [];
+  const violations: SafetyViolation[] = [];
+  for (const rule of stripAtRuleBlocks(css).matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    const [, selectorList, body] = rule;
+    for (const selector of selectorList.split(",")) {
+      const subject = selectorSubjectTokens(selector);
+      if (!subject) continue;
+      const target = frame.find((tokens) => subject.every((token) => tokens.has(token)));
+      if (!target) continue;
+      for (const declaration of body.matchAll(/(?:^|;)\s*(max-width|width)\s*:\s*([^;]+)/gi)) {
+        const measure = narrowMeasure(declaration[2]);
+        if (!measure) continue;
+        violations.push({
+          code: "PRODUCT_FRAME_NARROW",
+          message: "상품 슬롯을 감싸는 지면은 좁은 measure로 묶을 수 없습니다. 슬롯 안쪽은 부모 폭의 100%라 진열 전체가 같이 줄어듭니다.",
+          token: `${selector.trim()} { ${declaration[1]}: ${measure} }`,
+        });
+        break;
+      }
+      if (target === parent) {
+        const tracks = multiTrackGrid(body);
+        if (tracks) {
+          violations.push({
+            code: "PRODUCT_FRAME_GRID_TRACK",
+            message: "상품 슬롯의 부모를 다중 컬럼 grid로 만들 수 없습니다. 슬롯이 트랙 한 칸에 갇혀 진열이 그 폭으로 줄어듭니다.",
+            token: `${selector.trim()} { ${tracks} }`,
+          });
+        }
+      }
+    }
+  }
+  return violations;
+}
+
 function productSlotsAreEmpty(html: string, expectedCount: number) {
   const pattern = /<([a-z][a-z0-9-]*)\b[^>]*data-cafe24-slot\s*=\s*["']product-list["'][^>]*>([\s\S]*?)<\/\1\s*>/gi;
   const matches = [...html.matchAll(pattern)];
@@ -106,6 +244,7 @@ export function validateGeneratedDesignContract(
 
   if (slots !== 1) violations.push({ code: "PRODUCT_SLOT_COUNT", message: "AI 생성 페이지에는 product-list 슬롯이 정확히 하나 있어야 합니다." });
   if (slots > 0 && !productSlotsAreEmpty(source.html, slots)) violations.push({ code: "PRODUCT_SLOT_NOT_EMPTY", message: "product-list 슬롯 내부는 verified ProductSection이 소유하므로 비어 있어야 합니다." });
+  if (slots > 0) violations.push(...productFrameViolations(source.html, source.css));
   if (/<header\b/i.test(source.html)) violations.push({ code: "GENERATED_HEADER", message: "HeaderV1이 헤더를 소유하므로 AI HTML에 header 요소를 만들 수 없습니다." });
   if (!/data-moire-type\s*=\s*["']hero["']/i.test(source.html)) violations.push({ code: "MISSING_HERO", message: "완성된 쇼핑몰 구성을 위해 hero 섹션이 필요합니다." });
   if (sections < 3) violations.push({ code: "INSUFFICIENT_PAGE_COMPOSITION", message: "Hero와 상품 외에도 브랜드에 맞는 지원 섹션을 포함해 최소 세 개의 section 구성이 필요합니다." });

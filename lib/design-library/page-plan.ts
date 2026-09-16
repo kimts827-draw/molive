@@ -558,7 +558,7 @@ export function renderPagePlanContract(plan: PagePlan): string {
     const definition = SECTION_TYPES[section.type];
     const variant = definition.variants[section.variant] ?? Object.values(definition.variants)[0];
     const slot = section.type === "featuredProducts"
-      ? " ← 이 자리에 비어 있는 data-cafe24-slot=\"product-list\" wrapper를 두고 주변 프레임(헤딩·카피·배경)만 작성한다."
+      ? " ← 이 자리에 비어 있는 data-cafe24-slot=\"product-list\" wrapper를 두고 주변 프레임(헤딩·카피·배경)만 작성한다. wrapper는 섹션의 전폭 block 자식이어야 한다. 부모를 다중 컬럼 grid나 가로 flex로 만들어 wrapper를 한 칸에 넣지 않고, wrapper와 그 조상에 720px 미만의 width/max-width를 걸지 않는다."
       : "";
     const headline = section.headline.trim() ? `\n   헤딩 초안: ${section.headline.trim()}` : "";
     return `${index + 2}. [${section.type}/${variant.id}] ${definition.name} — ${variant.name}\n   구조: ${variant.spec}\n   축: ${axisLine(section)}\n   의도: ${section.intent}${headline}${slot}`;

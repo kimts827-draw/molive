@@ -94,7 +94,8 @@ test("썸네일 비율 override는 값이 있을 때만 상품 CSS에 더해진�
   assert.match(overridden, /aspect-ratio:3\/4/);
   // Cafe24 상품 binding과 카드 DOM은 CSS로만 다루고 마크업은 건드리지 않습니다.
   assert.equal(overridden.includes("{$image_medium}"), false);
-  assert.equal(overridden.includes("!important"), false);
+  // 덧붙는 비율 layer는 순수 재선언입니다. base의 슬롯 geometry 계약만 !important를 씁니다.
+  assert.equal(overridden.slice(base.length).includes("!important"), false);
   assert.ok(overridden.includes('[data-cafe24-slot] .moireProductSection'), "검증된 상품 영역 안에만 적용됩니다.");
 });
 

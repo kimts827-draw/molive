@@ -145,6 +145,29 @@ test("AI CSS는 unlayered static scope로 Guide보다 강하고 Product boundary
   assert.ok(responsive.includes("transform-origin:center center"));
 });
 
+test("상품 슬롯 geometry는 코드 소유라 AI 레이아웃이 진열을 좁히지 못한다", () => {
+  const outputs = [
+    verifiedProductLayoutCss(),
+    verifiedProductLayoutCss("editorial-two", "3:4"),
+    verifiedProductLayoutCss("grid-four", undefined, { productDisplay: "grid3_slide list_gallery", target: "preview" }),
+    verifiedProductLayoutCss("grid-four", undefined, { productDisplay: "grid5", target: "cafe24" }),
+  ];
+  for (const css of outputs) {
+    // 슬롯을 grid/flex 트랙 한 칸에 넣거나 inline style로 좁히는 경로를 모두 되돌립니다.
+    assert.match(css, /\[data-moire-root\] \[data-cafe24-slot="product-list"\]\{display:block!important/);
+    assert.match(css, /width:100%!important;max-width:none!important/);
+    assert.match(css, /grid-column:1\/-1!important/);
+    assert.match(css, /flex:1 1 100%!important/);
+    // 부모 지면 자체가 좁을 때만 작동하는 하한선입니다. 정상 지면에서는 margin이 정확히 0이 됩니다.
+    assert.match(css, /min-width:min\(55vw, 800px\)!important/);
+    assert.match(css, /margin-left:min\(0px,calc\(\(100% - min\(55vw, 800px\)\) \/ 2\)\)!important/);
+  }
+  // AI CSS는 슬롯 셀렉터를 가질 수 없어 이 계약을 되돌릴 방법이 없습니다.
+  const aimedAtSlot = isolateAiDesignCss('[data-moire-root="x"] [data-cafe24-slot="product-list"]{width:240px}');
+  assert.match(aimedAtSlot, /\[data-cafe24-slot="product-list"\]:where\(:not\(\[data-cafe24-slot\], \[data-cafe24-slot\] \*\)\)/);
+  assert.equal(aimedAtSlot.includes("!important;"), false);
+});
+
 test("AI static root 표식은 Preview/Cafe24 공통 본문에만 추가된다", () => {
   const preview = composeCommerce(body, "preview", {}, undefined, { includeHeader: false }).html;
   const cafe24 = composeCommerce(body, "cafe24", {}, undefined, { includeHeader: false }).html;

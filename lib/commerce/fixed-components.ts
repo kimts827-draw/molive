@@ -403,6 +403,41 @@ export type VerifiedProductLayoutOptions = {
   target?: RenderMode;
 };
 
+/** 상품 슬롯 wrapper의 선택자입니다. 이 요소는 AI HTML에 있지만 geometry는 코드가 소유합니다. */
+const PRODUCT_SLOT = '[data-moire-root] [data-cafe24-slot="product-list"]';
+
+/**
+ * 상품 진열이 좁은 지면에 갇혔을 때 되찾는 최소 가로 폭입니다.
+ *
+ * "정상 레이아웃은 절대 건드리지 않는다"가 이 값의 유일한 기준이라 일부러 낮게 잡았습니다.
+ * 실측한 정상 상품 지면은 화면 폭의 68%(1440px에서 975px)·85%(1024px에서 874px)·90%(390px에서 350px)라
+ * 55vw 항이 모든 구간에서 그 아래에 있고, 큰 모니터에서는 정상 지면이 1200~1560px에 고정되므로
+ * 800px 상한이 그 아래를 유지합니다. 갇힌 진열(스크린샷의 195~420px)만 여기까지 되돌아옵니다.
+ */
+const PRODUCT_SLOT_FLOOR = "min(55vw, 800px)";
+
+/**
+ * 상품 슬롯의 상자만 코드 소유로 못 박습니다.
+ *
+ * 슬롯 안쪽(.moireProductSection)은 전부 "부모의 100%" 기준이라, AI가 슬롯을 grid/flex 트랙 한 칸에
+ * 넣거나 좁은 measure 안에 가두면 썸네일과 글자까지 통째로 줄어듭니다. 그런데 isolateAiDesignCss가
+ * 모든 AI 셀렉터에 :where(:not([data-cafe24-slot], [data-cafe24-slot] *)) 경계를 붙이므로
+ * AI는 슬롯을 좁힐 수는 있어도 되돌릴 수는 없습니다. 그 한쪽 방향만 여기서 막습니다.
+ * AI CSS는 계약상 !important를 쓸 수 없어(CSS_IMPORTANT_FORBIDDEN) 이 경계도 한 방향으로만 작동하고,
+ * AI가 슬롯 요소에 inline style을 달아도 !important가 이깁니다.
+ *
+ * 1) 첫 블록 — 슬롯을 항상 전폭 block으로 되돌립니다. grid/flex 부모에서도 한 줄을 다 차지합니다.
+ * 2) 둘째 블록 — 부모 자체가 좁을 때만 작동하는 하한선입니다. 음수 margin은 min(0px, …)로 잠가 두어
+ *    지면이 충분한 정상 레이아웃에서는 정확히 0이 되고, 갇혔을 때만 좌우 대칭으로 풀려 가운데에 섭니다.
+ *    조상의 width/max-width를 :has()로 지우는 방법은 정상 섹션까지 전폭으로 풀어 헤딩을 화면 끝에
+ *    붙여 버리므로 쓰지 않습니다.
+ */
+function productSlotGeometryCss() {
+  return `/* 상품 슬롯 geometry는 코드 소유입니다. AI 레이아웃이 진열을 좁히는 경로만 막습니다. */
+${PRODUCT_SLOT}{display:block!important;box-sizing:border-box!important;position:static!important;float:none!important;transform:none!important;width:100%!important;max-width:none!important;padding-inline:0!important;grid-column:1/-1!important;justify-self:stretch!important;align-self:stretch!important;flex:1 1 100%!important}
+${PRODUCT_SLOT}{min-width:${PRODUCT_SLOT_FLOOR}!important;margin-left:min(0px,calc((100% - ${PRODUCT_SLOT_FLOOR}) / 2))!important;margin-right:0!important}`;
+}
+
 export function verifiedProductLayoutCss(
   layout: ProductLayout = "grid-four",
   thumbRatioOverride?: string,
@@ -417,7 +452,7 @@ export function verifiedProductLayoutCss(
    * 여기서 한 번만 실립니다. canonical의 우측 상단 세로 배치를 바로 뒤에서 덮으므로
    * 전시를 아직 고르지 않은 기존 프로젝트도 같은 hover 오버레이로 동작합니다.
    */
-  const canonical = `${stronglyScopeProductCss(renderVerifiedProductSection("preview").css)}\n${contentContract}\n${cardQuickActionCss()}`;
+  const canonical = `${stronglyScopeProductCss(renderVerifiedProductSection("preview").css)}\n${productSlotGeometryCss()}\n${contentContract}\n${cardQuickActionCss()}`;
   /**
    * Cafe24 전시 토큰이 정해져 있으면 그 전시만 씁니다.
    * reference 12종에는 이미지 크롭이 전혀 없으므로 여기서는 비율 override도 얹지 않고
