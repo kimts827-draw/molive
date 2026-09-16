@@ -60,7 +60,7 @@ test("프롬프트 생성 기능은 유지하고 기본 버튼 문구는 생성�
 });
 
 test("업종별 실제 결과 이미지를 crop preview와 전체 보기로 제공한다", () => {
-  for (const [category, filename] of [["유아동 / 베이비", "baby.png"], ["유아동 / 키즈", "kids.png"], ["패션 / 스트리트", "streetfashion.png"], ["패션잡화 / 주얼리", "jewelry.png"]]) {
+  for (const [category, filename] of [["유아동 / 베이비", "baby.png"], ["유아동 / 키즈", "kids.png"], ["패션 / 스트리트", "streetfashion-v2.png"], ["패션잡화 / 주얼리", "jewelry.png"]]) {
     assert.match(templateCatalog, new RegExp(category));
     assert.match(templateCatalog, new RegExp(`/templates/${filename}`));
   }

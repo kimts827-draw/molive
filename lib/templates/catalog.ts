@@ -39,7 +39,7 @@ export const templateCatalog: readonly TemplateItem[] = [
     mood: "대담하고 감각적인 분위기",
     brandColor: "#171717",
     prompt: "도시적이고 대담한 스트리트 패션 브랜드 쇼핑몰을 만들어줘. 블랙과 뉴트럴 컬러를 기반으로 강한 타이포그래피, 룩북형 비주얼, 신상품 드롭과 스타일링 콘텐츠가 돋보이게 구성해줘.",
-    image: { src: "/templates/streetfashion.png", width: 1027, height: 6290, position: "50% 0%" },
+    image: { src: "/templates/streetfashion-v2.png", width: 1027, height: 6072, position: "50% 0%" },
   },
   {
     id: "minimal-jewelry",
